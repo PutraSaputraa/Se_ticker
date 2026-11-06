@@ -64,6 +64,58 @@ const volumeStatuses = {
   false: { label: 'Di bawah ambang', className: 'below' },
   null: { label: 'Tidak tersedia', className: 'missing' },
 };
+const volumeSessionLabels = ['Sesi acuan', 'Sesi sebelum acuan'];
+
+function summarizeBuyVolume({ minimumVolume, volumeChecks }) {
+  const results = volumeChecks.map(({ meetsThreshold }) => meetsThreshold);
+  const passed = results.filter((meetsThreshold) => meetsThreshold === true).length;
+  const hasMissing = results.includes(null);
+  const threshold = formatVolume(minimumVolume);
+
+  if (passed === 2) {
+    return {
+      label: 'BUY YES',
+      className: 'pass',
+      reason: `2 dari 2 sesi lolos ambang ${threshold}.`,
+    };
+  }
+
+  if (passed === 1) {
+    const session = volumeSessionLabels[results.indexOf(true)];
+    const reason = hasMissing
+      ? `${session} lolos ambang ${threshold}. Data sesi lainnya belum tersedia.`
+      : `1 dari 2 sesi lolos. ${session} mencapai ambang ${threshold}.`;
+    return { label: 'BUY YES', className: 'pass', reason };
+  }
+
+  if (hasMissing) {
+    return {
+      label: 'Belum tersedia',
+      className: 'missing',
+      reason: 'Data volume belum lengkap untuk menilai syarat BUY.',
+    };
+  }
+
+  return {
+    label: 'BUY NO',
+    className: 'below',
+    reason: `Volume kedua sesi berada di bawah ambang ${threshold}.`,
+  };
+}
+
+function BuyVolumeSummary({ trigger }) {
+  const { label, className, reason } = summarizeBuyVolume(trigger);
+
+  return (
+    <section className="buy-volume-summary" aria-label="Status BUY berdasarkan volume">
+      <strong className={`volume-status volume-status--${className}`}>{label}</strong>
+      <div>
+        <p className="buy-volume-context">Berdasarkan volume</p>
+        <p>{reason}</p>
+      </div>
+    </section>
+  );
+}
 
 function VolumeChecks({ trigger }) {
   const { averageVolume, minimumVolume, volumeChecks } = trigger;
@@ -88,7 +140,7 @@ function VolumeChecks({ trigger }) {
       )}
       <ul>
         {volumeChecks.map(({ date, volume, meetsThreshold }, index) => {
-          const label = index === 0 ? 'Sesi acuan' : 'Sesi sebelum acuan';
+          const label = volumeSessionLabels[index];
           const status = volumeStatuses[meetsThreshold];
           return (
             <li key={label}>
@@ -142,6 +194,7 @@ function QuoteCard({ quote }) {
           )}
         </div>
       </div>
+      {buyTrigger && <BuyVolumeSummary trigger={buyTrigger} />}
       <dl className="quote-details" aria-label="OHLCV sesi acuan">
         <div>
           <dt>Buka</dt>

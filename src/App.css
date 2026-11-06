@@ -382,6 +382,34 @@ h1 {
   margin-top: 0.5rem;
 }
 
+.buy-volume-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem clamp(1rem, 4vw, 1.5rem);
+  border-bottom: 1px solid var(--border);
+  background: #f7faf6;
+}
+
+.buy-volume-summary .volume-status {
+  flex-shrink: 0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.buy-volume-summary p {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.buy-volume-summary .buy-volume-context {
+  margin-bottom: 0.125rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .quote-details {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.35fr);

@@ -41,5 +41,6 @@ Sesi acuan adalah sesi yang ditampilkan di kartu. Close sebelumnya berasal dari 
 - **True Range** = MAX(High acuan − Low acuan, |High acuan − Close sebelumnya|, |Low acuan − Close sebelumnya|).
 - **Level Buy Trigger sesi berikutnya** = Close acuan + 0,4 × True Range.
 - **Ambang volume** = 1,4 × rata-rata volume 50 sesi yang mendahului kedua sesi yang dicek. Ambang minimum dibulatkan ke atas ke satuan lembar. Volume sesi acuan dan volume sesi sebelumnya masing-masing memenuhi syarat jika mencapai ambang itu.
+- **Status BUY berdasarkan volume** menampilkan BUY YES jika satu atau kedua sesi lolos, dan BUY NO jika keduanya di bawah ambang. Kartu menampilkan alasannya bersama status.
 
 Rumus memakai nilai asli Yahoo Finance. Pembulatan harga mengikuti format mata uang saat hasil ditampilkan.
