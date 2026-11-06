@@ -59,99 +59,120 @@ const trends = {
   '-1': { label: 'Turun', className: 'down' },
 };
 
-const volumeStatuses = {
-  true: { label: 'Memenuhi', className: 'pass' },
-  false: { label: 'Di bawah ambang', className: 'below' },
+const checkStatuses = {
+  true: { label: 'YES', className: 'pass' },
+  false: { label: 'NO', className: 'below' },
   null: { label: 'Tidak tersedia', className: 'missing' },
 };
-const volumeSessionLabels = ['Sesi acuan', 'Sesi sebelum acuan'];
 
-function summarizeBuyVolume({ minimumVolume, volumeChecks }) {
-  const results = volumeChecks.map(({ meetsThreshold }) => meetsThreshold);
-  const passed = results.filter((meetsThreshold) => meetsThreshold === true).length;
-  const hasMissing = results.includes(null);
-  const threshold = formatVolume(minimumVolume);
-
-  if (passed === 2) {
-    return {
-      label: 'BUY YES',
-      className: 'pass',
-      reason: `2 dari 2 sesi lolos ambang ${threshold}.`,
-    };
-  }
-
-  if (passed === 1) {
-    const session = volumeSessionLabels[results.indexOf(true)];
-    const reason = hasMissing
-      ? `${session} lolos ambang ${threshold}. Data sesi lainnya belum tersedia.`
-      : `1 dari 2 sesi lolos. ${session} mencapai ambang ${threshold}.`;
-    return { label: 'BUY YES', className: 'pass', reason };
-  }
-
-  if (hasMissing) {
-    return {
-      label: 'Belum tersedia',
-      className: 'missing',
-      reason: 'Data volume belum lengkap untuk menilai syarat BUY.',
-    };
-  }
-
-  return {
-    label: 'BUY NO',
-    className: 'below',
-    reason: `Volume kedua sesi berada di bawah ambang ${threshold}.`,
-  };
+function priceDecimals(currency) {
+  return currency === 'JPY' || currency === 'IDR' ? 0 : 2;
 }
 
-function BuyVolumeSummary({ trigger }) {
-  const { label, className, reason } = summarizeBuyVolume(trigger);
-
-  return (
-    <section className="buy-volume-summary" aria-label="Status BUY berdasarkan volume">
-      <strong className={`volume-status volume-status--${className}`}>{label}</strong>
-      <div>
-        <p className="buy-volume-context">Berdasarkan volume</p>
-        <p>{reason}</p>
-      </div>
-    </section>
-  );
+function parseWatchPrice(input, decimals) {
+  const text = input.trim();
+  const pattern = decimals === 0 ? /^\d+$/ : /^\d+(?:[.,]\d{1,2})?$/;
+  if (!pattern.test(text)) return null;
+  const value = Number(text.replace(',', '.'));
+  return Number.isFinite(value) ? value : null;
 }
 
-function VolumeChecks({ trigger }) {
-  const { averageVolume, minimumVolume, volumeChecks } = trigger;
+function volumeDetail(check) {
+  return check?.date
+    ? `${formatDate(check.date)} · ${formatVolume(check.volume)}`
+    : 'Data sesi belum tersedia.';
+}
+
+function spreadsheetRows(quote, watchPrice) {
+  const { close, currency, buyTrigger } = quote;
+  const [reference, previous] = buyTrigger?.volumeChecks ?? [];
+  const { level, sellLevel } = buyTrigger ?? {};
+  const closeLabel = formatPrice(close, currency);
+  const displayedClose = Number(close.toLocaleString('en-US', {
+    useGrouping: false,
+    maximumFractionDigits: priceDecimals(currency),
+  }));
+
+  return [
+    {
+      column: 'N',
+      label: 'Buy berdasarkan volume sesi acuan',
+      detail: volumeDetail(reference),
+      passed: reference?.meetsThreshold ?? null,
+    },
+    {
+      column: 'M',
+      label: 'Buy berdasarkan volume sesi sebelumnya',
+      detail: volumeDetail(previous),
+      passed: previous?.meetsThreshold ?? null,
+    },
+    {
+      column: 'H',
+      label: 'Buy',
+      detail: Number.isFinite(level) ? `H ≥ C · H ${formatPrice(level, currency)}, C ${closeLabel}` : 'Level buy belum tersedia.',
+      passed: Number.isFinite(level) ? level >= close : null,
+    },
+    {
+      column: 'I',
+      label: 'Sell',
+      detail: Number.isFinite(sellLevel) ? `I ≤ C · I ${formatPrice(sellLevel, currency)}, C ${closeLabel}` : 'Level sell belum tersedia.',
+      passed: Number.isFinite(sellLevel) ? sellLevel <= close : null,
+    },
+    {
+      column: 'A',
+      label: 'Buy berdasarkan price to watch',
+      detail: `C > A · C ${closeLabel}`,
+      passed: watchPrice === null ? null : displayedClose > watchPrice,
+    },
+  ];
+}
+
+function SpreadsheetChecks({ quote }) {
+  const [watchInput, setWatchInput] = useState('');
+  const decimals = priceDecimals(quote.currency);
+  const watchPrice = parseWatchPrice(watchInput, decimals);
+  const minimumVolume = quote.buyTrigger?.minimumVolume;
 
   return (
-    <section className="volume-checks" aria-labelledby="volume-title">
-      <h3 id="volume-title">Cek volume per sesi</h3>
-      <p className="trigger-note">Ambang 1,4 × rata-rata volume dari 50 sesi sebelum kedua sesi yang dicek.</p>
-      {minimumVolume === null ? (
-        <p className="trigger-note">Riwayat volume 50 sesi belum lengkap.</p>
-      ) : (
-        <dl className="volume-baseline">
-          <div>
-            <dt>Rata-rata 50 sesi</dt>
-            <dd>{formatVolume(averageVolume)}</dd>
-          </div>
-          <div>
-            <dt>Ambang minimum</dt>
-            <dd>{formatVolume(minimumVolume)}</dd>
-          </div>
-        </dl>
-      )}
+    <section className="sheet-checks" aria-labelledby="sheet-checks-title">
+      <h3 id="sheet-checks-title">Cek Buy dan Sell</h3>
+      <p className="sheet-check-detail">
+        {minimumVolume == null
+          ? 'Ambang volume belum tersedia. Perlu riwayat volume 50 sesi.'
+          : `Ambang volume ${formatVolume(minimumVolume)} dari 1,4 × rata-rata volume 50 sesi.`}
+      </p>
       <ul>
-        {volumeChecks.map(({ date, volume, meetsThreshold }, index) => {
-          const label = volumeSessionLabels[index];
-          const status = volumeStatuses[meetsThreshold];
+        {spreadsheetRows(quote, watchPrice).map(({ column, label, detail, passed }) => {
+          const status = checkStatuses[passed];
           return (
-            <li key={label}>
+            <li key={column}>
+              <span className="sheet-column">{column}</span>
               <div>
                 <strong>{label}</strong>
-                {date && <time dateTime={date}>{formatDate(date)}</time>}
+                <p className="sheet-check-detail">{detail}</p>
+                {column === 'A' && (
+                  <div className="watch-field">
+                    <label htmlFor="watch-price">Harga pantauan ({quote.currency})</label>
+                    <input
+                      id="watch-price"
+                      type="text"
+                      inputMode={decimals === 0 ? 'numeric' : 'decimal'}
+                      autoComplete="off"
+                      placeholder={decimals === 0 ? 'Mis. 5200' : 'Mis. 189,50'}
+                      value={watchInput}
+                      onChange={(event) => setWatchInput(event.target.value)}
+                      aria-describedby="watch-hint"
+                      aria-invalid={watchInput.trim() !== '' && watchPrice === null}
+                    />
+                    <p id="watch-hint" className="sheet-check-detail">
+                      {decimals === 0
+                        ? 'Masukkan angka bulat tanpa pemisah ribuan.'
+                        : 'Gunakan maksimal dua angka desimal, tanpa pemisah ribuan.'}
+                    </p>
+                  </div>
+                )}
               </div>
-              <div className="volume-check-result">
-                {volume !== null && <strong>{formatVolume(volume)}</strong>}
-                <span className={`volume-status volume-status--${status.className}`}>{status.label}</span>
-              </div>
+              <span className={`check-status check-status--${status.className}`}>{status.label}</span>
             </li>
           );
         })}
@@ -194,7 +215,7 @@ function QuoteCard({ quote }) {
           )}
         </div>
       </div>
-      {buyTrigger && <BuyVolumeSummary trigger={buyTrigger} />}
+      <SpreadsheetChecks quote={quote} />
       <dl className="quote-details" aria-label="OHLCV sesi acuan">
         <div>
           <dt>Buka</dt>
@@ -220,7 +241,6 @@ function QuoteCard({ quote }) {
           <dd>{formatVolume(volume)}</dd>
         </div>
       </dl>
-      {buyTrigger && <VolumeChecks trigger={buyTrigger} />}
     </article>
   );
 }
@@ -304,7 +324,7 @@ export default function App() {
         <div className="intro">
           <p className="eyebrow">Ringkasan pasar</p>
           <h1>Cek Buy Trigger</h1>
-          <p>Lihat level sesi berikutnya, OHLCV sesi acuan, dan dua cek volume.</p>
+          <p>Lihat lima status dari spreadsheet, level harga, dan OHLCV sesi acuan.</p>
         </div>
 
         <div className="search-card">
@@ -388,7 +408,7 @@ export default function App() {
               </span>
               <div>
                 <p className="status-title">Ringkasan sesi perdagangan</p>
-                <p>Pilih bursa dan masukkan ticker untuk melihat level Buy Trigger.</p>
+                <p>Pilih bursa dan masukkan ticker untuk melihat status Buy dan Sell.</p>
               </div>
             </div>
           )}

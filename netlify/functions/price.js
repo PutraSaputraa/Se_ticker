@@ -57,6 +57,7 @@ function calculateBuyTrigger(sessions, index) {
       Math.abs(session.low - previous.close),
     )
     : null;
+  const triggerDistance = trueRange === null ? null : 0.4 * trueRange;
 
   // Ambil 50 sesi yang mendahului kedua sesi yang diuji.
   const baselineEnd = index - 1;
@@ -71,7 +72,8 @@ function calculateBuyTrigger(sessions, index) {
 
   return {
     trueRange,
-    level: trueRange === null ? null : session.close + 0.4 * trueRange,
+    level: triggerDistance === null ? null : session.close + triggerDistance,
+    sellLevel: triggerDistance === null ? null : session.close - triggerDistance,
     averageVolume,
     minimumVolume,
     volumeChecks: [session, previous].map((day) => {
