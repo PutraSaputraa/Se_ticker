@@ -199,7 +199,7 @@ export default async function price(request) {
       .slice(Math.max(0, index + 1 - chartLookback), index + 1)
       .filter(({ open, high, low, close }) => [open, high, low, close].every(Number.isFinite)
         && high >= Math.max(open, close) && low <= Math.min(open, close))
-      .map(({ date, open, high, low, close }) => ({ date, open, high, low, close }));
+      .map(({ date, open, high, low, close, volume }) => ({ date, open, high, low, close, volume }));
 
     return Response.json({
       symbol: typeof meta.symbol === 'string' && meta.symbol.trim() ? meta.symbol : symbol,

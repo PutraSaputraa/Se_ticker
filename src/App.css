@@ -614,10 +614,12 @@ h1 {
 }
 
 .candle-grid {
+  --candle-price-height: clamp(9rem, 32vw, 13rem);
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  grid-template-rows: clamp(9rem, 32vw, 13rem) auto;
-  gap: 0.375rem 0.625rem;
+  grid-auto-columns: max-content;
+  grid-template-rows: var(--candle-price-height) calc(var(--candle-price-height) * 0.29) auto;
+  gap: 0.375rem clamp(0.25rem, 1.5vw, 0.625rem);
   margin-top: 0.875rem;
   color: var(--muted);
   font-size: 0.6875rem;
@@ -637,12 +639,19 @@ h1 {
 
 .candle-axis-x {
   grid-column: 2;
+  grid-row: 3;
   gap: 0.25rem;
 }
 
 .candle-plot {
+  display: block;
   width: 100%;
   height: 100%;
+}
+
+.candle-volume {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .candle-guide {
@@ -650,15 +659,15 @@ h1 {
   stroke: var(--border);
 }
 
-.candle {
-  color: var(--muted);
-}
-
-.candle--up {
+.candle--up,
+.candle-trigger--buy,
+.candle-trigger-label--buy {
   color: #147048;
 }
 
-.candle--down {
+.candle--down,
+.candle-trigger--sell,
+.candle-trigger-label--sell {
   color: #a5302e;
 }
 
@@ -666,8 +675,96 @@ h1 {
   stroke: currentColor;
 }
 
-.candle-body {
+.candle-body,
+.candle-volume-bar {
   fill: currentColor;
+}
+
+.candle-volume-bar {
+  opacity: 0.6;
+}
+
+.candle-reference {
+  fill: #147048;
+  fill-opacity: 0.065;
+}
+
+.candle-trigger {
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-dasharray: 4 4;
+  stroke-opacity: 0.58;
+}
+
+.candle-volume-average {
+  stroke: var(--muted);
+  stroke-opacity: 0.45;
+}
+
+.candle-trigger-labels {
+  grid-column: 3;
+  grid-row: 1;
+  display: grid;
+  grid-template-rows: 100%;
+}
+
+.candle-trigger-label {
+  grid-area: 1 / 1;
+  align-self: start;
+  position: relative;
+  top: clamp(0px, calc(var(--level-y) - 0.5rem), calc(100% - 1rem));
+  line-height: 1rem;
+  white-space: nowrap;
+}
+
+.candle-trigger-label--buy:has(+ .candle-trigger-label--sell) {
+  top: clamp(0px, min(calc(var(--level-y) - 0.5rem), calc(var(--trigger-midpoint) - 1rem)), calc(100% - 2rem));
+}
+
+.candle-trigger-label--buy + .candle-trigger-label--sell {
+  top: clamp(1rem, max(calc(var(--level-y) - 0.5rem), var(--trigger-midpoint)), calc(100% - 1rem));
+}
+
+.candle-tooltip {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+  inline-size: max-content;
+  max-inline-size: min(12rem, var(--tooltip-room, 12rem));
+  overflow-wrap: anywhere;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: #fff;
+  box-shadow: 0 4px 14px rgb(23 43 35 / 0.12);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.candle-tooltip p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.candle-tooltip small,
+.candle-tooltip dt {
+  color: var(--muted);
+}
+
+.candle-tooltip dl {
+  margin: 0.25rem 0 0;
+}
+
+.candle-tooltip dl > div {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.35rem;
+}
+
+.candle-tooltip dd {
+  margin: 0;
+  text-align: end;
 }
 
 .source {

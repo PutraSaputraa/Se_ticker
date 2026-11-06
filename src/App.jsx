@@ -282,8 +282,13 @@ function QuoteCard({ quote }) {
       <SpreadsheetChecks quote={quote} />
       <CandlestickChart
         sessions={quote.priceHistory ?? []}
+        referenceDate={date}
+        buyLevel={buyTrigger?.level}
+        sellLevel={buyTrigger?.sellLevel}
+        averageVolume={averageVolume}
         formatPrice={(price) => formatPrice(price, currency)}
         formatDate={formatDate}
+        formatVolume={formatVolume}
       />
     </article>
   );
