@@ -128,7 +128,7 @@ function spreadsheetRows(quote, watchPrice) {
     {
       column: 'A',
       label: 'Buy berdasarkan price to watch',
-      detail: `C > A · C ${closeLabel}`,
+      detail: `Harga pantauan di bawah Close ${closeLabel} memenuhi syarat.`,
       passed: watchPrice === null ? null : displayedClose > watchPrice,
     },
   ];
@@ -185,53 +185,26 @@ function SpreadsheetChecks({ quote }) {
   );
 }
 
-function PositionLevels({ quote }) {
-  const { close, currency, buyTrigger } = quote;
+function TriggerLevels({ buyTrigger, currency }) {
   const { level, sellLevel, trueRange } = buyTrigger ?? {};
-  const closeLabel = formatPrice(close, currency);
-  const positions = [
-    {
-      side: 'Short', action: 'Sell', column: 'I', operator: '≤', price: sellLevel,
-      passed: Number.isFinite(sellLevel) ? sellLevel <= close : null,
-    },
-    {
-      side: 'Long', action: 'Buy', column: 'H', operator: '≥', price: level,
-      passed: Number.isFinite(level) ? level >= close : null,
-    },
-  ];
+  const hasBuyLevel = Number.isFinite(level);
+  const sellLabel = Number.isFinite(sellLevel) ? formatPrice(sellLevel, currency) : 'tidak tersedia';
 
   return (
-    <>
-      <div className="position-levels">
-        {positions.map(({ side, action, column, operator, price, passed }) => {
-          const priceLabel = Number.isFinite(price) ? formatPrice(price, currency) : 'Tidak tersedia';
-          return (
-            <section className={`position-level position-level--${side.toLowerCase()}`} aria-label={side} key={column}>
-              <div className="position-heading">
-                <h3>{side}</h3>
-                <CheckBadge passed={passed} />
-              </div>
-              <p className="position-price-label">Level {action} Trigger</p>
-              <strong className="position-price">{priceLabel}</strong>
-              <div className="position-rule">
-                <span className="sheet-column">{column}</span>
-                <div>
-                  <strong>{action}</strong>
-                  <p>
-                    {passed === null
-                      ? 'Harga tutup sesi sebelum acuan dibutuhkan.'
-                      : `${column} ${operator} C · C ${closeLabel}`}
-                  </p>
-                </div>
-              </div>
-            </section>
-          );
-        })}
+    <div className="trigger-levels">
+      <p className="trigger-label">Level Buy Trigger</p>
+      <strong className={hasBuyLevel ? 'trigger-price' : 'trigger-price trigger-price--missing'}>
+        {hasBuyLevel ? formatPrice(level, currency) : 'Tidak tersedia'}
+      </strong>
+      <div className="trigger-meta">
+        <p className="sell-trigger">Sell trigger {sellLabel}</p>
+        <p>
+          {Number.isFinite(trueRange)
+            ? `Untuk sesi berikutnya · True Range ${formatPrice(trueRange, currency)}`
+            : 'Harga tutup sesi sebelum acuan dibutuhkan.'}
+        </p>
       </div>
-      {Number.isFinite(trueRange) && (
-        <p className="position-note">Untuk sesi berikutnya · True Range {formatPrice(trueRange, currency)}</p>
-      )}
-    </>
+    </div>
   );
 }
 
@@ -255,7 +228,7 @@ function QuoteCard({ quote }) {
             <time dateTime={date}>{formatDate(date)}</time>
           </div>
         </div>
-        <PositionLevels quote={quote} />
+        <TriggerLevels buyTrigger={buyTrigger} currency={currency} />
       </div>
       <dl className="quote-details" aria-label="OHLCV sesi acuan">
         <div>
@@ -379,7 +352,7 @@ export default function App() {
         <div className="intro">
           <p className="eyebrow">Ringkasan pasar</p>
           <h1>Cek Buy Trigger</h1>
-          <p>Lihat level Short dan Long, OHLCV, dan cek dari spreadsheet.</p>
+          <p>Lihat level Buy Trigger, OHLCV, dan cek dari spreadsheet.</p>
         </div>
 
         <div className="search-card">
@@ -465,7 +438,7 @@ export default function App() {
               </span>
               <div>
                 <p className="status-title">Ringkasan sesi perdagangan</p>
-                <p>Pilih bursa dan masukkan ticker untuk melihat status Buy dan Sell.</p>
+                <p>Pilih bursa dan masukkan ticker untuk melihat level Buy Trigger.</p>
               </div>
             </div>
           )}

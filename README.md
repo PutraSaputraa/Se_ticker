@@ -1,6 +1,6 @@
 # Cek Saham
 
-Aplikasi React dan Vite untuk melihat OHLCV, level harga, dan lima status Buy dan Sell dari spreadsheet. Netlify Function mengambil data dari Yahoo Finance.
+Aplikasi React dan Vite untuk melihat level Buy dan Sell Trigger, OHLCV, serta cek volume dan harga pantauan. Netlify Function mengambil data dari Yahoo Finance.
 
 ## Jalankan lokal
 
@@ -37,7 +37,7 @@ Impor repo GitHub di Netlify, pilih branch `main`, lalu jalankan deploy. Netlify
 
 ## Rumus Buy Trigger
 
-Kartu menempatkan Short di kiri dan Long di kanan, diikuti OHLCV, rata-rata volume 50 sesi, dan Close 2 sesi lalu. Close 2 sesi lalu adalah harga tutup satu sesi sebelum acuan, dihitung relatif terhadap sesi berikutnya.
+Kartu menonjolkan level Buy Trigger, diikuti Sell trigger dan True Range. OHLCV, rata-rata volume 50 sesi, dan Close 2 sesi lalu tampil di bawahnya. Close 2 sesi lalu adalah harga tutup satu sesi sebelum acuan, dihitung relatif terhadap sesi berikutnya.
 
 - **True Range** = MAX(High acuan − Low acuan, |High acuan − Close sebelumnya|, |Low acuan − Close sebelumnya|).
 - **Level Buy Trigger sesi berikutnya** = Close acuan + 0,4 × True Range.
@@ -46,8 +46,7 @@ Kartu menempatkan Short di kiri dan Long di kanan, diikuti OHLCV, rata-rata volu
 
 Rumus memakai nilai asli Yahoo Finance. Pembulatan harga mengikuti format mata uang saat hasil ditampilkan.
 
-## Lima status
+## Cek volume dan harga pantauan
 
 - **N dan M** masing-masing YES jika volume sesi acuan atau sesi sebelumnya mencapai ambang. Kedua sesi dicek secara terpisah.
-- **H** YES jika level Buy Trigger ≥ Close acuan. **I** YES jika level Sell Trigger ≤ Close acuan. Kedua kondisi terpenuhi saat level lengkap karena keduanya diturunkan dari Close yang sama.
 - **A** YES jika Close yang ditampilkan lebih tinggi dari harga pantauan yang diisi pengguna. Isi angka tanpa pemisah ribuan dalam mata uang ticker.
