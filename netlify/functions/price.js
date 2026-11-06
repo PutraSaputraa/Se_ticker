@@ -1,9 +1,88 @@
 const symbolPattern = /^\^?[A-Z0-9]+(?:[.=-][A-Z0-9]+)*$/;
 const dayMilliseconds = 86_400_000;
+const historyDays = 180;
+const volumeLookback = 50;
 const pastDateError = 'Pilih tanggal sebelum hari ini di zona waktu bursa.';
 
 function errorResponse(error, status) {
   return Response.json({ error }, { status });
+}
+
+function readSessions(timestamps, quote, marketDate) {
+  const sessions = new Map();
+
+  for (const [index, timestamp] of timestamps.entries()) {
+    if (!Number.isFinite(timestamp)) continue;
+    const date = marketDate.format(timestamp * 1000);
+
+    // Yahoo dapat menambahkan snapshot pada tanggal yang sudah punya bar harian.
+    if (sessions.has(date)) continue;
+    const volume = quote.volume?.[index];
+    sessions.set(date, {
+      date,
+      open: quote.open?.[index],
+      high: quote.high?.[index],
+      low: quote.low?.[index],
+      close: quote.close?.[index],
+      volume: Number.isSafeInteger(volume) && volume >= 0 ? volume : null,
+    });
+  }
+
+  return [...sessions.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function latestCompletedIndex(sessions, meta, marketDate) {
+  const now = Date.now();
+  const today = marketDate.format(now);
+  const regularEnd = meta?.currentTradingPeriod?.regular?.end;
+  const lastTrade = meta?.regularMarketTime;
+
+  // Jadwal tutup dan waktu kuotasi harus mencakup akhir sesi hari ini.
+  const todayClosed = Number.isFinite(regularEnd)
+    && Number.isFinite(lastTrade)
+    && now >= regularEnd * 1000
+    && lastTrade >= regularEnd
+    && marketDate.format(regularEnd * 1000) === today;
+
+  return sessions.findLastIndex(({ date }) => date < today || (todayClosed && date === today));
+}
+
+function calculateBuyTrigger(sessions, index) {
+  const session = sessions[index];
+  const previous = sessions[index - 1];
+  const trueRange = Number.isFinite(previous?.close)
+    ? Math.max(
+      session.high - session.low,
+      Math.abs(session.high - previous.close),
+      Math.abs(session.low - previous.close),
+    )
+    : null;
+
+  // Ambil 50 sesi yang mendahului kedua sesi yang diuji.
+  const baselineEnd = index - 1;
+  const baselineStart = baselineEnd - volumeLookback;
+  const baseline = baselineStart >= 0 ? sessions.slice(baselineStart, baselineEnd) : [];
+  const volumeSum = baseline.length === volumeLookback && baseline.every(({ volume }) => volume !== null)
+    ? baseline.reduce((sum, { volume }) => sum + volume, 0)
+    : null;
+  const averageVolume = volumeSum === null ? null : volumeSum / volumeLookback;
+  // Gunakan 14/10 agar ambang minimum lembar tidak bergeser karena pembulatan 1,4.
+  const minimumVolume = volumeSum === null ? null : Math.ceil(volumeSum * 14 / (volumeLookback * 10));
+
+  return {
+    trueRange,
+    level: trueRange === null ? null : session.close + 0.4 * trueRange,
+    averageVolume,
+    minimumVolume,
+    volumeChecks: [session, previous].map((day) => {
+      const volume = day?.volume ?? null;
+      return {
+        date: day?.date ?? null,
+        volume,
+        meetsThreshold: volume === null || minimumVolume === null ? null : volume >= minimumVolume,
+      };
+    }),
+  };
 }
 
 export default async function price(request) {
@@ -22,7 +101,7 @@ export default async function price(request) {
     return errorResponse('Kode ticker kosong atau formatnya tidak valid.', 404);
   }
 
-  let period = { range: '5d' };
+  let period = { range: '6mo' };
   if (requestedDate) {
     const dateStart = Date.parse(`${requestedDate}T00:00:00Z`);
     if (!Number.isFinite(dateStart) || new Date(dateStart).toISOString().slice(0, 10) !== requestedDate) {
@@ -32,9 +111,9 @@ export default async function price(request) {
       return errorResponse(pastDateError, 400);
     }
 
-    // Beri ruang di kedua sisi karena batas hari UTC dan bursa bisa berbeda.
+    // Ambil riwayat untuk baseline dan beri ruang untuk perbedaan zona waktu.
     period = {
-      period1: (dateStart - dayMilliseconds) / 1000,
+      period1: (dateStart - historyDays * dayMilliseconds) / 1000,
       period2: (dateStart + 2 * dayMilliseconds) / 1000,
     };
   }
@@ -44,7 +123,7 @@ export default async function price(request) {
     : `Ticker ${symbol} tidak ditemukan di Yahoo Finance.`;
   const noData = requestedDate
     ? `Data perdagangan untuk ${symbol} pada tanggal yang dipilih belum tersedia atau tidak lengkap.`
-    : `Data sesi sebelumnya untuk ${symbol} belum tersedia atau tidak lengkap.`;
+    : `Data sesi yang sudah tutup untuk ${symbol} belum tersedia atau tidak lengkap.`;
   const query = new URLSearchParams({ ...period, interval: '1d' });
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`;
 
@@ -89,20 +168,15 @@ export default async function price(request) {
       return errorResponse(pastDateError, 400);
     }
 
-    // Tanpa tanggal, lewati bar terbaru karena sesi mungkin masih berlangsung.
+    const sessions = readSessions(timestamps, quote, marketDate);
     const index = requestedDate
-      ? timestamps.findIndex((timestamp) => (
-        Number.isFinite(timestamp) && marketDate.format(timestamp * 1000) === requestedDate
-      ))
-      : timestamps.length - 2;
+      ? sessions.findIndex(({ date }) => date === requestedDate)
+      : latestCompletedIndex(sessions, meta, marketDate);
     if (index < 0) return errorResponse(noData, 404);
 
-    const timestamp = timestamps[index];
-    const open = quote.open?.[index];
-    const high = quote.high?.[index];
-    const low = quote.low?.[index];
-    const close = quote.close?.[index];
-    if (![timestamp, open, high, low, close].every(Number.isFinite)) {
+    const session = sessions[index];
+    const { open, high, low, close } = session;
+    if (![open, high, low, close].every(Number.isFinite)) {
       return errorResponse(noData, 404);
     }
 
@@ -113,16 +187,17 @@ export default async function price(request) {
     const name = [meta.longName, meta.shortName, symbol].find(
       (value) => typeof value === 'string' && value.trim(),
     );
+    const exchange = [meta.fullExchangeName, meta.exchangeName].find(
+      (value) => typeof value === 'string' && value.trim(),
+    );
 
     return Response.json({
       symbol: typeof meta.symbol === 'string' && meta.symbol.trim() ? meta.symbol : symbol,
       name,
-      date: marketDate.format(timestamp * 1000),
-      open,
-      high,
-      low,
-      close,
+      exchange: exchange ?? null,
+      ...session,
       currency: meta.currency,
+      buyTrigger: calculateBuyTrigger(sessions, index),
     });
   } catch (error) {
     if (error.name === 'TimeoutError') {

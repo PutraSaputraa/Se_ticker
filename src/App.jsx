@@ -10,11 +10,14 @@ const dateFormat = new Intl.DateTimeFormat('id-ID', {
   month: 'long',
   year: 'numeric',
 });
+const volumeFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
 const serviceError = 'Layanan harga tidak dapat diakses. Coba lagi.';
 
-function normalizeTicker(ticker) {
+function normalizeTicker(ticker, market = 'auto') {
   const symbol = ticker.trim().toUpperCase();
-  if (/^\d{3,4}$/.test(symbol)) return `${symbol}.T`;
+  if (!symbol || symbol.includes('.') || market === 'us') return symbol;
+  if (market === 'id') return `${symbol}.JK`;
+  if (market === 'jp' || /^\d{3,4}$/.test(symbol)) return `${symbol}.T`;
   if (/^[A-Z]{2,5}$/.test(symbol) && symbol !== 'AAPL') return `${symbol}.JK`;
   return symbol;
 }
@@ -42,15 +45,73 @@ function formatPrice(price, currency) {
   return `${currency} ${price.toLocaleString('id-ID', decimal)}`;
 }
 
+function formatDate(date) {
+  return dateFormat.format(new Date(`${date}T00:00:00Z`));
+}
+
+function formatVolume(volume) {
+  return volume == null ? 'Tidak tersedia' : `${volumeFormat.format(volume)} lembar`;
+}
+
 const trends = {
   1: { label: 'Naik', className: 'up' },
   0: { label: 'Tetap', className: 'flat' },
   '-1': { label: 'Turun', className: 'down' },
 };
 
+const volumeStatuses = {
+  true: { label: 'Memenuhi', className: 'pass' },
+  false: { label: 'Di bawah ambang', className: 'below' },
+  null: { label: 'Tidak tersedia', className: 'missing' },
+};
+
+function VolumeChecks({ trigger }) {
+  const { averageVolume, minimumVolume, volumeChecks } = trigger;
+
+  return (
+    <section className="volume-checks" aria-labelledby="volume-title">
+      <h3 id="volume-title">Cek volume per sesi</h3>
+      <p className="trigger-note">Ambang 1,4 × rata-rata volume dari 50 sesi sebelum kedua sesi yang dicek.</p>
+      {minimumVolume === null ? (
+        <p className="trigger-note">Riwayat volume 50 sesi belum lengkap.</p>
+      ) : (
+        <dl className="volume-baseline">
+          <div>
+            <dt>Rata-rata 50 sesi</dt>
+            <dd>{formatVolume(averageVolume)}</dd>
+          </div>
+          <div>
+            <dt>Ambang minimum</dt>
+            <dd>{formatVolume(minimumVolume)}</dd>
+          </div>
+        </dl>
+      )}
+      <ul>
+        {volumeChecks.map(({ date, volume, meetsThreshold }, index) => {
+          const label = index === 0 ? 'Sesi acuan' : 'Sesi sebelum acuan';
+          const status = volumeStatuses[meetsThreshold];
+          return (
+            <li key={label}>
+              <div>
+                <strong>{label}</strong>
+                {date && <time dateTime={date}>{formatDate(date)}</time>}
+              </div>
+              <div className="volume-check-result">
+                {volume !== null && <strong>{formatVolume(volume)}</strong>}
+                <span className={`volume-status volume-status--${status.className}`}>{status.label}</span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function QuoteCard({ quote }) {
-  const { symbol, name, date, open, high, low, close, currency } = quote;
+  const { symbol, name, exchange, date, open, high, low, close, volume, currency, buyTrigger } = quote;
   const trend = trends[Math.sign(close - open)];
+  const level = buyTrigger?.level ?? null;
 
   return (
     <article className="quote-card">
@@ -58,23 +119,41 @@ function QuoteCard({ quote }) {
         <div className="quote-heading">
           <div>
             <span className="symbol-badge">{symbol}</span>
+            {exchange && <span className="exchange-label">{exchange}</span>}
             <h2>{name}</h2>
           </div>
-          <time dateTime={date}>{dateFormat.format(new Date(`${date}T00:00:00Z`))}</time>
+          <div className="quote-date">
+            <span>Sesi acuan</span>
+            <time dateTime={date}>{formatDate(date)}</time>
+          </div>
         </div>
         <div className="featured-price">
-          <p>Harga tertinggi</p>
-          <strong>{formatPrice(high, currency)}</strong>
+          <p>Level Buy Trigger</p>
+          {level === null ? (
+            <>
+              <strong className="featured-price-missing">Tidak tersedia</strong>
+              <span>Harga tutup sesi sebelum acuan dibutuhkan.</span>
+            </>
+          ) : (
+            <>
+              <strong>{formatPrice(level, currency)}</strong>
+              <span>Untuk sesi berikutnya · True Range {formatPrice(buyTrigger.trueRange, currency)}</span>
+            </>
+          )}
         </div>
       </div>
-      <dl className="quote-details">
-        <div>
-          <dt>Terendah</dt>
-          <dd>{formatPrice(low, currency)}</dd>
-        </div>
+      <dl className="quote-details" aria-label="OHLCV sesi acuan">
         <div>
           <dt>Buka</dt>
           <dd>{formatPrice(open, currency)}</dd>
+        </div>
+        <div>
+          <dt>Tertinggi</dt>
+          <dd>{formatPrice(high, currency)}</dd>
+        </div>
+        <div>
+          <dt>Terendah</dt>
+          <dd>{formatPrice(low, currency)}</dd>
         </div>
         <div>
           <dt>Tutup</dt>
@@ -83,14 +162,19 @@ function QuoteCard({ quote }) {
             <span className="trend-label">{trend.label}</span>
           </dd>
         </div>
+        <div>
+          <dt>Volume</dt>
+          <dd>{formatVolume(volume)}</dd>
+        </div>
       </dl>
+      {buyTrigger && <VolumeChecks trigger={buyTrigger} />}
     </article>
   );
 }
 
 export default function App() {
   const [ticker, setTicker] = useState('');
-  const [tradeDate, setTradeDate] = useState('');
+  const [market, setMarket] = useState('auto');
   const [history, setHistory] = useState(readHistory);
   const [result, setResult] = useState({ status: 'idle' });
   const activeSearch = useRef(null);
@@ -105,8 +189,7 @@ export default function App() {
 
   useEffect(() => () => activeSearch.current?.abort(), []);
 
-  async function search(value) {
-    const symbol = normalizeTicker(value);
+  async function search(symbol) {
     activeSearch.current?.abort();
 
     if (!symbol) {
@@ -120,7 +203,6 @@ export default function App() {
 
     try {
       const params = new URLSearchParams({ symbol });
-      if (tradeDate) params.set('date', tradeDate);
       const response = await fetch(`/.netlify/functions/price?${params}`, {
         signal: controller.signal,
       });
@@ -146,7 +228,7 @@ export default function App() {
 
   function handleSubmit(event) {
     event.preventDefault();
-    search(ticker);
+    search(normalizeTicker(ticker, market));
   }
 
   return (
@@ -168,47 +250,42 @@ export default function App() {
       <main className="workspace">
         <div className="intro">
           <p className="eyebrow">Ringkasan pasar</p>
-          <h1>Cek harga saham</h1>
-          <p>Lihat harga tertinggi, terendah, buka, dan tutup per sesi perdagangan.</p>
+          <h1>Cek Buy Trigger</h1>
+          <p>Lihat level sesi berikutnya, OHLCV sesi acuan, dan dua cek volume.</p>
         </div>
 
         <div className="search-card">
           <form onSubmit={handleSubmit}>
-            <label htmlFor="ticker">Kode ticker</label>
-            <div className="input-wrap">
-              <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-                <circle cx="10.8" cy="10.8" r="5.8" />
-                <path d="m15.1 15.1 4.3 4.3" />
-              </svg>
-              <input
-                id="ticker"
-                name="ticker"
-                type="text"
-                value={ticker}
-                onChange={(event) => setTicker(event.target.value)}
-                placeholder="7203, BBCA, atau AAPL"
-                aria-describedby="ticker-hint"
-                autoCapitalize="characters"
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </div>
-            <p id="ticker-hint" className="hint">
-              <span>7203 → 7203.T (Tokyo)</span>
-              <span>BBCA → BBCA.JK (Indonesia)</span>
-              <span>AAPL (AS)</span>
-            </p>
-            <div className="form-row">
-              <div className="date-field">
-                <label htmlFor="trade-date">Tanggal perdagangan <span>(opsional)</span></label>
-                <input
-                  id="trade-date"
-                  name="date"
-                  type="date"
-                  value={tradeDate}
-                  onChange={(event) => setTradeDate(event.target.value)}
-                  aria-describedby="date-hint"
-                />
+            <div className="ticker-row">
+              <div className="market-field">
+                <label htmlFor="market">Bursa</label>
+                <select id="market" value={market} onChange={(event) => setMarket(event.target.value)}>
+                  <option value="auto">Otomatis</option>
+                  <option value="us">AS</option>
+                  <option value="id">Indonesia</option>
+                  <option value="jp">Jepang</option>
+                </select>
+              </div>
+              <div className="ticker-field">
+                <label htmlFor="ticker">Kode ticker</label>
+                <div className="input-wrap">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+                    <circle cx="10.8" cy="10.8" r="5.8" />
+                    <path d="m15.1 15.1 4.3 4.3" />
+                  </svg>
+                  <input
+                    id="ticker"
+                    name="ticker"
+                    type="text"
+                    value={ticker}
+                    onChange={(event) => setTicker(event.target.value)}
+                    placeholder="Mis. NVDA atau BBCA"
+                    aria-describedby="ticker-hint"
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
               </div>
               <button type="submit" className="check-button">
                 Cek
@@ -217,14 +294,11 @@ export default function App() {
                 </svg>
               </button>
             </div>
-            <div className="date-caption">
-              <p id="date-hint" className="hint">Kosongkan untuk memakai sesi kedua dari akhir data Yahoo.</p>
-              {tradeDate && (
-                <button type="button" className="clear-date" onClick={() => setTradeDate('')}>
-                  Hapus tanggal
-                </button>
-              )}
-            </div>
+            <p id="ticker-hint" className="hint">
+              <span>NVDA, MSFT, AAPL (pilih AS)</span>
+              <span>BBCA → BBCA.JK (Indonesia)</span>
+              <span>7203 → 7203.T (Jepang)</span>
+            </p>
           </form>
 
           {history.length > 0 && (
@@ -238,6 +312,7 @@ export default function App() {
                       className="chip"
                       onClick={() => {
                         setTicker(symbol);
+                        setMarket(normalizeTicker(symbol) === symbol ? 'auto' : 'us');
                         search(symbol);
                       }}
                     >
@@ -259,8 +334,8 @@ export default function App() {
                 </svg>
               </span>
               <div>
-                <p className="status-title">Ringkasan harga</p>
-                <p>Hasil pencarian akan tampil di sini.</p>
+                <p className="status-title">Ringkasan sesi perdagangan</p>
+                <p>Pilih bursa dan masukkan ticker untuk melihat level Buy Trigger.</p>
               </div>
             </div>
           )}

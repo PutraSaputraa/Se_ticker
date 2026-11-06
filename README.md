@@ -1,6 +1,6 @@
 # Cek Saham
 
-Aplikasi React dan Vite untuk melihat harga tertinggi, terendah, buka, dan tutup per sesi perdagangan. Netlify Function mengambil data dari Yahoo Finance.
+Aplikasi React dan Vite untuk melihat OHLCV, level Buy Trigger, dan cek volume per sesi perdagangan. Netlify Function mengambil data dari Yahoo Finance.
 
 ## Jalankan lokal
 
@@ -30,7 +30,16 @@ Impor repo GitHub di Netlify, pilih branch `main`, lalu jalankan deploy. Netlify
 
 ## Cara kerja
 
-- Kode 3–4 digit mendapat akhiran `.T` (Tokyo). Kode 2–5 huruf mendapat `.JK` (Indonesia). `AAPL` dan ticker bersufiks dipakai langsung setelah spasi tepi dibuang dan huruf dikapitalisasi.
-- Saat kolom tanggal kosong, fungsi memilih bar harian kedua dari akhir respons Yahoo Finance.
-- Jika tanggal dipilih, fungsi mencari sesi pada tanggal itu di zona waktu bursa. Pilih tanggal yang sudah lewat di bursa. Jika data sesi pada tanggal itu tidak tersedia, aplikasi menampilkan pesan kesalahan.
+- Pilih **AS** untuk ticker seperti `NVDA`, `MSFT`, dan `AAPL`. Pilih **Indonesia** untuk `BBCA` atau **Jepang** untuk `7203`. Mode **Otomatis** mengarahkan kode 3–4 digit ke Tokyo dan kode 2–5 huruf ke Indonesia, dengan `AAPL` sebagai pengecualian. Ticker yang sudah bersufiks dikirim langsung.
+- Kartu menampilkan OHLCV dari sesi terakhir yang sudah tutup dalam data Yahoo Finance. Bar hari ini dipakai setelah jadwal tutup terlewati dan waktu kuotasi Yahoo sudah mencapai penutupan. Tanggal sesi mengikuti zona waktu bursa.
 - Lima pencarian sukses terakhir tersimpan di browser dan bisa dijalankan ulang dari tombol riwayat.
+
+## Rumus Buy Trigger
+
+Sesi acuan adalah sesi yang ditampilkan di kartu. Close sebelumnya berasal dari satu sesi perdagangan sebelum acuan.
+
+- **True Range** = MAX(High acuan − Low acuan, |High acuan − Close sebelumnya|, |Low acuan − Close sebelumnya|).
+- **Level Buy Trigger sesi berikutnya** = Close acuan + 0,4 × True Range.
+- **Ambang volume** = 1,4 × rata-rata volume 50 sesi yang mendahului kedua sesi yang dicek. Ambang minimum dibulatkan ke atas ke satuan lembar. Volume sesi acuan dan volume sesi sebelumnya masing-masing memenuhi syarat jika mencapai ambang itu.
+
+Rumus memakai nilai asli Yahoo Finance. Pembulatan harga mengikuti format mata uang saat hasil ditampilkan.
