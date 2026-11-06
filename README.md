@@ -37,7 +37,7 @@ Impor repo GitHub di Netlify, pilih branch `main`, lalu jalankan deploy. Netlify
 
 ## Rumus Buy Trigger
 
-Kartu menonjolkan level Buy Trigger, diikuti Sell trigger dan True Range. OHLCV, rata-rata volume 50 sesi, dan Close 2 sesi lalu tampil di bawahnya. Close 2 sesi lalu adalah harga tutup satu sesi sebelum acuan, dihitung relatif terhadap sesi berikutnya.
+Kartu menempatkan Long di kiri dan Short di kanan. Badge Long memakai level Buy Trigger ≥ Close acuan, sedangkan Short memakai level Sell Trigger ≤ Close acuan. OHLCV, rata-rata volume 50 sesi, dan Close 2 sesi lalu tampil di bawahnya. Close 2 sesi lalu adalah harga tutup satu sesi sebelum acuan, dihitung relatif terhadap sesi berikutnya.
 
 - **True Range** = MAX(High acuan − Low acuan, |High acuan − Close sebelumnya|, |Low acuan − Close sebelumnya|).
 - **Level Buy Trigger sesi berikutnya** = Close acuan + 0,4 × True Range.
@@ -50,3 +50,5 @@ Rumus memakai nilai asli Yahoo Finance. Pembulatan harga mengikuti format mata u
 
 - **N dan M** masing-masing YES jika volume sesi acuan atau sesi sebelumnya mencapai ambang. Kedua sesi dicek secara terpisah.
 - **A** YES jika Close yang ditampilkan lebih tinggi dari harga pantauan yang diisi pengguna. Isi angka tanpa pemisah ribuan dalam mata uang ticker.
+
+Grafik candlestick menampilkan OHLC dari hingga 20 sesi perdagangan yang sudah tutup sampai tanggal acuan.

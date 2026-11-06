@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import CandlestickChart from './CandlestickChart.jsx';
 import './App.css';
 
 const historyKey = 'cek-saham:recent';
@@ -185,25 +186,35 @@ function SpreadsheetChecks({ quote }) {
   );
 }
 
-function TriggerLevels({ buyTrigger, currency }) {
+function TriggerLevels({ buyTrigger, close, currency }) {
   const { level, sellLevel, trueRange } = buyTrigger ?? {};
-  const hasBuyLevel = Number.isFinite(level);
-  const sellLabel = Number.isFinite(sellLevel) ? formatPrice(sellLevel, currency) : 'tidak tersedia';
+  const sides = [
+    { side: 'Long', label: 'Level Buy Trigger', price: level, passed: Number.isFinite(level) && level >= close },
+    { side: 'Short', label: 'Level Sell Trigger', price: sellLevel, passed: Number.isFinite(sellLevel) && sellLevel <= close },
+  ];
 
   return (
     <div className="trigger-levels">
-      <p className="trigger-label">Level Buy Trigger</p>
-      <strong className={hasBuyLevel ? 'trigger-price' : 'trigger-price trigger-price--missing'}>
-        {hasBuyLevel ? formatPrice(level, currency) : 'Tidak tersedia'}
-      </strong>
-      <div className="trigger-meta">
-        <p className="sell-trigger">Sell trigger {sellLabel}</p>
-        <p>
-          {Number.isFinite(trueRange)
-            ? `Untuk sesi berikutnya · True Range ${formatPrice(trueRange, currency)}`
-            : 'Harga tutup sesi sebelum acuan dibutuhkan.'}
-        </p>
+      <div className="trigger-columns">
+        {sides.map(({ side, label, price, passed }) => {
+          const hasPrice = Number.isFinite(price);
+          return (
+            <section className="trigger-column" aria-label={side} key={side}>
+              <h3 className="trigger-side">{side}</h3>
+              <p className="trigger-label">{label}</p>
+              <strong className={hasPrice ? 'trigger-price' : 'trigger-price trigger-price--missing'}>
+                {hasPrice ? formatPrice(price, currency) : 'Tidak tersedia'}
+              </strong>
+              <CheckBadge passed={passed} />
+            </section>
+          );
+        })}
       </div>
+      <p className="trigger-note">
+        {Number.isFinite(trueRange)
+          ? `Untuk sesi berikutnya · True Range ${formatPrice(trueRange, currency)}`
+          : 'Harga tutup sesi sebelum acuan dibutuhkan.'}
+      </p>
     </div>
   );
 }
@@ -228,7 +239,7 @@ function QuoteCard({ quote }) {
             <time dateTime={date}>{formatDate(date)}</time>
           </div>
         </div>
-        <TriggerLevels buyTrigger={buyTrigger} currency={currency} />
+        <TriggerLevels buyTrigger={buyTrigger} close={close} currency={currency} />
       </div>
       <dl className="quote-details" aria-label="OHLCV sesi acuan">
         <div>
@@ -269,6 +280,11 @@ function QuoteCard({ quote }) {
         </div>
       </dl>
       <SpreadsheetChecks quote={quote} />
+      <CandlestickChart
+        sessions={quote.priceHistory ?? []}
+        formatPrice={(price) => formatPrice(price, currency)}
+        formatDate={formatDate}
+      />
     </article>
   );
 }

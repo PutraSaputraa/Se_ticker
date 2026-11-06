@@ -2,6 +2,7 @@ const symbolPattern = /^\^?[A-Z0-9]+(?:[.=-][A-Z0-9]+)*$/;
 const dayMilliseconds = 86_400_000;
 const historyDays = 180;
 const volumeLookback = 50;
+const chartLookback = 20;
 const pastDateError = 'Pilih tanggal sebelum hari ini di zona waktu bursa.';
 
 function errorResponse(error, status) {
@@ -194,6 +195,11 @@ export default async function price(request) {
     const exchange = [meta.fullExchangeName, meta.exchangeName].find(
       (value) => typeof value === 'string' && value.trim(),
     );
+    const priceHistory = sessions
+      .slice(Math.max(0, index + 1 - chartLookback), index + 1)
+      .filter(({ open, high, low, close }) => [open, high, low, close].every(Number.isFinite)
+        && high >= Math.max(open, close) && low <= Math.min(open, close))
+      .map(({ date, open, high, low, close }) => ({ date, open, high, low, close }));
 
     return Response.json({
       symbol: typeof meta.symbol === 'string' && meta.symbol.trim() ? meta.symbol : symbol,
@@ -202,6 +208,7 @@ export default async function price(request) {
       ...session,
       currency: meta.currency,
       buyTrigger: calculateBuyTrigger(sessions, index),
+      priceHistory,
     });
   } catch (error) {
     if (error.name === 'TimeoutError') {
