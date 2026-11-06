@@ -12,12 +12,27 @@ const dateFormat = new Intl.DateTimeFormat('id-ID', {
 });
 const volumeFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
 const serviceError = 'Layanan harga tidak dapat diakses. Coba lagi.';
+const markets = {
+  auto: { label: 'Otomatis' },
+  us: { label: 'AS' },
+  id: { label: 'Indonesia', suffix: '.JK' },
+  jp: { label: 'Jepang', suffix: '.T' },
+  hk: { label: 'Hong Kong', suffix: '.HK', digits: 4 },
+  ks: { label: 'Korea Selatan (KOSPI)', suffix: '.KS', digits: 6 },
+  kq: { label: 'Korea Selatan (KOSDAQ)', suffix: '.KQ', digits: 6 },
+  ss: { label: 'China (Shanghai)', suffix: '.SS', digits: 6 },
+  sz: { label: 'China (Shenzhen)', suffix: '.SZ', digits: 6 },
+};
 
 function normalizeTicker(ticker, market = 'auto') {
   const symbol = ticker.trim().toUpperCase();
   if (!symbol || symbol.includes('.') || market === 'us') return symbol;
-  if (market === 'id') return `${symbol}.JK`;
-  if (market === 'jp' || /^\d{3,4}$/.test(symbol)) return `${symbol}.T`;
+  const { suffix, digits } = markets[market] ?? {};
+  if (suffix) {
+    const code = /^\d+$/.test(symbol) ? symbol.padStart(digits ?? 0, '0') : symbol;
+    return `${code}${suffix}`;
+  }
+  if (/^\d{3,4}$/.test(symbol)) return `${symbol}.T`;
   if (/^[A-Z]{2,5}$/.test(symbol) && symbol !== 'AAPL') return `${symbol}.JK`;
   return symbol;
 }
@@ -65,6 +80,11 @@ const checkStatuses = {
   null: { label: 'Tidak tersedia', className: 'missing' },
 };
 
+function CheckBadge({ passed }) {
+  const { label, className } = checkStatuses[passed];
+  return <span className={`check-status check-status--${className}`}>{label}</span>;
+}
+
 function priceDecimals(currency) {
   return currency === 'JPY' || currency === 'IDR' ? 0 : 2;
 }
@@ -86,7 +106,6 @@ function volumeDetail(check) {
 function spreadsheetRows(quote, watchPrice) {
   const { close, currency, buyTrigger } = quote;
   const [reference, previous] = buyTrigger?.volumeChecks ?? [];
-  const { level, sellLevel } = buyTrigger ?? {};
   const closeLabel = formatPrice(close, currency);
   const displayedClose = Number(close.toLocaleString('en-US', {
     useGrouping: false,
@@ -107,18 +126,6 @@ function spreadsheetRows(quote, watchPrice) {
       passed: previous?.meetsThreshold ?? null,
     },
     {
-      column: 'H',
-      label: 'Buy',
-      detail: Number.isFinite(level) ? `H ≥ C · H ${formatPrice(level, currency)}, C ${closeLabel}` : 'Level buy belum tersedia.',
-      passed: Number.isFinite(level) ? level >= close : null,
-    },
-    {
-      column: 'I',
-      label: 'Sell',
-      detail: Number.isFinite(sellLevel) ? `I ≤ C · I ${formatPrice(sellLevel, currency)}, C ${closeLabel}` : 'Level sell belum tersedia.',
-      passed: Number.isFinite(sellLevel) ? sellLevel <= close : null,
-    },
-    {
       column: 'A',
       label: 'Buy berdasarkan price to watch',
       detail: `C > A · C ${closeLabel}`,
@@ -135,56 +142,104 @@ function SpreadsheetChecks({ quote }) {
 
   return (
     <section className="sheet-checks" aria-labelledby="sheet-checks-title">
-      <h3 id="sheet-checks-title">Cek Buy dan Sell</h3>
+      <h3 id="sheet-checks-title">Cek volume dan harga pantauan</h3>
       <p className="sheet-check-detail">
         {minimumVolume == null
           ? 'Ambang volume belum tersedia. Perlu riwayat volume 50 sesi.'
           : `Ambang volume ${formatVolume(minimumVolume)} dari 1,4 × rata-rata volume 50 sesi.`}
       </p>
       <ul>
-        {spreadsheetRows(quote, watchPrice).map(({ column, label, detail, passed }) => {
-          const status = checkStatuses[passed];
-          return (
-            <li key={column}>
-              <span className="sheet-column">{column}</span>
-              <div>
-                <strong>{label}</strong>
-                <p className="sheet-check-detail">{detail}</p>
-                {column === 'A' && (
-                  <div className="watch-field">
-                    <label htmlFor="watch-price">Harga pantauan ({quote.currency})</label>
-                    <input
-                      id="watch-price"
-                      type="text"
-                      inputMode={decimals === 0 ? 'numeric' : 'decimal'}
-                      autoComplete="off"
-                      placeholder={decimals === 0 ? 'Mis. 5200' : 'Mis. 189,50'}
-                      value={watchInput}
-                      onChange={(event) => setWatchInput(event.target.value)}
-                      aria-describedby="watch-hint"
-                      aria-invalid={watchInput.trim() !== '' && watchPrice === null}
-                    />
-                    <p id="watch-hint" className="sheet-check-detail">
-                      {decimals === 0
-                        ? 'Masukkan angka bulat tanpa pemisah ribuan.'
-                        : 'Gunakan maksimal dua angka desimal, tanpa pemisah ribuan.'}
-                    </p>
-                  </div>
-                )}
-              </div>
-              <span className={`check-status check-status--${status.className}`}>{status.label}</span>
-            </li>
-          );
-        })}
+        {spreadsheetRows(quote, watchPrice).map(({ column, label, detail, passed }) => (
+          <li key={column}>
+            <span className="sheet-column">{column}</span>
+            <div>
+              <strong>{label}</strong>
+              <p className="sheet-check-detail">{detail}</p>
+              {column === 'A' && (
+                <div className="watch-field">
+                  <label htmlFor="watch-price">Harga pantauan ({quote.currency})</label>
+                  <input
+                    id="watch-price"
+                    type="text"
+                    inputMode={decimals === 0 ? 'numeric' : 'decimal'}
+                    autoComplete="off"
+                    placeholder={decimals === 0 ? 'Mis. 5200' : 'Mis. 189,50'}
+                    value={watchInput}
+                    onChange={(event) => setWatchInput(event.target.value)}
+                    aria-describedby="watch-hint"
+                    aria-invalid={watchInput.trim() !== '' && watchPrice === null}
+                  />
+                  <p id="watch-hint" className="sheet-check-detail">
+                    {decimals === 0
+                      ? 'Masukkan angka bulat tanpa pemisah ribuan.'
+                      : 'Gunakan maksimal dua angka desimal, tanpa pemisah ribuan.'}
+                  </p>
+                </div>
+              )}
+            </div>
+            <CheckBadge passed={passed} />
+          </li>
+        ))}
       </ul>
     </section>
+  );
+}
+
+function PositionLevels({ quote }) {
+  const { close, currency, buyTrigger } = quote;
+  const { level, sellLevel, trueRange } = buyTrigger ?? {};
+  const closeLabel = formatPrice(close, currency);
+  const positions = [
+    {
+      side: 'Short', action: 'Sell', column: 'I', operator: '≤', price: sellLevel,
+      passed: Number.isFinite(sellLevel) ? sellLevel <= close : null,
+    },
+    {
+      side: 'Long', action: 'Buy', column: 'H', operator: '≥', price: level,
+      passed: Number.isFinite(level) ? level >= close : null,
+    },
+  ];
+
+  return (
+    <>
+      <div className="position-levels">
+        {positions.map(({ side, action, column, operator, price, passed }) => {
+          const priceLabel = Number.isFinite(price) ? formatPrice(price, currency) : 'Tidak tersedia';
+          return (
+            <section className={`position-level position-level--${side.toLowerCase()}`} aria-label={side} key={column}>
+              <div className="position-heading">
+                <h3>{side}</h3>
+                <CheckBadge passed={passed} />
+              </div>
+              <p className="position-price-label">Level {action} Trigger</p>
+              <strong className="position-price">{priceLabel}</strong>
+              <div className="position-rule">
+                <span className="sheet-column">{column}</span>
+                <div>
+                  <strong>{action}</strong>
+                  <p>
+                    {passed === null
+                      ? 'Harga tutup sesi sebelum acuan dibutuhkan.'
+                      : `${column} ${operator} C · C ${closeLabel}`}
+                  </p>
+                </div>
+              </div>
+            </section>
+          );
+        })}
+      </div>
+      {Number.isFinite(trueRange) && (
+        <p className="position-note">Untuk sesi berikutnya · True Range {formatPrice(trueRange, currency)}</p>
+      )}
+    </>
   );
 }
 
 function QuoteCard({ quote }) {
   const { symbol, name, exchange, date, open, high, low, close, volume, currency, buyTrigger } = quote;
   const trend = trends[Math.sign(close - open)];
-  const level = buyTrigger?.level ?? null;
+  const { previousClose, averageVolume } = buyTrigger ?? {};
+  const previousDate = buyTrigger?.volumeChecks?.[1]?.date;
 
   return (
     <article className="quote-card">
@@ -200,22 +255,8 @@ function QuoteCard({ quote }) {
             <time dateTime={date}>{formatDate(date)}</time>
           </div>
         </div>
-        <div className="featured-price">
-          <p>Level Buy Trigger</p>
-          {level === null ? (
-            <>
-              <strong className="featured-price-missing">Tidak tersedia</strong>
-              <span>Harga tutup sesi sebelum acuan dibutuhkan.</span>
-            </>
-          ) : (
-            <>
-              <strong>{formatPrice(level, currency)}</strong>
-              <span>Untuk sesi berikutnya · True Range {formatPrice(buyTrigger.trueRange, currency)}</span>
-            </>
-          )}
-        </div>
+        <PositionLevels quote={quote} />
       </div>
-      <SpreadsheetChecks quote={quote} />
       <dl className="quote-details" aria-label="OHLCV sesi acuan">
         <div>
           <dt>Buka</dt>
@@ -241,6 +282,20 @@ function QuoteCard({ quote }) {
           <dd>{formatVolume(volume)}</dd>
         </div>
       </dl>
+      <dl className="quote-details quote-history" aria-label="Riwayat sesi">
+        <div>
+          <dt>Rata-rata volume 50 sesi</dt>
+          <dd>{formatVolume(averageVolume)}</dd>
+        </div>
+        <div>
+          <dt>Close 2 sesi lalu</dt>
+          <dd>
+            {Number.isFinite(previousClose) ? formatPrice(previousClose, currency) : 'Tidak tersedia'}
+            {previousDate && <time dateTime={previousDate}>{formatDate(previousDate)}</time>}
+          </dd>
+        </div>
+      </dl>
+      <SpreadsheetChecks quote={quote} />
     </article>
   );
 }
@@ -324,7 +379,7 @@ export default function App() {
         <div className="intro">
           <p className="eyebrow">Ringkasan pasar</p>
           <h1>Cek Buy Trigger</h1>
-          <p>Lihat lima status dari spreadsheet, level harga, dan OHLCV sesi acuan.</p>
+          <p>Lihat level Short dan Long, OHLCV, dan cek dari spreadsheet.</p>
         </div>
 
         <div className="search-card">
@@ -333,10 +388,9 @@ export default function App() {
               <div className="market-field">
                 <label htmlFor="market">Bursa</label>
                 <select id="market" value={market} onChange={(event) => setMarket(event.target.value)}>
-                  <option value="auto">Otomatis</option>
-                  <option value="us">AS</option>
-                  <option value="id">Indonesia</option>
-                  <option value="jp">Jepang</option>
+                  {Object.entries(markets).map(([value, { label }]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
                 </select>
               </div>
               <div className="ticker-field">
@@ -371,6 +425,9 @@ export default function App() {
               <span>NVDA, MSFT, AAPL (pilih AS)</span>
               <span>BBCA → BBCA.JK (Indonesia)</span>
               <span>7203 → 7203.T (Jepang)</span>
+              <span>0700 (Hong Kong)</span>
+              <span>005930 (KOSPI)</span>
+              <span>600519 (Shanghai)</span>
             </p>
           </form>
 

@@ -50,13 +50,14 @@ function latestCompletedIndex(sessions, meta, marketDate) {
 function calculateBuyTrigger(sessions, index) {
   const session = sessions[index];
   const previous = sessions[index - 1];
-  const trueRange = Number.isFinite(previous?.close)
-    ? Math.max(
+  const previousClose = Number.isFinite(previous?.close) ? previous.close : null;
+  const trueRange = previousClose === null
+    ? null
+    : Math.max(
       session.high - session.low,
-      Math.abs(session.high - previous.close),
-      Math.abs(session.low - previous.close),
-    )
-    : null;
+      Math.abs(session.high - previousClose),
+      Math.abs(session.low - previousClose),
+    );
   const triggerDistance = trueRange === null ? null : 0.4 * trueRange;
 
   // Ambil 50 sesi yang mendahului kedua sesi yang diuji.
@@ -74,6 +75,7 @@ function calculateBuyTrigger(sessions, index) {
     trueRange,
     level: triggerDistance === null ? null : session.close + triggerDistance,
     sellLevel: triggerDistance === null ? null : session.close - triggerDistance,
+    previousClose,
     averageVolume,
     minimumVolume,
     volumeChecks: [session, previous].map((day) => {

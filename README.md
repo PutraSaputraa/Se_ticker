@@ -31,12 +31,13 @@ Impor repo GitHub di Netlify, pilih branch `main`, lalu jalankan deploy. Netlify
 ## Cara kerja
 
 - Pilih **AS** untuk ticker seperti `NVDA`, `MSFT`, dan `AAPL`. Pilih **Indonesia** untuk `BBCA` atau **Jepang** untuk `7203`. Mode **Otomatis** mengarahkan kode 3–4 digit ke Tokyo dan kode 2–5 huruf ke Indonesia, dengan `AAPL` sebagai pengecualian. Ticker yang sudah bersufiks dikirim langsung.
+- Pilih bursa untuk ticker Hong Kong (`.HK`), Korea Selatan (KOSPI `.KS` atau KOSDAQ `.KQ`), dan China (Shanghai `.SS` atau Shenzhen `.SZ`). Kode numerik dilengkapi nol di depan jika diperlukan. Contoh `700` menjadi `0700.HK` di Hong Kong.
 - Kartu menampilkan OHLCV dari sesi terakhir yang sudah tutup dalam data Yahoo Finance. Bar hari ini dipakai setelah jadwal tutup terlewati dan waktu kuotasi Yahoo sudah mencapai penutupan. Tanggal sesi mengikuti zona waktu bursa.
 - Lima pencarian sukses terakhir tersimpan di browser dan bisa dijalankan ulang dari tombol riwayat.
 
 ## Rumus Buy Trigger
 
-Sesi acuan adalah sesi yang ditampilkan di kartu. Close sebelumnya berasal dari satu sesi perdagangan sebelum acuan.
+Kartu menempatkan Short di kiri dan Long di kanan, diikuti OHLCV, rata-rata volume 50 sesi, dan Close 2 sesi lalu. Close 2 sesi lalu adalah harga tutup satu sesi sebelum acuan, dihitung relatif terhadap sesi berikutnya.
 
 - **True Range** = MAX(High acuan − Low acuan, |High acuan − Close sebelumnya|, |Low acuan − Close sebelumnya|).
 - **Level Buy Trigger sesi berikutnya** = Close acuan + 0,4 × True Range.
