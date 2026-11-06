@@ -63,7 +63,7 @@ function QuoteCard({ quote }) {
           <time dateTime={date}>{dateFormat.format(new Date(`${date}T00:00:00Z`))}</time>
         </div>
         <div className="featured-price">
-          <p>Harga tertinggi kemarin</p>
+          <p>Harga tertinggi</p>
           <strong>{formatPrice(high, currency)}</strong>
         </div>
       </div>
@@ -90,6 +90,7 @@ function QuoteCard({ quote }) {
 
 export default function App() {
   const [ticker, setTicker] = useState('');
+  const [tradeDate, setTradeDate] = useState('');
   const [history, setHistory] = useState(readHistory);
   const [result, setResult] = useState({ status: 'idle' });
   const activeSearch = useRef(null);
@@ -119,6 +120,7 @@ export default function App() {
 
     try {
       const params = new URLSearchParams({ symbol });
+      if (tradeDate) params.set('date', tradeDate);
       const response = await fetch(`/.netlify/functions/price?${params}`, {
         signal: controller.signal,
       });
@@ -167,29 +169,45 @@ export default function App() {
         <div className="intro">
           <p className="eyebrow">Ringkasan pasar</p>
           <h1>Cek harga saham</h1>
-          <p>Lihat harga tertinggi, terendah, buka, dan tutup dari sesi perdagangan sebelumnya.</p>
+          <p>Lihat harga tertinggi, terendah, buka, dan tutup per sesi perdagangan.</p>
         </div>
 
         <div className="search-card">
           <form onSubmit={handleSubmit}>
             <label htmlFor="ticker">Kode ticker</label>
+            <div className="input-wrap">
+              <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+                <circle cx="10.8" cy="10.8" r="5.8" />
+                <path d="m15.1 15.1 4.3 4.3" />
+              </svg>
+              <input
+                id="ticker"
+                name="ticker"
+                type="text"
+                value={ticker}
+                onChange={(event) => setTicker(event.target.value)}
+                placeholder="7203, BBCA, atau AAPL"
+                aria-describedby="ticker-hint"
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <p id="ticker-hint" className="hint">
+              <span>7203 → 7203.T (Tokyo)</span>
+              <span>BBCA → BBCA.JK (Indonesia)</span>
+              <span>AAPL (AS)</span>
+            </p>
             <div className="form-row">
-              <div className="input-wrap">
-                <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-                  <circle cx="10.8" cy="10.8" r="5.8" />
-                  <path d="m15.1 15.1 4.3 4.3" />
-                </svg>
+              <div className="date-field">
+                <label htmlFor="trade-date">Tanggal perdagangan <span>(opsional)</span></label>
                 <input
-                  id="ticker"
-                  name="ticker"
-                  type="text"
-                  value={ticker}
-                  onChange={(event) => setTicker(event.target.value)}
-                  placeholder="7203, BBCA, atau AAPL"
-                  aria-describedby="ticker-hint"
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                  spellCheck={false}
+                  id="trade-date"
+                  name="date"
+                  type="date"
+                  value={tradeDate}
+                  onChange={(event) => setTradeDate(event.target.value)}
+                  aria-describedby="date-hint"
                 />
               </div>
               <button type="submit" className="check-button">
@@ -199,11 +217,14 @@ export default function App() {
                 </svg>
               </button>
             </div>
-            <p id="ticker-hint" className="hint">
-              <span>7203 → 7203.T (Tokyo)</span>
-              <span>BBCA → BBCA.JK (Indonesia)</span>
-              <span>AAPL (AS)</span>
-            </p>
+            <div className="date-caption">
+              <p id="date-hint" className="hint">Kosongkan untuk memakai sesi kedua dari akhir data Yahoo.</p>
+              {tradeDate && (
+                <button type="button" className="clear-date" onClick={() => setTradeDate('')}>
+                  Hapus tanggal
+                </button>
+              )}
+            </div>
           </form>
 
           {history.length > 0 && (

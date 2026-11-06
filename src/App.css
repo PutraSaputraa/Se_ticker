@@ -130,7 +130,9 @@ h1 {
 .form-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 0.625rem;
+  margin-top: 1rem;
 }
 
 .input-wrap {
@@ -146,14 +148,20 @@ h1 {
   pointer-events: none;
 }
 
-.input-wrap input {
+.input-wrap input,
+.date-field input {
   width: 100%;
+  min-width: 0;
   min-height: 3rem;
-  padding: 0.65rem 0.75rem 0.65rem 2.5rem;
+  padding: 0.65rem 0.75rem;
   border: 1px solid #b5c6ba;
   border-radius: 0.625rem;
   background: #fcfdfb;
   color: inherit;
+}
+
+.input-wrap input {
+  padding-inline-start: 2.5rem;
 }
 
 .input-wrap input::placeholder {
@@ -186,6 +194,36 @@ h1 {
   color: var(--muted);
   font-size: 0.8125rem;
   line-height: 1.4;
+}
+
+.date-field label span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.date-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-top: 0.625rem;
+}
+
+.date-caption .hint {
+  margin: 0;
+}
+
+.clear-date {
+  min-height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .history {
