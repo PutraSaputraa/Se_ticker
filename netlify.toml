@@ -4,3 +4,8 @@
 
 [functions]
   directory = "netlify/functions"
+
+[dev]
+  # vite.config.js mengunci Vite di port ini; beri tahu Netlify Dev agar tidak
+  # menunggu port default 5173 yang tidak pernah terbuka.
+  targetPort = 5175

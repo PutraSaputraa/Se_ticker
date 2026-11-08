@@ -42,7 +42,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  width: min(100% - 2rem, 62rem);
+  width: min(100% - 2rem, 90rem);
   min-height: 4.25rem;
   margin-inline: auto;
 }
@@ -83,10 +83,26 @@ button {
   padding-block: clamp(2rem, 6vw, 4rem) 2rem;
 }
 
-/* Di layar lebar, beri ruang untuk tabel daftar pantauan. */
-@media (min-width: 62rem) {
-  .workspace:has(.watchlist) {
-    width: min(100% - 2rem, 60rem);
+/* Di layar lebar, pakai lebar penuh dan taruh watchlist + detail berdampingan. */
+@media (min-width: 72rem) {
+  .workspace {
+    width: min(100% - 3rem, 90rem);
+    padding-block: 1.75rem 2rem;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(26rem, 2fr);
+    align-items: start;
+    gap: 1.25rem;
+  }
+
+  .board .watchlist {
+    margin-top: 0;
+  }
+
+  .board .output {
+    margin-top: 0;
   }
 }
 
@@ -943,6 +959,52 @@ h1 {
   border-color: var(--border);
   background: #f4f8f3;
   color: #234c3d;
+}
+
+.watchlist-empty {
+  margin: 0.875rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.ptw-input {
+  width: 6.5rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: #fcfdfb;
+  color: inherit;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+}
+
+.breakout-badge {
+  display: inline-block;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.breakout-badge--on {
+  background: #d9f0e3;
+  color: #1c5b45;
+  box-shadow: 0 0 0 1px #9fdcb4 inset;
+}
+
+.breakout-badge--near {
+  background: #f8eee0;
+  color: #74471d;
+}
+
+.breakout-badge--off {
+  background: #edf1ee;
+  color: #8a9a92;
 }
 
 /* ---------- Tombol pantau di kartu hasil ---------- */

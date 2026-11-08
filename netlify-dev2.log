@@ -50,3 +50,7 @@ Request from ::1: GET /.netlify/functions/price?symbol=NVDA
 Response with status 200 in 803 ms.
 Request from ::1: GET /.netlify/functions/price?symbol=BBCA.JK
 Response with status 200 in 793 ms.
+21.43.39 [vite] (client) page reload design-prototype.html
+21.51.22 [vite] (client) page reload design-prototype.html
+21.58.16 [vite] (client) page reload design-prototype.html
+⬥ Command failed with exit code 1: npm run dev. Shutting down Netlify Dev server

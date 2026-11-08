@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cek Saham — Preview UI Desktop</title>
+<style>
+  :root {
+    --bg: #f4f7f2; --surface: #ffffff; --surface2: #fbfdf9; --border: #d9e3db;
+    --text: #172b23; --muted: #52665c; --accent: #1c5b45; --accent-strong: #147048;
+    --up: #147048; --down: #a5302e; --pass-bg: #e4f4e9; --below-bg: #f8eee0;
+    --hero-bg: #18332b; --hero-text: #ffffff; --hero-muted: #d3e8da;
+    --badge-breakout-bg: #d9f0e3; --badge-breakout-text: #1c5b45;
+    --radius: 0.75rem;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  button, input, select { font: inherit; }
+
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .topbar-inner {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 0.75rem 1.5rem;
+  }
+  .brand { display: flex; align-items: center; gap: 0.625rem; font-weight: 750; font-size: 1.0625rem; }
+  .brand-mark { width: 2rem; height: 2rem; border-radius: 0.5rem; background: #1b4034; color: #d4f3dd; display: grid; place-items: center; }
+  .topbar-actions { display: flex; align-items: center; gap: 0.5rem; }
+  .detail-toggle {
+    padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--surface2); color: var(--text); font-size: 0.8125rem; font-weight: 650; cursor: pointer;
+  }
+  .detail-toggle:hover { background: var(--border); }
+
+  .searchbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.875rem 1.5rem; }
+  .search-row { display: grid; grid-template-columns: 14rem 1fr auto; gap: 0.625rem; align-items: end; }
+  .search-row label { display: block; margin-bottom: 0.375rem; font-size: 0.8125rem; font-weight: 700; color: var(--muted); }
+  .search-row select, .search-row input {
+    width: 100%; min-height: 2.75rem; padding: 0.55rem 0.75rem;
+    border: 1px solid var(--border); border-radius: 0.625rem; background: var(--surface2); color: var(--text);
+  }
+  .check-btn {
+    min-height: 2.75rem; padding-inline: 1.5rem; border: 0; border-radius: 0.625rem;
+    background: var(--accent); color: #fff; font-weight: 700; cursor: pointer;
+  }
+
+  .layout {
+    display: grid; grid-template-columns: minmax(0, 3fr) minmax(24rem, 2fr);
+    gap: 1rem; padding: 1rem 1.5rem;
+  }
+  .layout.detail-closed { grid-template-columns: 1fr; }
+  .layout.detail-closed .detail-col { display: none; }
+  @media (max-width: 62rem) { .layout { grid-template-columns: 1fr; } }
+
+  .col-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.625rem; }
+  .col-head h2 { margin: 0; font-size: 0.9375rem; font-weight: 750; }
+  .col-head p { margin: 0; color: var(--muted); font-size: 0.8125rem; }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  thead th {
+    padding: 0.625rem 0.75rem; border-bottom: 1px solid var(--border);
+    color: var(--muted); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em;
+    text-align: left; text-transform: uppercase; white-space: nowrap;
+    background: var(--surface2);
+  }
+  tbody td { padding: 0.625rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr.active { background: var(--surface2); box-shadow: inset 3px 0 0 var(--accent); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .sym-badge { display: inline-block; padding: 0.2rem 0.5rem; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--surface2); font-size: 0.75rem; font-weight: 750; letter-spacing: 0.04em; }
+  .name-cell { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .up { color: var(--up); } .down { color: var(--down); }
+
+  .ptw-input {
+    width: 6.5rem; padding: 0.3rem 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem;
+    background: var(--bg); color: var(--text); text-align: right; font-variant-numeric: tabular-nums; font-size: 0.875rem;
+  }
+
+  .check { min-width: 2.5rem; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.6875rem; font-weight: 700; text-align: center; display: inline-block; }
+  .check.pass { background: var(--pass-bg); color: var(--accent-strong); }
+  .check.no { background: var(--below-bg); color: var(--muted); }
+  .check.na { background: var(--surface2); color: var(--muted); }
+
+  .breakout-badge {
+    padding: 0.25rem 0.625rem; border-radius: 999px; font-size: 0.6875rem; font-weight: 800; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .breakout-badge.on { background: var(--badge-breakout-bg); color: var(--badge-breakout-text); box-shadow: 0 0 0 1px currentColor inset; }
+  .breakout-badge.off { background: var(--surface2); color: var(--muted); }
+
+  .detail-col { display: flex; flex-direction: column; gap: 1rem; }
+
+  .hero { background: var(--hero-bg); color: var(--hero-text); border-radius: var(--radius); padding: 1.25rem; }
+  .hero-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .hero-sym { display: inline-block; padding: 0.2rem 0.5rem; border: 1px solid rgb(255 255 255 / 0.3); border-radius: 0.375rem; font-size: 0.75rem; font-weight: 750; letter-spacing: 0.05em; }
+  .hero-name { margin: 0.5rem 0 0; font-size: 1.25rem; line-height: 1.25; }
+  .hero-date { color: var(--hero-muted); font-size: 0.8125rem; text-align: right; }
+  .hero-date span { display: block; font-weight: 700; }
+
+  .trigger-cols { display: grid; grid-template-columns: 1fr 1fr; margin-top: 1.25rem; }
+  .trigger-col + .trigger-col { border-inline-start: 1px solid rgb(255 255 255 / 0.15); padding-inline-start: 1.25rem; }
+  .trigger-col:first-child { padding-inline-end: 1.25rem; }
+  .trigger-side { margin: 0 0 0.25rem; font-size: 0.75rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+  .trigger-price { display: block; font-size: clamp(2rem, 4vw, 3rem); font-variant-numeric: tabular-nums; line-height: 1.05; letter-spacing: -0.04em; }
+  .trigger-note { margin: 0.875rem 0 0; color: var(--hero-muted); font-size: 0.8125rem; }
+
+  .ohlcv { display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .ohlcv > div { padding: 0.875rem 1rem; }
+  .ohlcv > div + div { border-inline-start: 1px solid var(--border); }
+  .ohlcv dt { color: var(--muted); font-size: 0.75rem; margin: 0; }
+  .ohlcv dd { margin: 0.25rem 0 0; font-size: 1rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+
+  .chart-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+  .chart-panel h3 { margin: 0; font-size: 0.9375rem; }
+  .chart-panel p { margin: 0.25rem 0 0.875rem; color: var(--muted); font-size: 0.8125rem; }
+  .chart-svg { display: block; width: 100%; height: 16rem; }
+  .candle-up { color: var(--up); } .candle-down { color: var(--down); }
+  .wick { stroke: currentColor; } .body, .vol-bar { fill: currentColor; }
+  .vol-bar { opacity: 0.55; }
+  .trig-line { stroke: currentColor; stroke-width: 1.25; stroke-dasharray: 4 4; stroke-opacity: 0.6; }
+  .vol-avg { stroke: var(--muted); stroke-opacity: 0.45; }
+  .chart-guide { fill: none; stroke: var(--border); }
+  .ref-zone { fill: var(--up); fill-opacity: 0.06; }
+  .chart-foot { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.6875rem; margin-top: 0.25rem; }
+
+  .sheet-panel { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+  .sheet-panel h3 { margin: 0; font-size: 0.9375rem; }
+  .sheet-panel .sub { margin: 0.25rem 0 0.875rem; color: var(--muted); font-size: 0.8125rem; }
+  .sheet-row { display: grid; grid-template-columns: 1.5rem 1fr auto; gap: 0.625rem; padding-block: 0.625rem; border-top: 1px solid var(--border); align-items: start; font-size: 0.875rem; }
+  .sheet-col { display: grid; place-items: center; min-height: 1.5rem; border-radius: 0.375rem; background: var(--surface); color: var(--accent); font-weight: 750; }
+  .sheet-detail { margin: 0.125rem 0 0; color: var(--muted); font-size: 0.8125rem; }
+
+  footer { padding: 1rem 1.5rem 1.5rem; color: var(--muted); font-size: 0.75rem; text-align: right; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 5.5-5.5 3.5 3.5 7-8m-5 0h5v5"/></svg>
+      </span>
+      Cek Saham
+    </div>
+    <div class="topbar-actions">
+      <button class="detail-toggle" onclick="toggleDetail()">Sembunyikan detail</button>
+    </div>
+  </div>
+</header>
+
+<div class="searchbar">
+  <div class="search-row">
+    <div>
+      <label>Bursa</label>
+      <select><option>Otomatis</option><option>AS</option><option>Indonesia</option><option>Jepang</option><option>Hong Kong</option></select>
+    </div>
+    <div>
+      <label>Kode ticker</label>
+      <input value="NVDA" placeholder="Mis. NVDA atau BBCA" />
+    </div>
+    <button class="check-btn">Cek</button>
+  </div>
+</div>
+
+<main class="layout" id="layout">
+
+  <section>
+    <div class="col-head">
+      <h2>Daftar pantauan</h2>
+      <p>Diurutkan: breakout terlebih dahulu</p>
+    </div>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th>Simbol</th><th>Nama</th><th class="num">Close</th><th class="num">Buy Trigger</th>
+            <th class="num">Sell Trigger</th><th class="num">Price to Watch</th><th>Volume</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="active" onclick="selectRow(this)">
+            <td><span class="sym-badge">NVDA</span></td>
+            <td class="name-cell">NVIDIA Corporation</td>
+            <td class="num up">$195.40</td>
+            <td class="num">$198.42</td>
+            <td class="num">$186.10</td>
+            <td class="num"><input class="ptw-input" value="190" /></td>
+            <td><span class="check pass">YES</span></td>
+            <td><span class="breakout-badge on">BREAKOUT</span></td>
+          </tr>
+          <tr onclick="selectRow(this)">
+            <td><span class="sym-badge">GILD</span></td>
+            <td class="name-cell">Gilead Sciences</td>
+            <td class="num up">$174.48</td>
+            <td class="num">$168.99</td>
+            <td class="num">$164.79</td>
+            <td class="num"><input class="ptw-input" value="158" /></td>
+            <td><span class="check pass">YES</span></td>
+            <td><span class="breakout-badge on">BREAKOUT</span></td>
+          </tr>
+          <tr onclick="selectRow(this)">
+            <td><span class="sym-badge">AXP</span></td>
+            <td class="name-cell">American Express</td>
+            <td class="num up">$332.59</td>
+            <td class="num">$323.10</td>
+            <td class="num">$318.88</td>
+            <td class="num"><input class="ptw-input" value="330" /></td>
+            <td><span class="check pass">YES</span></td>
+            <td><span class="breakout-badge on">BREAKOUT</span></td>
+          </tr>
+          <tr onclick="selectRow(this)">
+            <td><span class="sym-badge">DAL</span></td>
+            <td class="name-cell">Delta Air Lines</td>
+            <td class="num up">$89.24</td>
+            <td class="num">$88.06</td>
+            <td class="num">$86.34</td>
+            <td class="num"><input class="ptw-input" value="87" /></td>
+            <td><span class="check no">NO</span></td>
+            <td><span class="breakout-badge off">Dekat</span></td>
+          </tr>
+          <tr onclick="selectRow(this)">
+            <td><span class="sym-badge">BBCA</span></td>
+            <td class="name-cell">Bank Central Asia Tbk</td>
+            <td class="num down">Rp9.850</td>
+            <td class="num">Rp10.020</td>
+            <td class="num">Rp9.680</td>
+            <td class="num"><input class="ptw-input" value="9700" /></td>
+            <td><span class="check pass">YES</span></td>
+            <td><span class="breakout-badge off">Dekat</span></td>
+          </tr>
+          <tr onclick="selectRow(this)">
+            <td><span class="sym-badge">HLT</span></td>
+            <td class="name-cell">Hilton Worldwide</td>
+            <td class="num up">$376.53</td>
+            <td class="num">$372.49</td>
+            <td class="num">$368.41</td>
+            <td class="num"><input class="ptw-input" placeholder="—" /></td>
+            <td><span class="check pass">YES</span></td>
+            <td><span class="breakout-badge off">—</span></td>
+          </tr>
+          <tr onclick="selectRow(this)">
+            <td><span class="sym-badge">7203</span></td>
+            <td class="name-cell">Toyota Motor Corp</td>
+            <td class="num down">¥3.120</td>
+            <td class="num">¥3.168</td>
+            <td class="num">¥3.072</td>
+            <td class="num"><input class="ptw-input" value="3100" /></td>
+            <td><span class="check no">NO</span></td>
+            <td><span class="breakout-badge off">—</span></td>
+          </tr>
+          <tr onclick="selectRow(this)">
+            <td><span class="sym-badge">MRK</span></td>
+            <td class="name-cell">Merck &amp; Co</td>
+            <td class="num down">$146.73</td>
+            <td class="num">$148.63</td>
+            <td class="num">$144.83</td>
+            <td class="num"><input class="ptw-input" value="151" /></td>
+            <td><span class="check na">—</span></td>
+            <td><span class="breakout-badge off">—</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <aside class="detail-col">
+
+    <div class="hero">
+      <div class="hero-head">
+        <div>
+          <span class="hero-sym">NVDA</span>
+          <span style="color:var(--hero-muted);font-size:0.8125rem;margin-left:0.5rem">NASDAQ</span>
+          <h2 class="hero-name">NVIDIA Corporation</h2>
+        </div>
+        <div class="hero-date"><span>Sesi acuan</span>Jumat, 7 November 2026</div>
+      </div>
+      <div class="trigger-cols">
+        <div class="trigger-col">
+          <p class="trigger-side">Long · Buy Trigger</p>
+          <strong class="trigger-price">$198.42</strong>
+          <span class="check pass" style="margin-top:0.5rem;display:inline-block">YES</span>
+        </div>
+        <div class="trigger-col">
+          <p class="trigger-side">Short · Sell Trigger</p>
+          <strong class="trigger-price">$186.10</strong>
+          <span class="check no" style="margin-top:0.5rem;display:inline-block">NO</span>
+        </div>
+      </div>
+      <p class="trigger-note">Trigger untuk sesi Senin, 10 November · True Range $7.70</p>
+    </div>
+
+    <dl class="ohlcv">
+      <div><dt>Buka</dt><dd>$190.20</dd></div>
+      <div><dt>Tertinggi</dt><dd>$199.80</dd></div>
+      <div><dt>Terendah</dt><dd>$189.50</dd></div>
+      <div><dt>Tutup</dt><dd class="up">$195.40</dd></div>
+      <div><dt>Volume</dt><dd>48,2M</dd></div>
+    </dl>
+
+    <div class="chart-panel">
+      <h3>Grafik candlestick</h3>
+      <p>20 sesi perdagangan hingga 7 Nov 2026.</p>
+      <svg class="chart-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <rect class="ref-zone" x="95" y="0" width="5" height="100"/>
+        <path class="chart-guide" d="M0 0H100 M0 25H100 M0 50H100 M0 75H100 M0 100H100" vector-effect="non-scaling-stroke"/>
+        <line class="trig-line candle-up" x1="0" x2="100" y1="18" y2="18" vector-effect="non-scaling-stroke"/>
+        <line class="trig-line candle-down" x1="0" x2="100" y1="78" y2="78" vector-effect="non-scaling-stroke"/>
+        <g class="candle-up"><line class="wick" x1="2.5" y1="72" x2="2.5" y2="88"/><rect class="body" x="1" y="78" width="3" height="6"/></g>
+        <g class="candle-down"><line class="wick" x1="7.5" y1="68" x2="7.5" y2="82"/><rect class="body" x="6" y="70" width="3" height="6"/></g>
+        <g class="candle-up"><line class="wick" x1="12.5" y1="60" x2="12.5" y2="76"/><rect class="body" x="11" y="64" width="3" height="7"/></g>
+        <g class="candle-up"><line class="wick" x1="17.5" y1="52" x2="17.5" y2="66"/><rect class="body" x="16" y="54" width="3" height="7"/></g>
+        <g class="candle-down"><line class="wick" x1="22.5" y1="50" x2="22.5" y2="64"/><rect class="body" x="21" y="52" width="3" height="6"/></g>
+        <g class="candle-up"><line class="wick" x1="27.5" y1="42" x2="27.5" y2="58"/><rect class="body" x="26" y="46" width="3" height="7"/></g>
+        <g class="candle-up"><line class="wick" x1="32.5" y1="36" x2="32.5" y2="50"/><rect class="body" x="31" y="38" width="3" height="6"/></g>
+        <g class="candle-down"><line class="wick" x1="37.5" y1="34" x2="37.5" y2="48"/><rect class="body" x="36" y="36" width="3" height="7"/></g>
+        <g class="candle-up"><line class="wick" x1="42.5" y1="28" x2="42.5" y2="44"/><rect class="body" x="41" y="30" width="3" height="6"/></g>
+        <g class="candle-up"><line class="wick" x1="47.5" y1="24" x2="47.5" y2="38"/><rect class="body" x="46" y="26" width="3" height="6"/></g>
+        <g class="candle-down"><line class="wick" x1="52.5" y1="22" x2="52.5" y2="36"/><rect class="body" x="51" y="24" width="3" height="6"/></g>
+        <g class="candle-up"><line class="wick" x1="57.5" y1="20" x2="57.5" y2="34"/><rect class="body" x="56" y="24" width="3" height="7"/></g>
+        <g class="candle-up"><line class="wick" x1="62.5" y1="14" x2="62.5" y2="28"/><rect class="body" x="61" y="16" width="3" height="6"/></g>
+        <g class="candle-down"><line class="wick" x1="67.5" y1="12" x2="67.5" y2="26"/><rect class="body" x="66" y="14" width="3" height="7"/></g>
+        <g class="candle-up"><line class="wick" x1="72.5" y1="10" x2="72.5" y2="24"/><rect class="body" x="71" y="13" width="3" height="6"/></g>
+        <g class="candle-up"><line class="wick" x1="77.5" y1="6" x2="77.5" y2="20"/><rect class="body" x="76" y="8" width="3" height="7"/></g>
+        <g class="candle-down"><line class="wick" x1="82.5" y1="8" x2="82.5" y2="22"/><rect class="body" x="81" y="10" width="3" height="6"/></g>
+        <g class="candle-up"><line class="wick" x1="87.5" y1="6" x2="87.5" y2="20"/><rect class="body" x="86" y="9" width="3" height="6"/></g>
+        <g class="candle-up"><line class="wick" x1="92.5" y1="4" x2="92.5" y2="16"/><rect class="body" x="91" y="6" width="3" height="6"/></g>
+        <g class="candle-up"><line class="wick" x1="97.5" y1="2" x2="97.5" y2="14"/><rect class="body" x="96" y="4" width="3" height="6"/></g>
+      </svg>
+      <svg class="chart-svg" viewBox="0 0 100 100" preserveAspectRatio="none" style="height:4.5rem;margin-top:0.375rem">
+        <line class="vol-avg" x1="0" x2="100" y1="35" y2="35" vector-effect="non-scaling-stroke"/>
+        <rect class="vol-bar candle-up" x="1" y="60" width="3" height="40"/><rect class="vol-bar candle-down" x="6" y="55" width="3" height="40"/>
+        <rect class="vol-bar candle-up" x="11" y="45" width="3" height="55"/><rect class="vol-bar candle-up" x="16" y="50" width="3" height="50"/>
+        <rect class="vol-bar candle-down" x="21" y="65" width="3" height="35"/><rect class="vol-bar candle-up" x="26" y="40" width="3" height="60"/>
+        <rect class="vol-bar candle-up" x="31" y="35" width="3" height="65"/><rect class="vol-bar candle-down" x="36" y="55" width="3" height="45"/>
+        <rect class="vol-bar candle-up" x="41" y="30" width="3" height="70"/><rect class="vol-bar candle-up" x="46" y="25" width="3" height="75"/>
+        <rect class="vol-bar candle-down" x="51" y="50" width="3" height="50"/><rect class="vol-bar candle-up" x="56" y="20" width="3" height="80"/>
+        <rect class="vol-bar candle-up" x="61" y="15" width="3" height="85"/><rect class="vol-bar candle-down" x="66" y="45" width="3" height="55"/>
+        <rect class="vol-bar candle-up" x="71" y="18" width="3" height="82"/><rect class="vol-bar candle-up" x="76" y="12" width="3" height="88"/>
+        <rect class="vol-bar candle-down" x="81" y="40" width="3" height="60"/><rect class="vol-bar candle-up" x="86" y="15" width="3" height="85"/>
+        <rect class="vol-bar candle-up" x="91" y="10" width="3" height="90"/><rect class="vol-bar candle-up" x="96" y="8" width="3" height="92"/>
+      </svg>
+      <div class="chart-foot"><span>Buy $198.42</span><span>20 Okt — 7 Nov</span><span>Sell $186.10</span></div>
+    </div>
+
+    <div class="sheet-panel">
+      <h3>Cek volume dan harga pantauan</h3>
+      <p class="sub">Ambang volume 67,5M lembar dari 1,4 × rata-rata volume 50 sesi.</p>
+      <div class="sheet-row">
+        <span class="sheet-col">N</span>
+        <div><strong>Buy berdasarkan volume sesi acuan</strong><p class="sheet-detail">Jumat, 7 Nov · 48,2M lembar</p></div>
+        <span class="check pass">YES</span>
+      </div>
+      <div class="sheet-row">
+        <span class="sheet-col">M</span>
+        <div><strong>Buy berdasarkan volume sesi sebelumnya</strong><p class="sheet-detail">Kamis, 6 Nov · 31,1M lembar</p></div>
+        <span class="check no">NO</span>
+      </div>
+      <div class="sheet-row">
+        <span class="sheet-col">A</span>
+        <div>
+          <strong>Buy berdasarkan price to watch</strong>
+          <p class="sheet-detail">Harga pantauan di bawah Close $195.40 memenuhi syarat.</p>
+          <input class="ptw-input" style="margin-top:0.5rem" value="190" />
+        </div>
+        <span class="check pass">YES</span>
+      </div>
+    </div>
+
+  </aside>
+</main>
+
+<footer>Data historis dari Yahoo Finance · Preview UI — bukan aplikasi asli</footer>
+
+<script>
+  function toggleDetail() {
+    const l = document.getElementById('layout');
+    const closed = l.classList.toggle('detail-closed');
+    document.querySelector('.detail-toggle').textContent = closed ? 'Tampilkan detail' : 'Sembunyikan detail';
+  }
+  function selectRow(el) {
+    document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('active'));
+    el.classList.add('active');
+  }
+</script>
+</body>
+</html>

@@ -3,7 +3,9 @@
   "configurations": [
     {
       "name": "webticker-dev",
-      "url": "http://localhost:9400"
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["netlify-cli", "dev", "--offline", "-p", "9400"],
+      "port": 9400
     }
   ]
 }

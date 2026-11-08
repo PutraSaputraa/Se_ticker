@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import CandlestickChart from './CandlestickChart.jsx';
 import WatchlistTable from './WatchlistTable.jsx';
-import { readWatchlist, saveWatchlist, addSymbol, removeSymbol } from './watchlist.js';
+import { readWatchlist, saveWatchlist, addSymbol, removeSymbol, setPriceToWatch } from './watchlist.js';
 import './App.css';
 
 const historyKey = 'cek-saham:recent';
@@ -383,7 +383,9 @@ export default function App() {
 
   function toggleWatchlist(symbol) {
     setWatchlist((previous) =>
-      previous.includes(symbol) ? removeSymbol(previous, symbol) : addSymbol(previous, symbol),
+      previous.some((entry) => entry.symbol === symbol)
+        ? removeSymbol(previous, symbol)
+        : addSymbol(previous, symbol),
     );
   }
 
@@ -531,60 +533,69 @@ export default function App() {
           )}
         </div>
 
-        {watchlist.length > 0 && (
+        <div className="board">
           <section className="watchlist" aria-labelledby="watchlist-title">
             <div className="watchlist-head">
               <h2 id="watchlist-title">Daftar pantauan</h2>
-              <p>Level trigger untuk sesi berikutnya dari sesi terakhir yang sudah tutup.</p>
+              <p>Diurutkan: breakout terlebih dahulu.</p>
             </div>
-            <WatchlistTable
-              symbols={watchlist}
-              formatPrice={formatPrice}
-              onOpen={openFromWatchlist}
-              onRemove={(symbol) => setWatchlist((previous) => removeSymbol(previous, symbol))}
-            />
+            {watchlist.length > 0 ? (
+              <WatchlistTable
+                entries={watchlist}
+                formatPrice={formatPrice}
+                onOpen={openFromWatchlist}
+                onRemove={(symbol) => setWatchlist((previous) => removeSymbol(previous, symbol))}
+                onSetWatchPrice={(symbol, price) =>
+                  setWatchlist((previous) => setPriceToWatch(previous, symbol, price))
+                }
+              />
+            ) : (
+              <p className="watchlist-empty">
+                Belum ada saham dipantau. Cek ticker lalu tekan "+ Pantau" untuk menambahkannya di sini.
+              </p>
+            )}
           </section>
-        )}
 
-        <div className="output" aria-live="polite">
-          {result.status === 'idle' && (
-            <div className="status-card">
-              <span className="status-mark">
-                <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-                  <path d="M5 18v-5m5 5V8m5 10v-7m5 7V5" />
-                </svg>
-              </span>
-              <div>
-                <p className="status-title">Ringkasan sesi perdagangan</p>
-                <p>Pilih bursa dan masukkan ticker untuk melihat level Buy Trigger.</p>
+          <div className="output" aria-live="polite">
+            {result.status === 'idle' && (
+              <div className="status-card">
+                <span className="status-mark">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+                    <path d="M5 18v-5m5 5V8m5 10v-7m5 7V5" />
+                  </svg>
+                </span>
+                <div>
+                  <p className="status-title">Ringkasan sesi perdagangan</p>
+                  <p>Pilih bursa dan masukkan ticker untuk melihat level Buy Trigger.</p>
+                </div>
               </div>
-            </div>
-          )}
-          {result.status === 'loading' && (
-            <div className="status-card">
-              <span className="spinner" aria-hidden="true" />
-              <div>
-                <p className="status-title">Memuat...</p>
-                <p>Mengambil data {result.symbol} dari Yahoo Finance.</p>
+            )}
+            {result.status === 'loading' && (
+              <div className="status-card">
+                <span className="spinner" aria-hidden="true" />
+                <div>
+                  <p className="status-title">Memuat...</p>
+                  <p>Mengambil data {result.symbol} dari Yahoo Finance.</p>
+                </div>
               </div>
-            </div>
-          )}
-          {result.status === 'error' && (
-            <div className="status-card status-card--error">
-              <span className="status-mark" aria-hidden="true">!</span>
-              <div>
-                <p className="status-title">Pencarian gagal</p>
-                <p>{result.message}</p>
+            )}
+            {result.status === 'error' && (
+              <div className="status-card status-card--error">
+                <span className="status-mark" aria-hidden="true">!</span>
+                <div>
+                  <p className="status-title">Pencarian gagal</p>
+                  <p>{result.message}</p>
+                </div>
               </div>
-            </div>
-          )}
-          {result.status === 'success' && (
-            <QuoteCard
-              quote={result.quote}
-              inWatchlist={watchlist.includes(result.quote.symbol)}
-              onToggleWatchlist={toggleWatchlist}
-            />
-          )}
+            )}
+            {result.status === 'success' && (
+              <QuoteCard
+                quote={result.quote}
+                inWatchlist={watchlist.some((entry) => entry.symbol === result.quote.symbol)}
+                onToggleWatchlist={toggleWatchlist}
+              />
+            )}
+          </div>
         </div>
 
         <footer className="source">Data historis dari Yahoo Finance.</footer>
