@@ -83,6 +83,13 @@ button {
   padding-block: clamp(2rem, 6vw, 4rem) 2rem;
 }
 
+/* Di layar lebar, beri ruang untuk tabel daftar pantauan. */
+@media (min-width: 62rem) {
+  .workspace:has(.watchlist) {
+    width: min(100% - 2rem, 60rem);
+  }
+}
+
 .intro {
   margin-bottom: 1.625rem;
 }
@@ -817,5 +824,197 @@ h1 {
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation: none;
+  }
+}
+
+/* ---------- Daftar pantauan ---------- */
+.watchlist {
+  margin-top: 1.25rem;
+  padding: clamp(1rem, 4vw, 1.5rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: 0 0.25rem 1.25rem #203c2a08;
+}
+
+.watchlist-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.watchlist-head p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.watchlist-table-wrap {
+  margin-top: 0.875rem;
+  overflow-x: auto;
+}
+
+.watchlist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.watchlist-table th {
+  padding: 0.5rem 0.625rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.watchlist-table td {
+  padding: 0.625rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.watchlist-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.watchlist-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.watchlist-row {
+  cursor: pointer;
+}
+
+.watchlist-row:hover {
+  background: #f6faf4;
+}
+
+.watchlist-row:focus-visible {
+  outline: 3px solid #2a765c;
+  outline-offset: -3px;
+}
+
+.watchlist-name {
+  max-width: 16rem;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.watchlist-note--error {
+  color: #a5302e;
+}
+
+.watchlist-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.watchlist-remove {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: none;
+  color: var(--muted);
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.watchlist-remove:hover {
+  background: #fae8e6;
+  color: #a5302e;
+}
+
+.symbol-badge--light {
+  border-color: var(--border);
+  background: #f4f8f3;
+  color: #234c3d;
+}
+
+/* ---------- Tombol pantau di kartu hasil ---------- */
+.quote-heading-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.625rem;
+}
+
+.watch-toggle {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: #e0f4e4;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.watch-toggle:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.watch-toggle--active {
+  border-color: #9fdcb4;
+  background: #d9f0e3;
+  color: #1c5b45;
+}
+
+/* ---------- Tombol salin di level trigger ---------- */
+.trigger-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+}
+
+.trigger-tools .check-status {
+  margin-top: 0;
+}
+
+.copy-button {
+  padding: 0.3rem 0.625rem;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  border-radius: 999px;
+  background: transparent;
+  color: rgb(255 255 255 / 0.85);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.copy-button:hover {
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+}
+
+.copy-button--copied {
+  border-color: #9fdcb4;
+  background: #d9f0e3;
+  color: #1c5b45;
+}
+
+@media (max-width: 40rem) {
+  .watchlist-name {
+    max-width: 9rem;
+  }
+
+  .quote-heading-side {
+    align-items: flex-start;
   }
 }

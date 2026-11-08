@@ -1,0 +1,52 @@
+⬥ Injecting environment variable values for all scopes
+Failed to fetch AI Gateway token for account 686a851a9f1c71525dbf7ec4: Unauthorized
+⬥ Setting up local dev server
+
+⬥ Starting Vite dev server
+[33m⠋[39m Waiting for Vite dev server to be ready on port 5173
+[32m✔[39m Vite dev server ready on port 5173
+
+   ╭─────────────────────── ⬥  ────────────────────────╮
+   │                                                   │
+   │   Local dev server ready: http://localhost:9500   │
+   │                                                   │
+   ╰───────────────────────────────────────────────────╯
+
+
+> cek-saham@1.0.0 dev
+> vite
+
+⬥ Loaded function price
+Port 5173 is in use, trying another one...
+Port 5174 is in use, trying another one...
+
+  VITE v8.3.6  ready in 902 ms
+
+  ➜  Local:   http://localhost:5175/
+  ➜  Network: use --host to expose
+(node:34100) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Request from ::1: GET /.netlify/functions/price?symbol=BBCA.JK
+Response with status 200 in 1820 ms.
+20.52.40 [vite] vite.config.js changed, restarting server...
+20.52.40 [vite] server restarted.
+20.53.59 [vite] vite.config.js changed, restarting server...
+20.53.59 [vite] server restarted.
+Request from ::1: GET /.netlify/functions/price?symbol=NVDA.JK
+Response with status 404 in 918 ms.
+Request from ::1: GET /.netlify/functions/price?symbol=NVDA
+Response with status 200 in 873 ms.
+Request from ::1: GET /.netlify/functions/price?symbol=NVDA
+Response with status 200 in 739 ms.
+Request from ::1: GET /.netlify/functions/price?symbol=NVDA
+Response with status 200 in 776 ms.
+Request from ::1: GET /.netlify/functions/price?symbol=NVDA
+Request from ::1: GET /.netlify/functions/price?symbol=NVDA
+Response with status 200 in 1026 ms.
+Response with status 200 in 1043 ms.
+Request from ::1: GET /.netlify/functions/price?symbol=BBCA.JK
+Response with status 200 in 869 ms.
+Request from ::1: GET /.netlify/functions/price?symbol=NVDA
+Response with status 200 in 803 ms.
+Request from ::1: GET /.netlify/functions/price?symbol=BBCA.JK
+Response with status 200 in 793 ms.

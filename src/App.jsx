@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import CandlestickChart from './CandlestickChart.jsx';
+import WatchlistTable from './WatchlistTable.jsx';
+import { readWatchlist, saveWatchlist, addSymbol, removeSymbol } from './watchlist.js';
 import './App.css';
 
 const historyKey = 'cek-saham:recent';
@@ -11,6 +13,7 @@ const dateFormat = new Intl.DateTimeFormat('id-ID', {
   month: 'long',
   year: 'numeric',
 });
+const shortDateFormat = new Intl.DateTimeFormat('id-ID', { timeZone: 'UTC' });
 const volumeFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
 const serviceError = 'Layanan harga tidak dapat diakses. Coba lagi.';
 const markets = {
@@ -63,6 +66,24 @@ function formatPrice(price, currency) {
 
 function formatDate(date) {
   return dateFormat.format(new Date(`${date}T00:00:00Z`));
+}
+
+function formatNumberRaw(price, currency) {
+  const decimals = currency === 'JPY' || currency === 'IDR' ? 0 : 2;
+  return price.toLocaleString('en-US', {
+    useGrouping: false,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+// Perkiraan sesi berikutnya: lewati akhir pekan (zona waktu UTC mendekati).
+function nextSessionDate(date) {
+  const d = new Date(`${date}T00:00:00Z`);
+  do {
+    d.setUTCDate(d.getUTCDate() + 1);
+  } while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+  return dateFormat.format(d);
 }
 
 function formatVolume(volume) {
@@ -186,7 +207,33 @@ function SpreadsheetChecks({ quote }) {
   );
 }
 
-function TriggerLevels({ buyTrigger, close, currency }) {
+function CopyButton({ text, label }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      // Clipboard tidak tersedia (mis. bukan HTTPS) — biarkan senyap.
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`copy-button${copied ? ' copy-button--copied' : ''}`}
+      onClick={handleCopy}
+      title={label}
+      aria-label={label}
+    >
+      {copied ? '✓ Tersalin' : '⧉ Salin'}
+    </button>
+  );
+}
+
+function TriggerLevels({ buyTrigger, close, currency, referenceDate }) {
   const { level, sellLevel, trueRange } = buyTrigger ?? {};
   const sides = [
     { side: 'Long', label: 'Level Buy Trigger', price: level, passed: Number.isFinite(level) && level >= close },
@@ -205,21 +252,29 @@ function TriggerLevels({ buyTrigger, close, currency }) {
               <strong className={hasPrice ? 'trigger-price' : 'trigger-price trigger-price--missing'}>
                 {hasPrice ? formatPrice(price, currency) : 'Tidak tersedia'}
               </strong>
-              <CheckBadge passed={passed} />
+              <div className="trigger-tools">
+                <CheckBadge passed={passed} />
+                {hasPrice && (
+                  <CopyButton
+                    text={formatNumberRaw(price, currency)}
+                    label={`Salin ${label} ${formatPrice(price, currency)}`}
+                  />
+                )}
+              </div>
             </section>
           );
         })}
       </div>
       <p className="trigger-note">
         {Number.isFinite(trueRange)
-          ? `Untuk sesi berikutnya · True Range ${formatPrice(trueRange, currency)}`
+          ? `Trigger untuk sesi ${nextSessionDate(referenceDate)} · True Range ${formatPrice(trueRange, currency)}`
           : 'Harga tutup sesi sebelum acuan dibutuhkan.'}
       </p>
     </div>
   );
 }
 
-function QuoteCard({ quote }) {
+function QuoteCard({ quote, inWatchlist, onToggleWatchlist }) {
   const { symbol, name, exchange, date, open, high, low, close, volume, currency, buyTrigger } = quote;
   const trend = trends[Math.sign(close - open)];
   const { previousClose, averageVolume } = buyTrigger ?? {};
@@ -234,12 +289,22 @@ function QuoteCard({ quote }) {
             {exchange && <span className="exchange-label">{exchange}</span>}
             <h2>{name}</h2>
           </div>
-          <div className="quote-date">
-            <span>Sesi acuan</span>
-            <time dateTime={date}>{formatDate(date)}</time>
+          <div className="quote-heading-side">
+            <div className="quote-date">
+              <span>Sesi acuan</span>
+              <time dateTime={date}>{formatDate(date)}</time>
+            </div>
+            <button
+              type="button"
+              className={`watch-toggle${inWatchlist ? ' watch-toggle--active' : ''}`}
+              onClick={() => onToggleWatchlist(symbol)}
+              aria-pressed={inWatchlist}
+            >
+              {inWatchlist ? '✓ Dipantau' : '+ Pantau'}
+            </button>
           </div>
         </div>
-        <TriggerLevels buyTrigger={buyTrigger} close={close} currency={currency} />
+        <TriggerLevels buyTrigger={buyTrigger} close={close} currency={currency} referenceDate={date} />
       </div>
       <dl className="quote-details" aria-label="OHLCV sesi acuan">
         <div>
@@ -299,6 +364,7 @@ export default function App() {
   const [market, setMarket] = useState('auto');
   const [history, setHistory] = useState(readHistory);
   const [result, setResult] = useState({ status: 'idle' });
+  const [watchlist, setWatchlist] = useState(readWatchlist);
   const activeSearch = useRef(null);
 
   useEffect(() => {
@@ -309,7 +375,23 @@ export default function App() {
     }
   }, [history]);
 
+  useEffect(() => {
+    saveWatchlist(watchlist);
+  }, [watchlist]);
+
   useEffect(() => () => activeSearch.current?.abort(), []);
+
+  function toggleWatchlist(symbol) {
+    setWatchlist((previous) =>
+      previous.includes(symbol) ? removeSymbol(previous, symbol) : addSymbol(previous, symbol),
+    );
+  }
+
+  function openFromWatchlist(symbol) {
+    setTicker(symbol);
+    setMarket('auto');
+    search(symbol);
+  }
 
   async function search(symbol) {
     activeSearch.current?.abort();
@@ -449,6 +531,21 @@ export default function App() {
           )}
         </div>
 
+        {watchlist.length > 0 && (
+          <section className="watchlist" aria-labelledby="watchlist-title">
+            <div className="watchlist-head">
+              <h2 id="watchlist-title">Daftar pantauan</h2>
+              <p>Level trigger untuk sesi berikutnya dari sesi terakhir yang sudah tutup.</p>
+            </div>
+            <WatchlistTable
+              symbols={watchlist}
+              formatPrice={formatPrice}
+              onOpen={openFromWatchlist}
+              onRemove={(symbol) => setWatchlist((previous) => removeSymbol(previous, symbol))}
+            />
+          </section>
+        )}
+
         <div className="output" aria-live="polite">
           {result.status === 'idle' && (
             <div className="status-card">
@@ -481,7 +578,13 @@ export default function App() {
               </div>
             </div>
           )}
-          {result.status === 'success' && <QuoteCard quote={result.quote} />}
+          {result.status === 'success' && (
+            <QuoteCard
+              quote={result.quote}
+              inWatchlist={watchlist.includes(result.quote.symbol)}
+              onToggleWatchlist={toggleWatchlist}
+            />
+          )}
         </div>
 
         <footer className="source">Data historis dari Yahoo Finance.</footer>
