@@ -109,18 +109,52 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     setState({ status: 'loading', mode: targetMode });
 
     try {
+      // 1. Mulai job di background (menghindari timeout function sinkron).
       const query = new URLSearchParams({ mode: targetMode, region: targetRegion });
-      const response = await fetch(`/.netlify/functions/breakout-scan?${query}`, {
+      const startResponse = await fetch(`/.netlify/functions/breakout-start?${query}`, {
         signal: controller.signal,
       });
-      const payload = await response.json().catch(() => null);
+      const startPayload = await startResponse.json().catch(() => null);
       if (controller.signal.aborted) return;
-
-      if (!response.ok || !payload) {
-        setState({ status: 'error', message: payload?.error || scanErrorMessage });
+      if (!startResponse.ok || !startPayload?.jobId) {
+        setState({ status: 'error', message: startPayload?.error || scanErrorMessage });
         return;
       }
-      setState({ status: 'success', mode: targetMode, data: payload });
+
+      // 2. Poll status sampai selesai (atau timeout di sisi klien).
+      const jobId = startPayload.jobId;
+      const deadline = Date.now() + 90_000;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        if (controller.signal.aborted) return;
+        if (Date.now() > deadline) {
+          setState({ status: 'error', message: 'Pemindaian terlalu lama. Coba lagi.' });
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (controller.signal.aborted) return;
+
+        const statusResponse = await fetch(
+          `/.netlify/functions/breakout-status?${new URLSearchParams({ jobId })}`,
+          { signal: controller.signal },
+        );
+        const statusPayload = await statusResponse.json().catch(() => null);
+        if (controller.signal.aborted) return;
+
+        if (!statusResponse.ok) {
+          setState({ status: 'error', message: statusPayload?.error || scanErrorMessage });
+          return;
+        }
+        if (statusPayload?.status === 'done') {
+          setState({ status: 'success', mode: targetMode, data: statusPayload.result });
+          return;
+        }
+        if (statusPayload?.status === 'error') {
+          setState({ status: 'error', message: statusPayload.error || scanErrorMessage });
+          return;
+        }
+        // pending / running → lanjut poll
+      }
     } catch {
       if (!controller.signal.aborted) {
         setState({ status: 'error', message: scanErrorMessage });
