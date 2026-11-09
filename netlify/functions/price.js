@@ -21,6 +21,42 @@ function errorResponse(error, status) {
   return Response.json({ error }, { status });
 }
 
+function journalQuote(symbol, requestedDate, result, marketDate) {
+  const today = marketDate.format(Date.now());
+  if (requestedDate && requestedDate > today) {
+    return errorResponse('Tanggal masuk belum tiba di zona waktu bursa.', 400);
+  }
+
+  const meta = result.meta;
+  const currency = typeof meta.currency === 'string' ? meta.currency.trim() : '';
+  if (!currency) {
+    return errorResponse('Yahoo Finance tidak memberikan mata uang untuk ticker ini.', 502);
+  }
+
+  let price;
+  let date;
+  let timestamp = null;
+  if (requestedDate && requestedDate < today) {
+    const quote = result.indicators?.quote?.[0];
+    const sessions = Array.isArray(result.timestamp) && quote
+      ? readSessions(result.timestamp, quote, marketDate)
+      : [];
+    price = sessions.find((session) => session.date === requestedDate)?.close;
+    date = requestedDate;
+  } else if (Number.isSafeInteger(meta.regularMarketTime) && meta.regularMarketTime > 0) {
+    timestamp = meta.regularMarketTime;
+    price = meta.regularMarketPrice;
+    date = marketDate.format(timestamp * 1000);
+  }
+
+  if (!Number.isFinite(price) || price <= 0 || !date || date > today || (requestedDate && date !== requestedDate)) {
+    const detail = requestedDate ? ` pada ${requestedDate}` : '';
+    return errorResponse(`Harga ${symbol}${detail} belum tersedia. Periksa tanggal perdagangan atau coba lagi.`, 404);
+  }
+
+  return Response.json({ date, price, currency, timestamp }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
 export default async function price(request) {
   if (request.method !== 'GET') {
     return Response.json({ error: 'Gunakan metode GET.' }, {
@@ -32,6 +68,7 @@ export default async function price(request) {
   const params = new URL(request.url).searchParams;
   const symbol = params.get('symbol')?.trim().toUpperCase() ?? '';
   const requestedDate = params.get('date');
+  const journal = params.get('mode') === 'journal';
   const chartParam = params.get('chart');
   const chartConfig = chartConfigs[chartParam] ?? defaultChartConfig;
 
@@ -39,7 +76,7 @@ export default async function price(request) {
     return errorResponse('Kode ticker kosong atau formatnya tidak valid.', 404);
   }
 
-  let period = { range: chartConfig.range };
+  let period = { range: journal ? '5d' : chartConfig.range };
   if (requestedDate) {
     const dateStart = Date.parse(`${requestedDate}T00:00:00Z`);
     if (!Number.isFinite(dateStart) || new Date(dateStart).toISOString().slice(0, 10) !== requestedDate) {
@@ -49,9 +86,9 @@ export default async function price(request) {
       return errorResponse(pastDateError, 400);
     }
 
-    // Ambil riwayat untuk baseline dan beri ruang untuk perbedaan zona waktu.
+    // Jurnal cukup mengambil harga tanggal yang dipilih. Cek harga perlu riwayat untuk baseline.
     period = {
-      period1: (dateStart - historyDays * dayMilliseconds) / 1000,
+      period1: (dateStart - (journal ? 1 : historyDays) * dayMilliseconds) / 1000,
       period2: (dateStart + 2 * dayMilliseconds) / 1000,
     };
   }
@@ -62,7 +99,7 @@ export default async function price(request) {
   const noData = requestedDate
     ? `Data perdagangan untuk ${symbol} pada tanggal yang dipilih belum tersedia atau tidak lengkap.`
     : `Data sesi yang sudah tutup untuk ${symbol} belum tersedia atau tidak lengkap.`;
-  const query = new URLSearchParams({ ...period, interval: chartConfig.interval });
+  const query = new URLSearchParams({ ...period, interval: journal ? '1d' : chartConfig.interval });
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`;
 
   try {
@@ -86,13 +123,13 @@ export default async function price(request) {
     const result = chart.result?.[0];
     const timestamps = result?.timestamp;
     const quote = result?.indicators?.quote?.[0];
-    if (!Array.isArray(timestamps) || timestamps.length === 0 || !quote) {
+    if (!result || (!journal && (!Array.isArray(timestamps) || timestamps.length === 0 || !quote))) {
       return errorResponse(noData, 404);
     }
 
     const meta = result.meta;
     const timeZone = meta?.exchangeTimezoneName;
-    if (requestedDate && !timeZone) {
+    if ((requestedDate || journal) && !timeZone) {
       return errorResponse('Yahoo Finance tidak memberikan zona waktu bursa untuk ticker ini.', 502);
     }
 
@@ -102,6 +139,8 @@ export default async function price(request) {
       month: '2-digit',
       day: '2-digit',
     });
+    if (journal) return journalQuote(symbol, requestedDate, result, marketDate);
+
     if (requestedDate && requestedDate >= marketDate.format(Date.now())) {
       return errorResponse(pastDateError, 400);
     }

@@ -10,10 +10,14 @@ service cloud.firestore {
       allow read, delete: if isOwner();
       allow create, update: if isOwner()
         && request.resource.data.keys().hasAll(['watchlist', 'history', 'updatedAt'])
-        && request.resource.data.keys().hasOnly(['watchlist', 'history', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['watchlist', 'history', 'updatedAt', 'journal', 'capital', 'currency'])
         && request.resource.data.watchlist is list
         && request.resource.data.history is list
         && request.resource.data.history.size() <= 5
+        && request.resource.data.get('journal', []) is list
+        && request.resource.data.get('capital', 0) is number
+        && request.resource.data.get('capital', 0) >= 0
+        && request.resource.data.get('currency', 'USD') in ['USD', 'IDR', 'USDT']
         && request.resource.data.updatedAt == request.time;
     }
   }

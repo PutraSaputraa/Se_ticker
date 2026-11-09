@@ -47,6 +47,7 @@ export function clearLegacyData() {
 
 export function mergeLegacyData(current, legacy) {
   return {
+    ...current,
     watchlist: normalizeWatchlist([...current.watchlist, ...legacy.watchlist]),
     history: normalizeHistory([...current.history, ...legacy.history]),
   };

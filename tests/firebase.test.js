@@ -10,6 +10,7 @@ import {
   getDocsFromServer, getFirestore, serverTimestamp, setDoc, terminate,
 } from 'firebase/firestore';
 import { mergeLegacyData, normalizeAccountData, updateAccountData } from '../src/accountData.js';
+import { addTrade, closeTrade } from '../src/journal.js';
 import { addSymbol, removeSymbol, setPriceToWatch } from '../src/watchlist.js';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
@@ -85,6 +86,7 @@ test('aturan menolak dokumen di luar skema akun', async () => {
   await assert.rejects(setDoc(reference, { ...valid, admin: true }), { code: 'permission-denied' });
   await assert.rejects(setDoc(reference, { ...valid, watchlist: 'invalid' }), { code: 'permission-denied' });
   await assert.rejects(setDoc(reference, { ...valid, history: Array(6).fill('BBCA.JK') }), { code: 'permission-denied' });
+  await assert.rejects(setDoc(reference, { ...valid, journal: {} }), { code: 'permission-denied' });
 });
 
 test('perubahan serentak dari dua perangkat mempertahankan kedua ticker', async () => {
@@ -126,4 +128,40 @@ test('logout mencabut akses dan login kembali memulihkan data akun', async () =>
   await signInWithEmailAndPassword(owner.auth, email, password);
   const snapshot = await getDocFromServer(doc(owner.db, 'users', uid));
   assert.equal(snapshot.data().watchlist.find(({ symbol }) => symbol === 'BBCA.JK').priceToWatch, 9000);
+});
+
+test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil close satu kali', async () => {
+  const reference = doc(owner.db, 'users', uid);
+  const readJournal = async () => (await getDocFromServer(reference)).data().journal;
+  const date = '2026-01-05';
+  const position = { date, pair: 'BBCA.JK', setup: 'Breakout', entryPrice: 1000, quoteCurrency: 'IDR', status: 'open' };
+  await updateAccountData(owner.db, uid, (current) => ({
+    ...current,
+    journal: addTrade(
+      addTrade(current.journal, { ...position, id: 'test-long', side: 'long' }),
+      { ...position, id: 'test-short', side: 'short' },
+    ),
+  }));
+
+  await updateAccountData(owner.db, uid, (current) => mergeLegacyData(current, { watchlist: [], history: [] }));
+  const open = await readJournal();
+  assert.equal(open.length, 2);
+  assert.ok(open.every((trade) => trade.status === 'open' && trade.pnl === null));
+
+  const exitDate = '2026-01-06';
+  const close = (id, price) => (current) => ({
+    ...current,
+    journal: closeTrade(current.journal, id, { price, date: exitDate }),
+  });
+  await Promise.all([
+    updateAccountData(owner.db, uid, close('test-long', 2000)),
+    updateAccountData(secondDevice.db, uid, close('test-short', 500)),
+  ]);
+  await updateAccountData(secondDevice.db, uid, close('test-long', 750));
+
+  const closed = await readJournal();
+  const long = closed.find((trade) => trade.id === 'test-long');
+  const short = closed.find((trade) => trade.id === 'test-short');
+  assert.deepEqual([long.exitPrice, long.exitDate, long.status, long.pnl, long.pnlPct], [2000, exitDate, 'win', 1000, 100]);
+  assert.deepEqual([short.exitPrice, short.exitDate, short.status, short.pnl, short.pnlPct], [500, exitDate, 'win', 500, 50]);
 });

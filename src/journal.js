@@ -1,11 +1,8 @@
-// Struktur & kalkulasi jurnal trading.
-//
-// Satu trade (kolom inti):
-// { id, date, pair, side, setup, riskPct, pnl, pnlPct, status, notes }
-// side: 'long' | 'short'. status: 'win' | 'loss' | 'be' (breakeven).
-// pnl: nilai uang dalam currency utama akun. pnlPct: PnL terhadap modal (%).
+// Posisi baru menyimpan harga masuk dan PnL per saham setelah ditutup.
+// Catatan lama menyimpan PnL manual dalam mata uang akun.
 
 export const journalStatuses = {
+  open: { label: 'Terbuka', className: 'be' },
   win: { label: 'Win', className: 'win' },
   loss: { label: 'Loss', className: 'loss' },
   be: { label: 'BE', className: 'be' },
@@ -30,11 +27,17 @@ export function normalizeTrade(entry) {
   if (!pair) return null;
 
   const side = entry.side === 'short' ? 'short' : 'long';
-  const status = journalStatuses[entry.status] ? entry.status : null;
   const num = (value) => {
-    const parsed = Number(String(value ?? '').replace(',', '.'));
+    const text = String(value ?? '').trim();
+    if (!text) return null;
+    const parsed = Number(text.replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : null;
   };
+  const entryPrice = num(entry.entryPrice);
+  const quoteCurrency = typeof entry.quoteCurrency === 'string' ? entry.quoteCurrency.trim() : '';
+  const hasPrice = entryPrice > 0 && Boolean(quoteCurrency);
+  const validStatus = Object.hasOwn(journalStatuses, entry.status) && (entry.status !== 'open' || hasPrice);
+  const status = validStatus ? entry.status : null;
 
   return {
     id: typeof entry.id === 'string' && entry.id ? entry.id : makeId(),
@@ -43,10 +46,17 @@ export function normalizeTrade(entry) {
     side,
     setup: typeof entry.setup === 'string' ? entry.setup.trim() : '',
     riskPct: num(entry.riskPct),
-    pnl: num(entry.pnl),
-    pnlPct: num(entry.pnlPct),
+    pnl: status === 'open' ? null : num(entry.pnl),
+    pnlPct: status === 'open' ? null : num(entry.pnlPct),
     status,
     notes: typeof entry.notes === 'string' ? entry.notes.trim() : '',
+    ...(hasPrice && {
+      entryPrice,
+      entryTimestamp: Number.isSafeInteger(entry.entryTimestamp) ? entry.entryTimestamp : null,
+      quoteCurrency,
+      exitPrice: num(entry.exitPrice),
+      exitDate: typeof entry.exitDate === 'string' ? entry.exitDate : null,
+    }),
   };
 }
 
@@ -67,8 +77,23 @@ export function normalizeJournal(value) {
 
 export function addTrade(journal, trade) {
   const normalized = normalizeTrade(trade);
-  if (!normalized) return journal;
+  if (!normalized || journal.some(({ id }) => id === normalized.id)) return journal;
   return [normalized, ...journal];
+}
+
+export function closeTrade(journal, id, quote) {
+  return journal.map((trade) => {
+    if (trade.id !== id || trade.status !== 'open') return trade;
+    const pnl = trade.side === 'short' ? trade.entryPrice - quote.price : quote.price - trade.entryPrice;
+    return {
+      ...trade,
+      exitPrice: quote.price,
+      exitDate: quote.date,
+      pnl,
+      pnlPct: (pnl / trade.entryPrice) * 100,
+      status: pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'be',
+    };
+  });
 }
 
 export function removeTrade(journal, id) {
@@ -76,23 +101,23 @@ export function removeTrade(journal, id) {
 }
 
 // Statistik ringkas ala Minervini: win rate, avg win/loss, expectancy.
-export function summarizeJournal(journal) {
+export function summarizeJournal(journal, metric = 'pnl') {
   const closed = journal.filter((trade) => trade.status === 'win' || trade.status === 'loss');
   const wins = closed.filter((trade) => trade.status === 'win');
   const losses = closed.filter((trade) => trade.status === 'loss');
   const sum = (arr, key) => arr.reduce((total, trade) => total + (trade[key] ?? 0), 0);
 
-  const totalPnl = sum(journal, 'pnl');
+  const totalPnl = sum(journal, metric);
   const winRate = closed.length ? (wins.length / closed.length) * 100 : null;
-  const avgWin = wins.length ? sum(wins, 'pnl') / wins.length : null;
-  const avgLoss = losses.length ? Math.abs(sum(losses, 'pnl')) / losses.length : null;
+  const avgWin = wins.length ? sum(wins, metric) / wins.length : null;
+  const avgLoss = losses.length ? Math.abs(sum(losses, metric)) / losses.length : null;
   const pw = closed.length ? wins.length / closed.length : 0;
   const pl = 1 - pw;
   const expectancyRatio = pl > 0 && avgLoss > 0 && avgWin !== null
     ? (pw * avgWin) / (pl * avgLoss)
     : null;
-  const netExpectancy = closed.length && avgWin !== null && avgLoss !== null
-    ? (pw * avgWin) - (pl * avgLoss)
+  const netExpectancy = closed.length
+    ? (pw * (avgWin ?? 0)) - (pl * (avgLoss ?? 0))
     : null;
 
   return {

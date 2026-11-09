@@ -2269,30 +2269,22 @@ h1 {
 
 .journal-page .intro { margin-bottom: 1.25rem; }
 
-.journal-settings {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.75rem 1rem;
-  margin-bottom: 1.25rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: #fff;
-}
+.journal-section + .journal-section { margin-top: 1.5rem; }
 
-.journal-field {
-  display: grid;
-  gap: 0.25rem;
+.journal-section h2 { margin: 0 0 0.65rem; font-size: 1.15rem; }
+
+.journal-help {
+  margin: 0 0 0.75rem;
   color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }
 
-.journal-field input,
-.journal-field select,
-.journal-form input,
-.journal-form select {
+.journal-form .journal-help { margin: 0; }
+
+.journal-form input {
+  width: 100%;
+  min-width: 0;
   padding: 0.5rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
@@ -2301,9 +2293,16 @@ h1 {
   color: inherit;
 }
 
-.journal-currency-note { color: var(--muted); font-size: 0.75rem; }
 .journal-page .detail-metrics { padding: 0; margin-bottom: 1rem; }
-.journal-actions { margin-bottom: 1rem; }
+
+.journal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.journal-short-button { background: #a3472f; }
+.journal-short-button:hover:not(:disabled) { background: #823622; }
 
 .journal-form {
   display: grid;
@@ -2317,7 +2316,7 @@ h1 {
 
 .journal-form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
   gap: 0.75rem;
 }
 
@@ -2329,8 +2328,6 @@ h1 {
   font-weight: 600;
 }
 
-.journal-form-wide { grid-column: 1 / -1; }
-
 .journal-table-wrap {
   overflow-x: auto;
   padding: 1rem 1.25rem;
@@ -2340,15 +2337,24 @@ h1 {
 }
 
 .journal-table th, .journal-table td { white-space: nowrap; }
+.journal-table-wrap .watchlist-empty { margin: 0; }
 
-.journal-notes, .journal-setup {
-  max-width: 14rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.journal-table .journal-setup {
+  min-width: 8rem;
+  max-width: 16rem;
   color: var(--muted);
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
-.journal-week { color: var(--muted); font-size: 0.75rem; }
+.journal-trade-note { display: block; color: var(--muted); }
+
+.journal-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
 
 .journal-badge {
   display: inline-block;
