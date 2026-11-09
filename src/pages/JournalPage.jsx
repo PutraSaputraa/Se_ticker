@@ -15,9 +15,10 @@ function emptyForm() {
   return { date: new Date().toLocaleDateString('sv-SE'), ticker: '', setup: '' };
 }
 
-async function fetchJournalQuote(symbol, date) {
+async function fetchJournalQuote(symbol, date, fallback) {
   const params = new URLSearchParams({ symbol, mode: 'journal' });
   if (date) params.set('date', date);
+  if (fallback) params.set('fallback', fallback);
   const response = await fetch(`/.netlify/functions/price?${params}`, { cache: 'no-store' }).catch(() => null);
   const quote = await response?.json().catch(() => null);
   if (!response?.ok || !Number.isFinite(quote?.price) || quote.price <= 0 || !quote.date || !quote.currency) {
@@ -184,14 +185,17 @@ export default function JournalPage({ account }) {
     if (side !== 'long' && side !== 'short') return;
 
     return runAction(side, async () => {
-      const pair = normalizeTicker(form.ticker);
+      const input = form.ticker.trim().toUpperCase();
+      const market = input.startsWith('US:') ? 'us' : 'auto';
+      const rawTicker = market === 'us' ? input.slice(3).trim() : input;
+      const symbol = normalizeTicker(rawTicker, market);
       const setup = form.setup.trim();
-      if (!pair || !setup) throw new Error('Isi kode saham dan setup posisi.');
+      if (!symbol || !setup) throw new Error('Isi kode saham dan setup posisi.');
 
-      const quote = await fetchJournalQuote(pair, form.date);
+      const quote = await fetchJournalQuote(symbol, form.date, symbol === rawTicker ? null : rawTicker);
       const trade = normalizeTrade({
         date: quote.date,
-        pair,
+        pair: quote.symbol ?? symbol,
         side,
         setup,
         status: 'open',
@@ -251,11 +255,12 @@ export default function JournalPage({ account }) {
                 type="text"
                 value={form.ticker}
                 onChange={(event) => setField('ticker', event.target.value)}
-                placeholder="BBCA.JK atau NVDA"
+                placeholder="BBCA, ABBV, 7203.T"
                 autoCapitalize="characters"
                 autoComplete="off"
                 spellCheck={false}
-                maxLength={32}
+                maxLength={35}
+                aria-describedby="journal-ticker-note"
                 disabled={disabled}
                 required
               />
@@ -274,7 +279,8 @@ export default function JournalPage({ account }) {
             </label>
           </div>
           <p className="journal-help" id="journal-price-note">
-            Tanggal mengikuti zona waktu bursa. Jurnal memakai harga penutupan untuk tanggal lampau dan kuotasi terakhir Yahoo Finance untuk hari ini serta saat Close.
+            <span id="journal-ticker-note">Gunakan kode Yahoo Finance. Awali dengan US: untuk memilih ticker AS jika kodenya sama.</span>{' '}
+            Tanggal mengikuti zona waktu bursa. Jurnal memakai harga penutupan untuk tanggal lampau dan kuotasi terakhir untuk hari ini serta saat Close.
           </p>
           <div className="journal-actions">
             <button type="submit" value="long" className="scan-button" disabled={disabled}>

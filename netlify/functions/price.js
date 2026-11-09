@@ -21,6 +21,13 @@ function errorResponse(error, status) {
   return Response.json({ error }, { status });
 }
 
+async function fetchChart(symbol, query, signal) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`;
+  const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal });
+  const chart = response.ok ? (await response.json())?.chart : null;
+  return { chart, ok: response.ok, notFound: response.status === 404 || chart?.error?.code === 'Not Found' };
+}
+
 function journalQuote(symbol, requestedDate, result, marketDate) {
   const today = marketDate.format(Date.now());
   if (requestedDate && requestedDate > today) {
@@ -54,7 +61,7 @@ function journalQuote(symbol, requestedDate, result, marketDate) {
     return errorResponse(`Harga ${symbol}${detail} belum tersedia. Periksa tanggal perdagangan atau coba lagi.`, 404);
   }
 
-  return Response.json({ date, price, currency, timestamp }, { headers: { 'Cache-Control': 'no-store' } });
+  return Response.json({ symbol, date, price, currency, timestamp }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export default async function price(request) {
@@ -69,6 +76,10 @@ export default async function price(request) {
   const symbol = params.get('symbol')?.trim().toUpperCase() ?? '';
   const requestedDate = params.get('date');
   const journal = params.get('mode') === 'journal';
+  const alternate = journal && requestedDate ? params.get('fallback')?.trim().toUpperCase() : null;
+  const fallback = alternate && alternate !== symbol && alternate.length <= 32 && symbolPattern.test(alternate)
+    ? alternate
+    : null;
   const chartParam = params.get('chart');
   const chartConfig = chartConfigs[chartParam] ?? defaultChartConfig;
 
@@ -94,28 +105,32 @@ export default async function price(request) {
   }
 
   const notFound = requestedDate
-    ? `Ticker ${symbol} atau data untuk tanggal yang dipilih tidak ditemukan di Yahoo Finance.`
+    ? `Ticker ${fallback ?? symbol} atau data untuk tanggal yang dipilih tidak ditemukan di Yahoo Finance.`
     : `Ticker ${symbol} tidak ditemukan di Yahoo Finance.`;
   const noData = requestedDate
     ? `Data perdagangan untuk ${symbol} pada tanggal yang dipilih belum tersedia atau tidak lengkap.`
     : `Data sesi yang sudah tutup untuk ${symbol} belum tersedia atau tidak lengkap.`;
   const query = new URLSearchParams({ ...period, interval: journal ? '1d' : chartConfig.interval });
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`;
 
   try {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(8_000),
-    });
+    const signal = AbortSignal.timeout(8_000);
+    let resolvedSymbol = symbol;
+    let lookup = await fetchChart(symbol, query, signal);
+    if (fallback && lookup.notFound) {
+      // Tanggal libur atau sebelum IPO dapat menghasilkan 404 untuk ticker yang valid.
+      const listing = await fetchChart(symbol, 'range=1mo&interval=1d', signal);
+      if (listing.notFound) {
+        resolvedSymbol = fallback;
+        lookup = await fetchChart(resolvedSymbol, query, signal);
+      }
+    }
 
-    if (response.status === 404) return errorResponse(notFound, 404);
-    if (!response.ok) {
+    if (lookup.notFound) return errorResponse(notFound, 404);
+    if (!lookup.ok) {
       return errorResponse('Yahoo Finance gagal menyediakan data. Coba lagi nanti.', 502);
     }
 
-    const data = await response.json();
-    const chart = data?.chart;
-    if (chart?.error?.code === 'Not Found') return errorResponse(notFound, 404);
+    const { chart } = lookup;
     if (!chart || chart.error) {
       return errorResponse('Respons dari Yahoo Finance tidak dapat diproses.', 502);
     }
@@ -139,7 +154,7 @@ export default async function price(request) {
       month: '2-digit',
       day: '2-digit',
     });
-    if (journal) return journalQuote(symbol, requestedDate, result, marketDate);
+    if (journal) return journalQuote(resolvedSymbol, requestedDate, result, marketDate);
 
     if (requestedDate && requestedDate >= marketDate.format(Date.now())) {
       return errorResponse(pastDateError, 400);
