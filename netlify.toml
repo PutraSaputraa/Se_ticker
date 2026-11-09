@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
+  [build.environment]
+    # Config Firebase client memang didesain untuk ikut ke bundle publik (dist/)
+    # dan diamankan lewat Firebase Security Rules, bukan dengan menyembunyikannya.
+    # Kecualikan dari secrets scanning Netlify agar tidak dianggap kebocoran.
+    SECRETS_SCAN_OMIT_KEYS = "VITE_FIREBASE_API_KEY,VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID,VITE_FIREBASE_APP_ID"
+
 [functions]
   directory = "netlify/functions"
 
