@@ -129,15 +129,21 @@ export default function StockDetailPage({ account }) {
   const decoded = decodeURIComponent(symbol ?? '');
   const [range, setRange] = useState('3m');
   const [result, setResult] = useState({ status: 'idle' });
+  const [chartData, setChartData] = useState({ status: 'idle' });
   const activeSearch = useRef(null);
+  const activeChart = useRef(null);
   const [watchInput, setWatchInput] = useState('');
 
   const { watchlist } = account;
   const watchlistDisabled = !account.ready || account.pending;
   const inWatchlist = watchlist.some((entry) => entry.symbol === decoded);
 
-  useEffect(() => () => activeSearch.current?.abort(), []);
+  useEffect(() => () => {
+    activeSearch.current?.abort();
+    activeChart.current?.abort();
+  }, []);
 
+  // Fetch DETAIL saham — hanya saat symbol berubah (tidak tergantung range).
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
@@ -147,7 +153,8 @@ export default function StockDetailPage({ account }) {
 
     (async () => {
       try {
-        const params = new URLSearchParams({ symbol: decoded, range });
+        // Detail memakai range default; chart dimuat terpisah di bawah.
+        const params = new URLSearchParams({ symbol: decoded, range: '3m' });
         const response = await fetch(`/.netlify/functions/stock?${params}`, { signal: controller.signal });
         const payload = await response.json().catch(() => null);
         if (cancelled || controller.signal.aborted) return;
@@ -171,7 +178,43 @@ export default function StockDetailPage({ account }) {
       cancelled = true;
       controller.abort();
     };
-    // history update pakai account.update yang stabil; abaikan perubahan account.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decoded]);
+
+  // Fetch CHART saja — setiap range berubah, tanpa menyentuh detail.
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    activeChart.current?.abort();
+    activeChart.current = controller;
+    setChartData({ status: 'loading' });
+
+    (async () => {
+      try {
+        const params = new URLSearchParams({ symbol: decoded, range });
+        const response = await fetch(`/.netlify/functions/stock?${params}`, { signal: controller.signal });
+        const payload = await response.json().catch(() => null);
+        if (cancelled || controller.signal.aborted) return;
+        if (!response.ok || !payload) {
+          setChartData({ status: 'error' });
+          return;
+        }
+        setChartData({
+          status: 'success',
+          priceHistory: payload.priceHistory,
+          availableRanges: payload.availableRanges,
+        });
+      } catch {
+        if (!cancelled && !controller.signal.aborted) {
+          setChartData({ status: 'error' });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decoded, range]);
 
@@ -342,19 +385,26 @@ export default function StockDetailPage({ account }) {
               <FundamentalsTable fundamentals={quote.fundamentals} currency={currency} />
             </div>
 
-            <CandlestickChart
-              sessions={quote.priceHistory ?? []}
-              referenceDate={quote.date}
-              buyLevel={buyTrigger.level}
-              sellLevel={buyTrigger.sellLevel}
-              averageVolume={buyTrigger.averageVolume}
-              formatPrice={(price) => formatPrice(price, currency)}
-              formatDate={formatDate}
-              formatVolume={formatVolume}
-              timeframe={range}
-              onTimeframeChange={setRange}
-              ranges={quote.availableRanges}
-            />
+            <div className="chart-area">
+              {chartData.status === 'loading' && (
+                <div className="chart-loading" aria-live="polite">
+                  <span className="spinner" aria-hidden="true" />
+                </div>
+              )}
+              <CandlestickChart
+                sessions={chartData.status === 'success' ? chartData.priceHistory : (quote.priceHistory ?? [])}
+                referenceDate={quote.date}
+                buyLevel={buyTrigger.level}
+                sellLevel={buyTrigger.sellLevel}
+                averageVolume={buyTrigger.averageVolume}
+                formatPrice={(price) => formatPrice(price, currency)}
+                formatDate={formatDate}
+                formatVolume={formatVolume}
+                timeframe={range}
+                onTimeframeChange={setRange}
+                ranges={quote.availableRanges}
+              />
+            </div>
           </div>
         </article>
       )}
