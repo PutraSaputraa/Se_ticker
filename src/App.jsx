@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { signOut } from 'firebase/auth';
 import CandlestickChart from './CandlestickChart.jsx';
 import WatchlistTable from './WatchlistTable.jsx';
-import { readWatchlist, saveWatchlist, addSymbol, removeSymbol, setPriceToWatch } from './watchlist.js';
-import './App.css';
+import { addSymbol, removeSymbol, setPriceToWatch } from './watchlist.js';
+import { clearLegacyData, mergeLegacyData, normalizeHistory, readLegacyData } from './accountData.js';
+import { auth } from './firebase.js';
+import useAccountData from './useAccountData.js';
 
-const historyKey = 'cek-saham:recent';
-const historyLimit = 5;
 const dateFormat = new Intl.DateTimeFormat('id-ID', {
   timeZone: 'UTC',
   weekday: 'long',
@@ -41,20 +42,8 @@ function normalizeTicker(ticker, market = 'auto') {
   return symbol;
 }
 
-function readHistory() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(historyKey) ?? '[]');
-    if (Array.isArray(saved)) {
-      const tickers = saved.filter((ticker) => typeof ticker === 'string' && ticker.trim());
-      return [...new Set(tickers)].slice(0, historyLimit);
-    }
-  } catch {
-    // Riwayat tersimpan mungkin rusak atau penyimpanan diblokir browser.
-  }
-  return [];
-}
-
 function formatPrice(price, currency) {
+  if (!Number.isFinite(price)) return 'Tidak tersedia';
   const integer = { maximumFractionDigits: 0 };
   const decimal = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
 
@@ -274,7 +263,7 @@ function TriggerLevels({ buyTrigger, close, currency, referenceDate }) {
   );
 }
 
-function QuoteCard({ quote, inWatchlist, onToggleWatchlist }) {
+function QuoteCard({ quote, inWatchlist, onToggleWatchlist, watchlistDisabled }) {
   const { symbol, name, exchange, date, open, high, low, close, volume, currency, buyTrigger } = quote;
   const trend = trends[Math.sign(close - open)];
   const { previousClose, averageVolume } = buyTrigger ?? {};
@@ -299,6 +288,7 @@ function QuoteCard({ quote, inWatchlist, onToggleWatchlist }) {
               className={`watch-toggle${inWatchlist ? ' watch-toggle--active' : ''}`}
               onClick={() => onToggleWatchlist(symbol)}
               aria-pressed={inWatchlist}
+              disabled={watchlistDisabled}
             >
               {inWatchlist ? '✓ Dipantau' : '+ Pantau'}
             </button>
@@ -359,34 +349,44 @@ function QuoteCard({ quote, inWatchlist, onToggleWatchlist }) {
   );
 }
 
-export default function App() {
+export default function App({ user }) {
   const [ticker, setTicker] = useState('');
   const [market, setMarket] = useState('auto');
-  const [history, setHistory] = useState(readHistory);
   const [result, setResult] = useState({ status: 'idle' });
-  const [watchlist, setWatchlist] = useState(readWatchlist);
+  const account = useAccountData(user.uid);
+  const { watchlist, history } = account;
+  const [legacy, setLegacy] = useState(readLegacyData);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
   const activeSearch = useRef(null);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(historyKey, JSON.stringify(history));
-    } catch {
-      // Pencarian tetap berjalan jika penyimpanan browser tidak tersedia.
-    }
-  }, [history]);
-
-  useEffect(() => {
-    saveWatchlist(watchlist);
-  }, [watchlist]);
+  const watchlistDisabled = !account.ready || account.pending;
 
   useEffect(() => () => activeSearch.current?.abort(), []);
 
   function toggleWatchlist(symbol) {
-    setWatchlist((previous) =>
-      previous.some((entry) => entry.symbol === symbol)
-        ? removeSymbol(previous, symbol)
-        : addSymbol(previous, symbol),
-    );
+    const alreadyWatched = watchlist.some((entry) => entry.symbol === symbol);
+    account.update((current) => ({
+      ...current,
+      watchlist: alreadyWatched ? removeSymbol(current.watchlist, symbol) : addSymbol(current.watchlist, symbol),
+    }));
+  }
+
+  async function importLegacy() {
+    if (await account.update((current) => mergeLegacyData(current, legacy))) {
+      clearLegacyData();
+      setLegacy({ watchlist: [], history: [] });
+    }
+  }
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    setSignOutError('');
+    try {
+      await signOut(auth);
+    } catch {
+      setSignOutError('Gagal keluar dari akun. Coba lagi.');
+      setSigningOut(false);
+    }
   }
 
   function openFromWatchlist(symbol) {
@@ -421,10 +421,7 @@ export default function App() {
       }
 
       setResult({ status: 'success', quote: payload });
-      setHistory((previous) => [
-        symbol,
-        ...previous.filter((item) => item !== symbol),
-      ].slice(0, historyLimit));
+      account.update((current) => ({ ...current, history: normalizeHistory([symbol, ...current.history]) }));
     } catch {
       if (!controller.signal.aborted) {
         setResult({ status: 'error', message: serviceError });
@@ -449,11 +446,28 @@ export default function App() {
             </span>
             Cek Saham
           </div>
-          <span className="topbar-label">Data historis</span>
+          <div className="account-controls">
+            <span className="account-email" title={user.email}>{user.email}</span>
+            <button type="button" className="account-signout" disabled={signingOut} onClick={handleSignOut}>
+              {signingOut ? 'Keluar…' : 'Keluar'}
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="workspace">
+        {(account.error || signOutError) && (
+          <div className="account-message account-message--error" role="alert">
+            <p>{signOutError || account.error}</p>
+            {account.readError && <button type="button" className="text-button" onClick={account.retry}>Coba lagi</button>}
+          </div>
+        )}
+        {(legacy.watchlist.length > 0 || legacy.history.length > 0) && (
+          <div className="legacy-import">
+            <p>Data lama di browser ini tersedia. Impor {legacy.watchlist.length} saham pantauan dan {legacy.history.length} riwayat pencarian ke akun {user.email}.</p>
+            <button type="button" className="account-signout" disabled={watchlistDisabled} onClick={importLegacy}>Impor ke akun</button>
+          </div>
+        )}
         <div className="intro">
           <p className="eyebrow">Ringkasan pasar</p>
           <h1>Cek Buy Trigger</h1>
@@ -537,21 +551,23 @@ export default function App() {
           <section className="watchlist" aria-labelledby="watchlist-title">
             <div className="watchlist-head">
               <h2 id="watchlist-title">Daftar pantauan</h2>
-              <p>Diurutkan: breakout terlebih dahulu.</p>
+              <p>Breakout ditampilkan terlebih dahulu.</p>
+              <p role="status">{account.pending ? 'Menyimpan perubahan…' : account.error ? 'Sinkronisasi perlu dicoba lagi.' : account.ready ? 'Tersinkron dengan akunmu.' : 'Memuat daftar pantauan akun…'}</p>
             </div>
             {watchlist.length > 0 ? (
               <WatchlistTable
                 entries={watchlist}
                 formatPrice={formatPrice}
+                disabled={watchlistDisabled}
                 onOpen={openFromWatchlist}
-                onRemove={(symbol) => setWatchlist((previous) => removeSymbol(previous, symbol))}
+                onRemove={(symbol) => account.update((current) => ({ ...current, watchlist: removeSymbol(current.watchlist, symbol) }))}
                 onSetWatchPrice={(symbol, price) =>
-                  setWatchlist((previous) => setPriceToWatch(previous, symbol, price))
+                  account.update((current) => ({ ...current, watchlist: setPriceToWatch(current.watchlist, symbol, price) }))
                 }
               />
             ) : (
               <p className="watchlist-empty">
-                Belum ada saham dipantau. Cek ticker lalu tekan "+ Pantau" untuk menambahkannya di sini.
+                {account.ready ? 'Belum ada saham dipantau. Cek ticker lalu tekan "+ Pantau" untuk menambahkannya di sini.' : 'Daftar pantauan akan tampil setelah data akun berhasil dimuat.'}
               </p>
             )}
           </section>
@@ -593,6 +609,7 @@ export default function App() {
                 quote={result.quote}
                 inWatchlist={watchlist.some((entry) => entry.symbol === result.quote.symbol)}
                 onToggleWatchlist={toggleWatchlist}
+                watchlistDisabled={watchlistDisabled}
               />
             )}
           </div>

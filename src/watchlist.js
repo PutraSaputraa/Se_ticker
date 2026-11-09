@@ -16,32 +16,34 @@ function normalizeEntry(entry) {
   return null;
 }
 
+export function normalizeWatchlist(saved) {
+  if (!Array.isArray(saved)) return [];
+  const seen = new Set();
+  const entries = [];
+  for (const raw of saved) {
+    const entry = normalizeEntry(raw);
+    if (entry && !seen.has(entry.symbol)) {
+      seen.add(entry.symbol);
+      entries.push(entry);
+    }
+  }
+  return entries;
+}
+
 export function readWatchlist() {
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
-    if (Array.isArray(saved)) {
-      const seen = new Set();
-      const entries = [];
-      for (const raw of saved) {
-        const entry = normalizeEntry(raw);
-        if (entry && !seen.has(entry.symbol)) {
-          seen.add(entry.symbol);
-          entries.push(entry);
-        }
-      }
-      return entries;
-    }
+    return normalizeWatchlist(JSON.parse(localStorage.getItem(storageKey) ?? '[]'));
   } catch {
     // Penyimpanan browser mungkin diblokir — daftar pantauan dikosongkan.
   }
   return [];
 }
 
-export function saveWatchlist(list) {
+export function clearLegacyWatchlist() {
   try {
-    localStorage.setItem(storageKey, JSON.stringify(list));
+    localStorage.removeItem(storageKey);
   } catch {
-    // Abaikan — watchlist tetap jalan di memori meski penyimpanan gagal.
+    // Impor tetap aman diulang jika browser menolak penghapusan data lama.
   }
 }
 

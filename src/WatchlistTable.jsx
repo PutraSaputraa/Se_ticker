@@ -93,17 +93,18 @@ function BreakoutBadge({ state }) {
   return <span className="breakout-badge breakout-badge--off">—</span>;
 }
 
-function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice }) {
+function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled }) {
   const [text, setText] = useState(value == null ? '' : String(value));
 
   useEffect(() => {
     setText(value == null ? '' : String(value));
   }, [value]);
 
-  function commit() {
+  async function commit() {
+    if (disabled) return;
     const trimmed = text.trim();
     if (!trimmed) {
-      onSetWatchPrice(symbol, null);
+      if (value !== null && !await onSetWatchPrice(symbol, null)) setText(String(value));
       return;
     }
     const pattern = decimals === 0 ? /^\d+$/ : /^\d+(?:[.,]\d{1,2})?$/;
@@ -112,7 +113,13 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice }) {
       return;
     }
     const parsed = Number(trimmed.replace(',', '.'));
-    onSetWatchPrice(symbol, Number.isFinite(parsed) ? parsed : null);
+    if (!Number.isFinite(parsed)) {
+      setText(value == null ? '' : String(value));
+      return;
+    }
+    if (parsed !== value && !await onSetWatchPrice(symbol, parsed)) {
+      setText(value == null ? '' : String(value));
+    }
   }
 
   return (
@@ -122,10 +129,12 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice }) {
       inputMode={decimals === 0 ? 'numeric' : 'decimal'}
       placeholder="—"
       value={text}
+      disabled={disabled}
       onClick={(event) => event.stopPropagation()}
       onChange={(event) => setText(event.target.value)}
       onBlur={commit}
       onKeyDown={(event) => {
+        event.stopPropagation();
         if (event.key === 'Enter') event.currentTarget.blur();
       }}
       aria-label={`Price to watch untuk ${symbol}`}
@@ -133,16 +142,16 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice }) {
   );
 }
 
-function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice }) {
+function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, disabled }) {
   const { symbol, priceToWatch } = entry;
 
   if (!row || row.status === 'loading') {
     return (
       <tr>
         <td><span className="symbol-badge symbol-badge--light">{symbol}</span></td>
-        <td colSpan={6} className="watchlist-note">Memuat…</td>
+        <td colSpan={7} className="watchlist-note">Memuat…</td>
         <td className="watchlist-actions">
-          <button type="button" className="watchlist-remove" title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`} onClick={() => onRemove(symbol)}>×</button>
+          <button type="button" className="watchlist-remove" disabled={disabled} title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`} onClick={() => onRemove(symbol)}>×</button>
         </td>
       </tr>
     );
@@ -152,9 +161,9 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
     return (
       <tr>
         <td><span className="symbol-badge symbol-badge--light">{symbol}</span></td>
-        <td colSpan={6} className="watchlist-note watchlist-note--error">{row.message}</td>
+        <td colSpan={7} className="watchlist-note watchlist-note--error">{row.message}</td>
         <td className="watchlist-actions">
-          <button type="button" className="watchlist-remove" title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`} onClick={() => onRemove(symbol)}>×</button>
+          <button type="button" className="watchlist-remove" disabled={disabled} title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`} onClick={() => onRemove(symbol)}>×</button>
         </td>
       </tr>
     );
@@ -181,12 +190,13 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
           value={priceToWatch}
           decimals={decimals}
           onSetWatchPrice={onSetWatchPrice}
+          disabled={disabled}
         />
       </td>
       <td><CheckBadgeMini passed={volumePass} /></td>
       <td><BreakoutBadge state={breakout.state} /></td>
       <td className="watchlist-actions">
-        <button type="button" className="watchlist-remove" title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`}
+        <button type="button" className="watchlist-remove" disabled={disabled} title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`}
           onClick={(e) => { e.stopPropagation(); onRemove(symbol); }}>×</button>
       </td>
     </tr>
@@ -195,7 +205,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
 
 const stateRank = { breakout: 0, near: 1, none: 2 };
 
-export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove, onSetWatchPrice }) {
+export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove, onSetWatchPrice, disabled }) {
   const symbolsKey = entries.map((entry) => entry.symbol).join('\n');
   const rows = useWatchlistData(symbolsKey);
 
@@ -233,6 +243,7 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
               onOpen={onOpen}
               onRemove={onRemove}
               onSetWatchPrice={onSetWatchPrice}
+              disabled={disabled}
             />
           ))}
         </tbody>

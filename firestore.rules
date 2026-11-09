@@ -1,0 +1,20 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner()
+        && request.resource.data.keys().hasAll(['watchlist', 'history', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['watchlist', 'history', 'updatedAt'])
+        && request.resource.data.watchlist is list
+        && request.resource.data.history is list
+        && request.resource.data.history.size() <= 5
+        && request.resource.data.updatedAt == request.time;
+    }
+  }
+}

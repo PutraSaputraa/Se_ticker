@@ -32,6 +32,264 @@ button {
   outline-offset: 3px;
 }
 
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.auth-page {
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: 2rem 1rem;
+}
+
+.auth-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(100%, 64rem);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  background: #fff;
+  box-shadow: 0 1.5rem 4rem #203c2a0c;
+}
+
+.auth-intro,
+.auth-card {
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.auth-intro {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: linear-gradient(145deg, #173e30, #245c45);
+  color: #f1f8ef;
+}
+
+.auth-eyebrow {
+  margin: 0 0 2.5rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.auth-intro h1 {
+  margin-block: 0 1rem;
+  font-size: clamp(2.1rem, 4vw, 3.25rem);
+  line-height: 1.14;
+}
+
+.auth-intro > p:last-of-type {
+  max-width: 22rem;
+  margin: 0;
+  color: #c1d7c8;
+  line-height: 1.7;
+}
+
+.auth-benefit {
+  display: flex;
+  gap: 0.875rem;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #ffffff26;
+  font-size: 0.875rem;
+}
+
+.auth-benefit > span {
+  font-size: 1.5rem;
+}
+
+.auth-benefit p {
+  margin-bottom: 0;
+  color: #c1d7c8;
+  line-height: 1.6;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin-bottom: 2rem;
+  border-radius: 0.75rem;
+  background: #eff4ed;
+}
+
+.auth-tabs button {
+  flex: 1;
+  padding: 0.65rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.auth-tabs button[aria-pressed="true"] {
+  background: #fff;
+  color: var(--accent);
+  box-shadow: 0 0.125rem 0.3rem #203c2a0c;
+}
+
+.auth-card h2 {
+  margin: 0 0 0.625rem;
+  font-size: 1.5rem;
+  letter-spacing: -0.035em;
+}
+
+.auth-description,
+.auth-hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.auth-description {
+  margin: 0 0 1.5rem;
+}
+
+.auth-fields {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.auth-fields label {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.auth-fields input {
+  width: 100%;
+  min-height: 2.875rem;
+  padding: 0.65rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: #fcfdfb;
+  color: inherit;
+}
+
+.auth-hint {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.auth-submit {
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.text-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.auth-switch {
+  display: block;
+  margin: 1.25rem auto 0;
+}
+
+.account-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.account-email {
+  max-width: 18rem;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-signout {
+  flex-shrink: 0;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: #fff;
+  color: var(--accent);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.account-message,
+.legacy-import {
+  margin: 0 0 1.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid #c9dfcf;
+  border-radius: 0.75rem;
+  background: #f1f8ef;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.account-message p,
+.legacy-import p {
+  margin: 0;
+}
+
+.account-message--error {
+  border-color: #e9c5bf;
+  background: #fff2ef;
+  color: #8b3029;
+}
+
+.legacy-import {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+@media (max-width: 44rem) {
+  .auth-layout {
+    grid-template-columns: 1fr;
+    max-width: 28rem;
+  }
+
+  .auth-eyebrow {
+    margin-bottom: 1.5rem;
+  }
+
+  .auth-benefit {
+    display: none;
+  }
+
+  .legacy-import {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .account-email {
+    max-width: 8rem;
+  }
+}
+
+@media (max-width: 24rem) {
+  .account-controls {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-block: 0.5rem;
+  }
+}
+
 .topbar {
   background: #fff;
   border-bottom: 1px solid var(--border);
