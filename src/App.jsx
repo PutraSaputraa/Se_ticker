@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
+import BreakoutScanner from './BreakoutScanner.jsx';
 import CandlestickChart from './CandlestickChart.jsx';
 import WatchlistTable from './WatchlistTable.jsx';
 import { addSymbol, removeSymbol, setPriceToWatch } from './watchlist.js';
@@ -548,6 +549,16 @@ export default function App({ user }) {
         </div>
 
         <div className="board">
+          <BreakoutScanner
+            watchlist={watchlist}
+            disabled={watchlistDisabled}
+            formatPrice={formatPrice}
+            formatDate={formatDate}
+            onAdd={(symbol) =>
+              account.update((current) => ({ ...current, watchlist: addSymbol(current.watchlist, symbol) }))
+            }
+          />
+
           <section className="watchlist" aria-labelledby="watchlist-title">
             <div className="watchlist-head">
               <h2 id="watchlist-title">Daftar pantauan</h2>
