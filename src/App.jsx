@@ -264,7 +264,7 @@ function TriggerLevels({ buyTrigger, close, currency, referenceDate }) {
   );
 }
 
-function QuoteCard({ quote, inWatchlist, onToggleWatchlist, watchlistDisabled }) {
+function QuoteCard({ quote, inWatchlist, onToggleWatchlist, watchlistDisabled, timeframe, onTimeframeChange }) {
   const { symbol, name, exchange, date, open, high, low, close, volume, currency, buyTrigger } = quote;
   const trend = trends[Math.sign(close - open)];
   const { previousClose, averageVolume } = buyTrigger ?? {};
@@ -272,80 +272,84 @@ function QuoteCard({ quote, inWatchlist, onToggleWatchlist, watchlistDisabled })
 
   return (
     <article className="quote-card">
-      <div className="quote-highlight">
-        <div className="quote-heading">
-          <div>
-            <span className="symbol-badge">{symbol}</span>
-            {exchange && <span className="exchange-label">{exchange}</span>}
-            <h2>{name}</h2>
-          </div>
-          <div className="quote-heading-side">
-            <div className="quote-date">
-              <span>Sesi acuan</span>
-              <time dateTime={date}>{formatDate(date)}</time>
-            </div>
-            <button
-              type="button"
-              className={`watch-toggle${inWatchlist ? ' watch-toggle--active' : ''}`}
-              onClick={() => onToggleWatchlist(symbol)}
-              aria-pressed={inWatchlist}
-              disabled={watchlistDisabled}
-            >
-              {inWatchlist ? '✓ Dipantau' : '+ Pantau'}
-            </button>
-          </div>
+      <div className="quote-heading">
+        <div>
+          <span className="symbol-badge">{symbol}</span>
+          {exchange && <span className="exchange-label">{exchange}</span>}
+          <h2>{name}</h2>
         </div>
-        <TriggerLevels buyTrigger={buyTrigger} close={close} currency={currency} referenceDate={date} />
+        <div className="quote-heading-side">
+          <div className="quote-date">
+            <span>Sesi acuan</span>
+            <time dateTime={date}>{formatDate(date)}</time>
+          </div>
+          <button
+            type="button"
+            className={`watch-toggle${inWatchlist ? ' watch-toggle--active' : ''}`}
+            onClick={() => onToggleWatchlist(symbol)}
+            aria-pressed={inWatchlist}
+            disabled={watchlistDisabled}
+          >
+            {inWatchlist ? '✓ Dipantau' : '+ Pantau'}
+          </button>
+        </div>
       </div>
-      <dl className="quote-details" aria-label="OHLCV sesi acuan">
-        <div>
-          <dt>Buka</dt>
-          <dd>{formatPrice(open, currency)}</dd>
+      <div className="quote-layout">
+        <div className="quote-panel">
+          <TriggerLevels buyTrigger={buyTrigger} close={close} currency={currency} referenceDate={date} />
+          <dl className="quote-details" aria-label="OHLCV sesi acuan">
+            <div>
+              <dt>Buka</dt>
+              <dd>{formatPrice(open, currency)}</dd>
+            </div>
+            <div>
+              <dt>Tertinggi</dt>
+              <dd>{formatPrice(high, currency)}</dd>
+            </div>
+            <div>
+              <dt>Terendah</dt>
+              <dd>{formatPrice(low, currency)}</dd>
+            </div>
+            <div>
+              <dt>Tutup</dt>
+              <dd className={`trend trend--${trend.className}`}>
+                {formatPrice(close, currency)}
+                <span className="trend-label">{trend.label}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Volume</dt>
+              <dd>{formatVolume(volume)}</dd>
+            </div>
+          </dl>
+          <dl className="quote-details quote-history" aria-label="Riwayat sesi">
+            <div>
+              <dt>Rata-rata volume 50 sesi</dt>
+              <dd>{formatVolume(averageVolume)}</dd>
+            </div>
+            <div>
+              <dt>Close 2 sesi lalu</dt>
+              <dd>
+                {Number.isFinite(previousClose) ? formatPrice(previousClose, currency) : 'Tidak tersedia'}
+                {previousDate && <time dateTime={previousDate}>{formatDate(previousDate)}</time>}
+              </dd>
+            </div>
+          </dl>
+          <SpreadsheetChecks quote={quote} />
         </div>
-        <div>
-          <dt>Tertinggi</dt>
-          <dd>{formatPrice(high, currency)}</dd>
-        </div>
-        <div>
-          <dt>Terendah</dt>
-          <dd>{formatPrice(low, currency)}</dd>
-        </div>
-        <div>
-          <dt>Tutup</dt>
-          <dd className={`trend trend--${trend.className}`}>
-            {formatPrice(close, currency)}
-            <span className="trend-label">{trend.label}</span>
-          </dd>
-        </div>
-        <div>
-          <dt>Volume</dt>
-          <dd>{formatVolume(volume)}</dd>
-        </div>
-      </dl>
-      <dl className="quote-details quote-history" aria-label="Riwayat sesi">
-        <div>
-          <dt>Rata-rata volume 50 sesi</dt>
-          <dd>{formatVolume(averageVolume)}</dd>
-        </div>
-        <div>
-          <dt>Close 2 sesi lalu</dt>
-          <dd>
-            {Number.isFinite(previousClose) ? formatPrice(previousClose, currency) : 'Tidak tersedia'}
-            {previousDate && <time dateTime={previousDate}>{formatDate(previousDate)}</time>}
-          </dd>
-        </div>
-      </dl>
-      <SpreadsheetChecks quote={quote} />
-      <CandlestickChart
-        sessions={quote.priceHistory ?? []}
-        referenceDate={date}
-        buyLevel={buyTrigger?.level}
-        sellLevel={buyTrigger?.sellLevel}
-        averageVolume={averageVolume}
-        formatPrice={(price) => formatPrice(price, currency)}
-        formatDate={formatDate}
-        formatVolume={formatVolume}
-      />
+        <CandlestickChart
+          sessions={quote.priceHistory ?? []}
+          referenceDate={date}
+          buyLevel={buyTrigger?.level}
+          sellLevel={buyTrigger?.sellLevel}
+          averageVolume={averageVolume}
+          formatPrice={(price) => formatPrice(price, currency)}
+          formatDate={formatDate}
+          formatVolume={formatVolume}
+          timeframe={timeframe}
+          onTimeframeChange={onTimeframeChange}
+        />
+      </div>
     </article>
   );
 }
@@ -354,6 +358,7 @@ export default function App({ user }) {
   const [ticker, setTicker] = useState('');
   const [market, setMarket] = useState('auto');
   const [result, setResult] = useState({ status: 'idle' });
+  const [timeframe, setTimeframe] = useState('1d');
   const account = useAccountData(user.uid);
   const { watchlist, history } = account;
   const [legacy, setLegacy] = useState(readLegacyData);
@@ -393,10 +398,10 @@ export default function App({ user }) {
   function openFromWatchlist(symbol) {
     setTicker(symbol);
     setMarket('auto');
-    search(symbol);
+    search(symbol, timeframe);
   }
 
-  async function search(symbol) {
+  async function search(symbol, tf = '1d') {
     activeSearch.current?.abort();
 
     if (!symbol) {
@@ -407,9 +412,10 @@ export default function App({ user }) {
     const controller = new AbortController();
     activeSearch.current = controller;
     setResult({ status: 'loading', symbol });
+    setTimeframe(tf);
 
     try {
-      const params = new URLSearchParams({ symbol });
+      const params = new URLSearchParams({ symbol, chart: tf });
       const response = await fetch(`/.netlify/functions/price?${params}`, {
         signal: controller.signal,
       });
@@ -430,9 +436,17 @@ export default function App({ user }) {
     }
   }
 
+  function handleTimeframeChange(tf) {
+    if (result.status === 'success' && result.quote?.symbol && tf !== timeframe) {
+      search(result.quote.symbol, tf);
+    } else {
+      setTimeframe(tf);
+    }
+  }
+
   function handleSubmit(event) {
     event.preventDefault();
-    search(normalizeTicker(ticker, market));
+    search(normalizeTicker(ticker, market), timeframe);
   }
 
   return (
@@ -536,7 +550,7 @@ export default function App({ user }) {
                       onClick={() => {
                         setTicker(symbol);
                         setMarket(normalizeTicker(symbol) === symbol ? 'auto' : 'us');
-                        search(symbol);
+                        search(symbol, timeframe);
                       }}
                     >
                       {symbol}
@@ -621,6 +635,8 @@ export default function App({ user }) {
                 inWatchlist={watchlist.some((entry) => entry.symbol === result.quote.symbol)}
                 onToggleWatchlist={toggleWatchlist}
                 watchlistDisabled={watchlistDisabled}
+                timeframe={timeframe}
+                onTimeframeChange={handleTimeframeChange}
               />
             )}
           </div>

@@ -47,6 +47,7 @@ function CandleTooltip({ session, point, isReference, formatDate, formatPrice, f
 
 export default function CandlestickChart({
   sessions, referenceDate, buyLevel, sellLevel, averageVolume, formatPrice, formatDate, formatVolume,
+  timeframe = '1d', onTimeframeChange,
 }) {
   const plotRef = useRef(null);
   const [active, setActive] = useState(null);
@@ -129,8 +130,25 @@ export default function CandlestickChart({
 
   return (
     <section className="candle-chart" aria-labelledby="candle-title">
-      <h3 id="candle-title">Grafik candlestick</h3>
-      <p>{sessions.length} sesi perdagangan hingga {formatDate(latest.date)}.</p>
+      <div className="candle-chart-head">
+        <h3 id="candle-title">Grafik candlestick</h3>
+        {typeof onTimeframeChange === 'function' && (
+          <div className="candle-timeframe" role="group" aria-label="Rentang waktu grafik">
+            {['1d', '1wk'].map((tf) => (
+              <button
+                key={tf}
+                type="button"
+                className={`candle-timeframe-btn${timeframe === tf ? ' candle-timeframe-btn--active' : ''}`}
+                onClick={() => onTimeframeChange(tf)}
+                aria-pressed={timeframe === tf}
+              >
+                {tf === '1d' ? 'Harian' : 'Mingguan'}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <p>{sessions.length} {timeframe === '1wk' ? 'minggu' : 'sesi'} perdagangan hingga {formatDate(latest.date)}.</p>
       <div className="candle-grid">
         <div className="candle-axis-y" aria-hidden="true">
           {[ceiling, (ceiling + floor) / 2, floor].map((price) => (

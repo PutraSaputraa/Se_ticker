@@ -1,6 +1,5 @@
 import {
   calculateBuyTrigger,
-  chartLookback,
   dayMilliseconds,
   latestCompletedIndex,
   readSessions,
@@ -9,6 +8,14 @@ import {
 const symbolPattern = /^\^?[A-Z0-9]+(?:[.=-][A-Z0-9]+)*$/;
 const historyDays = 180;
 const pastDateError = 'Pilih tanggal sebelum hari ini di zona waktu bursa.';
+
+// Konfigurasi per timeframe grafik: berapa sesi ke belakang diambil dan
+// interval Yahoo yang dipakai. Lookback diperbesar agar grafik bisa lebar.
+const chartConfigs = {
+  '1d': { lookback: 60, interval: '1d', range: '6mo' },
+  '1wk': { lookback: 52, interval: '1wk', range: '5y' },
+};
+const defaultChartConfig = chartConfigs['1d'];
 
 function errorResponse(error, status) {
   return Response.json({ error }, { status });
@@ -25,12 +32,14 @@ export default async function price(request) {
   const params = new URL(request.url).searchParams;
   const symbol = params.get('symbol')?.trim().toUpperCase() ?? '';
   const requestedDate = params.get('date');
+  const chartParam = params.get('chart');
+  const chartConfig = chartConfigs[chartParam] ?? defaultChartConfig;
 
   if (symbol.length > 32 || !symbolPattern.test(symbol)) {
     return errorResponse('Kode ticker kosong atau formatnya tidak valid.', 404);
   }
 
-  let period = { range: '6mo' };
+  let period = { range: chartConfig.range };
   if (requestedDate) {
     const dateStart = Date.parse(`${requestedDate}T00:00:00Z`);
     if (!Number.isFinite(dateStart) || new Date(dateStart).toISOString().slice(0, 10) !== requestedDate) {
@@ -53,7 +62,7 @@ export default async function price(request) {
   const noData = requestedDate
     ? `Data perdagangan untuk ${symbol} pada tanggal yang dipilih belum tersedia atau tidak lengkap.`
     : `Data sesi yang sudah tutup untuk ${symbol} belum tersedia atau tidak lengkap.`;
-  const query = new URLSearchParams({ ...period, interval: '1d' });
+  const query = new URLSearchParams({ ...period, interval: chartConfig.interval });
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`;
 
   try {
@@ -120,7 +129,7 @@ export default async function price(request) {
       (value) => typeof value === 'string' && value.trim(),
     );
     const priceHistory = sessions
-      .slice(Math.max(0, index + 1 - chartLookback), index + 1)
+      .slice(Math.max(0, index + 1 - chartConfig.lookback), index + 1)
       .filter(({ open, high, low, close }) => [open, high, low, close].every(Number.isFinite)
         && high >= Math.max(open, close) && low <= Math.min(open, close))
       .map(({ date, open, high, low, close, volume }) => ({ date, open, high, low, close, volume }));
