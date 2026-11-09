@@ -1,5 +1,6 @@
 import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { clearLegacyWatchlist, normalizeWatchlist, readWatchlist } from './watchlist.js';
+import { journalCurrencies, normalizeJournal } from './journal.js';
 
 const historyKey = 'cek-saham:recent';
 
@@ -9,10 +10,19 @@ export function normalizeHistory(value) {
   return [...new Set(symbols)].slice(0, 5);
 }
 
+export function normalizeCapital(value) {
+  const parsed = Number(String(value ?? '').replace(/[^\d.,-]/g, '').replace(',', '.'));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
 export function normalizeAccountData(value) {
+  const currency = journalCurrencies.includes(value?.currency) ? value.currency : 'USD';
   return {
     watchlist: normalizeWatchlist(value?.watchlist),
     history: normalizeHistory(value?.history),
+    journal: normalizeJournal(value?.journal),
+    capital: normalizeCapital(value?.capital),
+    currency,
   };
 }
 

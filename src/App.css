@@ -2262,3 +2262,104 @@ h1 {
   background: #eef1f4;
   color: #8a94a0;
 }
+
+/* ------------------------------------------------------------------ */
+/* Jurnal trading                                                      */
+/* ------------------------------------------------------------------ */
+
+.journal-page .intro { margin-bottom: 1.25rem; }
+
+.journal-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.journal-field {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.journal-field input,
+.journal-field select,
+.journal-form input,
+.journal-form select {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+}
+
+.journal-currency-note { color: var(--muted); font-size: 0.75rem; }
+.journal-page .detail-metrics { padding: 0; margin-bottom: 1rem; }
+.journal-actions { margin-bottom: 1rem; }
+
+.journal-form {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.journal-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+
+.journal-form label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.journal-form-wide { grid-column: 1 / -1; }
+
+.journal-table-wrap {
+  overflow-x: auto;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.journal-table th, .journal-table td { white-space: nowrap; }
+
+.journal-notes, .journal-setup {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+.journal-week { color: var(--muted); font-size: 0.75rem; }
+
+.journal-badge {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.journal-badge--win, .journal-badge--long { background: #d9f0e3; color: #14603f; }
+.journal-badge--loss, .journal-badge--short { background: #f8e1da; color: #a3472f; }
+.journal-badge--be { background: #e3e9f6; color: #2f4a85; }

@@ -9,6 +9,7 @@ import StockDetailPage from './pages/StockDetailPage.jsx';
 import WatchlistPage from './pages/WatchlistPage.jsx';
 import RecommendPage from './pages/RecommendPage.jsx';
 import BacktestPage from './pages/BacktestPage.jsx';
+import JournalPage from './pages/JournalPage.jsx';
 
 function TopBar({ user }) {
   const [signingOut, setSigningOut] = useState(false);
@@ -49,6 +50,9 @@ function TopBar({ user }) {
             </NavLink>
             <NavLink to="/uji-strategi" className={({ isActive }) => `topnav-link${isActive ? ' topnav-link--active' : ''}`}>
               Uji Strategi
+            </NavLink>
+            <NavLink to="/jurnal" className={({ isActive }) => `topnav-link${isActive ? ' topnav-link--active' : ''}`}>
+              Jurnal
             </NavLink>
           </nav>
           <div className="account-controls">
@@ -102,6 +106,7 @@ export default function App({ user }) {
           <Route path="/watchlist" element={<WatchlistPage account={account} />} />
           <Route path="/rekomendasi" element={<RecommendPage account={account} />} />
           <Route path="/uji-strategi" element={<BacktestPage />} />
+          <Route path="/jurnal" element={<JournalPage account={account} />} />
           <Route path="*" element={<HomePage history={account.history} />} />
         </Routes>
 
