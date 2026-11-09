@@ -5,6 +5,7 @@ import MinerviniPanel from '../components/MinerviniPanel.jsx';
 import {
   formatCompactNumber,
   formatDate,
+  formatDateCompact,
   formatPct,
   formatPrice,
   formatVolume,
@@ -358,30 +359,6 @@ export default function StockDetailPage({ account }) {
                 <div><dt>Volume</dt><dd>{formatVolume(quote.volume)}</dd></div>
               </dl>
 
-              <section className="detail-section" aria-labelledby="daily-title">
-                <h3 id="daily-title">Harga harian (OHLCV)</h3>
-                <table className="fund-table">
-                  <thead>
-                    <tr>
-                      <th>Tanggal</th><th className="num">Open</th><th className="num">High</th>
-                      <th className="num">Low</th><th className="num">Close</th><th className="num">Volume</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(quote.recentBars ?? []).map((bar) => (
-                      <tr key={bar.date}>
-                        <td>{formatDate(bar.date)}</td>
-                        <td className="num">{formatPrice(bar.open, currency)}</td>
-                        <td className="num">{formatPrice(bar.high, currency)}</td>
-                        <td className="num">{formatPrice(bar.low, currency)}</td>
-                        <td className="num">{formatPrice(bar.close, currency)}</td>
-                        <td className="num">{formatCompactNumber(bar.volume)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </section>
-
               <FundamentalsTable fundamentals={quote.fundamentals} currency={currency} />
             </div>
 
@@ -406,6 +383,31 @@ export default function StockDetailPage({ account }) {
               />
             </div>
           </div>
+
+          {/* Tabel OHLCV diletakkan full-width di bawah layout agar tidak sempit. */}
+          <section className="detail-section detail-section--wide" aria-labelledby="daily-title">
+            <h3 id="daily-title">Harga harian (OHLCV)</h3>
+            <table className="fund-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th><th className="num">Open</th><th className="num">High</th>
+                  <th className="num">Low</th><th className="num">Close</th><th className="num">Volume</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(quote.recentBars ?? []).map((bar) => (
+                  <tr key={bar.date}>
+                    <td>{formatDate(bar.date)}</td>
+                    <td className="num">{formatPrice(bar.open, currency)}</td>
+                    <td className="num">{formatPrice(bar.high, currency)}</td>
+                    <td className="num">{formatPrice(bar.low, currency)}</td>
+                    <td className="num">{formatPrice(bar.close, currency)}</td>
+                    <td className="num">{formatCompactNumber(bar.volume)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
         </article>
       )}
     </div>

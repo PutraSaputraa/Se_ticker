@@ -7,12 +7,27 @@ export const dateFormat = new Intl.DateTimeFormat('id-ID', {
   year: 'numeric',
 });
 export const shortDateFormat = new Intl.DateTimeFormat('id-ID', { timeZone: 'UTC' });
+export const compactDateFormat = new Intl.DateTimeFormat('id-ID', {
+  timeZone: 'UTC',
+  day: 'numeric',
+  month: 'short',
+});
 const volumeFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
 
 export function formatDate(date) {
   if (!date) return 'Tidak tersedia';
   try {
     return dateFormat.format(new Date(`${date}T00:00:00Z`));
+  } catch {
+    return date;
+  }
+}
+
+// Versi ringkas ("6 Nov") untuk tabel sempit seperti OHLCV di panel kiri.
+export function formatDateCompact(date) {
+  if (!date) return '—';
+  try {
+    return compactDateFormat.format(new Date(`${date}T00:00:00Z`));
   } catch {
     return date;
   }

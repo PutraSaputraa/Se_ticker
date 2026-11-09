@@ -593,7 +593,7 @@ h1 {
 /* Layout detail: panel info di kiri (sempit), grafik candlestick di kanan (lebar). */
 .quote-layout {
   display: grid;
-  grid-template-columns: minmax(15rem, 17rem) minmax(0, 1fr);
+  grid-template-columns: 19rem minmax(0, 1fr);
   align-items: start;
   gap: 0;
   margin-top: 1.25rem;
@@ -601,11 +601,43 @@ h1 {
 
 .quote-panel {
   min-width: 0;
+  overflow: hidden;
   border-inline-end: 1px solid var(--border);
 }
 
+/* Panel kiri sempit: batasi padding agar konten tidak meluber ke chart. */
+.quote-panel .detail-section,
+.quote-panel .fundamentals {
+  padding: 1rem 0.75rem;
+}
+
+.quote-panel .quote-details > div {
+  padding: 0.875rem 0.75rem;
+}
+
+.quote-panel .fund-table {
+  font-size: 0.7rem;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.quote-panel .fund-table .col-date { width: 15%; }
+.quote-panel .fund-table .col-vol { width: 16%; }
+
+.quote-panel .fund-table th,
+.quote-panel .fund-table td {
+  padding: 0.4rem 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quote-panel .fund-table .num {
+  font-variant-numeric: tabular-nums;
+}
+
 .quote-panel .trigger-levels {
-  padding: clamp(1.125rem, 3vw, 1.5rem);
+  padding: 1rem 0.75rem;
   background: #18332b;
   color: #fff;
   margin-top: 0;
