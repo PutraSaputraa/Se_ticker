@@ -10,7 +10,7 @@ import {
   getDocsFromServer, getFirestore, serverTimestamp, setDoc, terminate,
 } from 'firebase/firestore';
 import { mergeLegacyData, normalizeAccountData, updateAccountData } from '../src/accountData.js';
-import { addTrade, closeTrade } from '../src/journal.js';
+import { addTrade, closeTrade, positionPnlUsd } from '../src/journal.js';
 import { addSymbol, removeSymbol, setPriceToWatch } from '../src/watchlist.js';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
@@ -138,7 +138,7 @@ test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil
   await updateAccountData(owner.db, uid, (current) => ({
     ...current,
     journal: addTrade(
-      addTrade(current.journal, { ...position, id: 'test-long', side: 'long' }),
+      addTrade(current.journal, { ...position, id: 'test-long', side: 'long', positionUsd: 500 }),
       { ...position, id: 'test-short', side: 'short' },
     ),
   }));
@@ -147,6 +147,7 @@ test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil
   const open = await readJournal();
   assert.equal(open.length, 2);
   assert.ok(open.every((trade) => trade.status === 'open' && trade.pnl === null));
+  assert.equal(open.find((trade) => trade.id === 'test-long').positionUsd, 500);
 
   const exitDate = '2026-01-06';
   const close = (id, price) => (current) => ({
@@ -164,4 +165,6 @@ test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil
   const short = closed.find((trade) => trade.id === 'test-short');
   assert.deepEqual([long.exitPrice, long.exitDate, long.status, long.pnl, long.pnlPct], [2000, exitDate, 'win', 1000, 100]);
   assert.deepEqual([short.exitPrice, short.exitDate, short.status, short.pnl, short.pnlPct], [500, exitDate, 'win', 500, 50]);
+  assert.equal(positionPnlUsd(long), 500);
+  assert.equal(positionPnlUsd(short), null);
 });

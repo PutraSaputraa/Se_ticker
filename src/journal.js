@@ -34,6 +34,7 @@ export function normalizeTrade(entry) {
     return Number.isFinite(parsed) ? parsed : null;
   };
   const entryPrice = num(entry.entryPrice);
+  const positionUsd = num(entry.positionUsd);
   const quoteCurrency = typeof entry.quoteCurrency === 'string' ? entry.quoteCurrency.trim() : '';
   const hasPrice = entryPrice > 0 && Boolean(quoteCurrency);
   const validStatus = Object.hasOwn(journalStatuses, entry.status) && (entry.status !== 'open' || hasPrice);
@@ -56,6 +57,7 @@ export function normalizeTrade(entry) {
       quoteCurrency,
       exitPrice: num(entry.exitPrice),
       exitDate: typeof entry.exitDate === 'string' ? entry.exitDate : null,
+      ...(positionUsd > 0 && { positionUsd }),
     }),
   };
 }
@@ -94,6 +96,11 @@ export function closeTrade(journal, id, quote) {
       status: pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'be',
     };
   });
+}
+
+export function positionPnlUsd(trade) {
+  if (!Number.isFinite(trade.positionUsd) || !Number.isFinite(trade.pnlPct)) return null;
+  return trade.positionUsd * (trade.pnlPct / 100);
 }
 
 export function removeTrade(journal, id) {

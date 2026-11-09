@@ -6,13 +6,14 @@ import {
   journalSides,
   journalStatuses,
   normalizeTrade,
+  positionPnlUsd,
   removeTrade,
   summarizeJournal,
 } from '../journal.js';
 import { formatPct, formatPrice } from '../format.js';
 
 function emptyForm() {
-  return { date: new Date().toLocaleDateString('sv-SE'), ticker: '', setup: '' };
+  return { date: new Date().toLocaleDateString('sv-SE'), ticker: '', setup: '', positionUsd: '' };
 }
 
 async function fetchJournalQuote(symbol, date, fallback) {
@@ -64,10 +65,12 @@ function TradeTable({ trades, closed = false, manualCurrency, disabled, activeAc
               <th>Posisi</th>
               <th>Setup</th>
               <th className="num">Harga masuk</th>
+              <th className="num">Nilai posisi (USD)</th>
               {closed && (
                 <>
                   <th>Tanggal keluar</th>
                   <th className="num">Harga keluar</th>
+                  <th className="num">PnL posisi (USD)</th>
                   <th className="num">PnL</th>
                   <th className="num">PnL %</th>
                   <th>Status</th>
@@ -92,13 +95,15 @@ function TradeTable({ trades, closed = false, manualCurrency, disabled, activeAc
                     {trade.notes && <small className="journal-trade-note">{trade.notes}</small>}
                   </td>
                   <td className="num">{formatJournalPrice(trade.entryPrice, currency)}</td>
+                  <td className="num">{formatJournalPrice(trade.positionUsd, 'USD')}</td>
                   {closed && (
                     <>
                       <td>{trade.exitDate ?? '–'}</td>
                       <td className="num">{formatJournalPrice(trade.exitPrice, currency)}</td>
+                      <td className={`num ${pnlTone}`}>{formatPnl(positionPnlUsd(trade), 'USD')}</td>
                       <td className={`num ${pnlTone}`}>
                         {formatPnl(trade.pnl, currency)}
-                        {!trade.quoteCurrency && trade.pnl != null && <small className="journal-trade-note">Manual</small>}
+                        {trade.pnl != null && <small className="journal-trade-note">{trade.quoteCurrency ? 'Per saham' : 'Manual'}</small>}
                       </td>
                       <td className={`num ${pnlTone}`}>{trade.pnlPct == null ? '–' : formatPct(trade.pnlPct)}</td>
                       <td>{trade.status ? <Badge meta={journalStatuses[trade.status]} /> : '–'}</td>
@@ -192,12 +197,19 @@ export default function JournalPage({ account }) {
       const setup = form.setup.trim();
       if (!symbol || !setup) throw new Error('Isi kode saham dan setup posisi.');
 
+      const amount = form.positionUsd.trim();
+      const positionUsd = Number(amount.replace(',', '.'));
+      if (!/^\d+(?:[.,]\d{1,2})?$/.test(amount) || positionUsd <= 0) {
+        throw new Error('Isi nilai posisi USD lebih dari 0, misalnya 500 atau 125,50.');
+      }
+
       const quote = await fetchJournalQuote(symbol, form.date, symbol === rawTicker ? null : rawTicker);
       const trade = normalizeTrade({
         date: quote.date,
         pair: quote.symbol ?? symbol,
         side,
         setup,
+        positionUsd,
         status: 'open',
         entryPrice: quote.price,
         entryTimestamp: quote.timestamp,
@@ -277,6 +289,19 @@ export default function JournalPage({ account }) {
                 required
               />
             </label>
+            <label>
+              Nilai posisi (USD)
+              <input
+                type="text"
+                inputMode="decimal"
+                value={form.positionUsd}
+                onChange={(event) => setField('positionUsd', event.target.value)}
+                placeholder="Mis. 500 atau 125,50"
+                maxLength={13}
+                disabled={disabled}
+                required
+              />
+            </label>
           </div>
           <p className="journal-help" id="journal-price-note">
             <span id="journal-ticker-note">Gunakan kode Yahoo Finance. Awali dengan US: untuk memilih ticker AS jika kodenya sama.</span>{' '}
@@ -296,7 +321,7 @@ export default function JournalPage({ account }) {
 
       <section className="journal-section" aria-labelledby="journal-closed">
         <h2 id="journal-closed">Posisi ditutup</h2>
-        <p className="journal-help">PnL otomatis ditampilkan per saham dan dalam persentase terhadap harga masuk.</p>
+        <p className="journal-help">PnL posisi dalam USD dihitung dari nilai posisi dikali PnL %. Untuk saham non-USD, perhitungan mengasumsikan kurs tetap.</p>
         <div className="detail-metrics">
           <StatCard label="Posisi ditutup" value={closedTrades.length} />
           <StatCard label="Win rate" value={winRate == null ? '–' : `${winRate.toLocaleString('id-ID', { maximumFractionDigits: 2 })}%`} />
