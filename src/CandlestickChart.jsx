@@ -47,7 +47,7 @@ function CandleTooltip({ session, point, isReference, formatDate, formatPrice, f
 
 export default function CandlestickChart({
   sessions, referenceDate, buyLevel, sellLevel, averageVolume, formatPrice, formatDate, formatVolume,
-  timeframe = '1d', onTimeframeChange,
+  timeframe = '1d', onTimeframeChange, ranges,
 }) {
   const plotRef = useRef(null);
   const [active, setActive] = useState(null);
@@ -134,21 +134,24 @@ export default function CandlestickChart({
         <h3 id="candle-title">Grafik candlestick</h3>
         {typeof onTimeframeChange === 'function' && (
           <div className="candle-timeframe" role="group" aria-label="Rentang waktu grafik">
-            {['1d', '1wk'].map((tf) => (
+            {(Array.isArray(ranges) && ranges.length > 0 ? ranges : [
+              { value: '1d', label: 'Harian' },
+              { value: '1wk', label: 'Mingguan' },
+            ]).map((range) => (
               <button
-                key={tf}
+                key={range.value}
                 type="button"
-                className={`candle-timeframe-btn${timeframe === tf ? ' candle-timeframe-btn--active' : ''}`}
-                onClick={() => onTimeframeChange(tf)}
-                aria-pressed={timeframe === tf}
+                className={`candle-timeframe-btn${timeframe === range.value ? ' candle-timeframe-btn--active' : ''}`}
+                onClick={() => onTimeframeChange(range.value)}
+                aria-pressed={timeframe === range.value}
               >
-                {tf === '1d' ? 'Harian' : 'Mingguan'}
+                {range.label}
               </button>
             ))}
           </div>
         )}
       </div>
-      <p>{sessions.length} {timeframe === '1wk' ? 'minggu' : 'sesi'} perdagangan hingga {formatDate(latest.date)}.</p>
+      <p>{sessions.length} {timeframe === '1wk' || timeframe === '1y' || timeframe === '2y' ? 'minggu' : 'sesi'} perdagangan hingga {formatDate(latest.date)}.</p>
       <div className="candle-grid">
         <div className="candle-axis-y" aria-hidden="true">
           {[ceiling, (ceiling + floor) / 2, floor].map((price) => (
