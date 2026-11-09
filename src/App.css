@@ -2243,3 +2243,22 @@ h1 {
   z-index: 2;
   pointer-events: none;
 }
+
+/* Watchlist: skor Trend Template & link simbol ke detail */
+.symbol-badge--link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.symbol-badge--link:hover {
+  border-color: var(--accent);
+  background: #eef4f0;
+  color: var(--accent);
+}
+
+.trend-score--loading,
+.trend-score--na {
+  background: #eef1f4;
+  color: #8a94a0;
+}

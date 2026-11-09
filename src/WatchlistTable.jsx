@@ -1,5 +1,49 @@
 import { useEffect, useRef, useState } from 'react';
 
+// Skor Trend Template Minervini per simbol (analyze.js tanpa RS agar cepat).
+function useTrendScores(symbolsKey) {
+  const [scores, setScores] = useState({});
+  const generation = useRef(0);
+
+  useEffect(() => {
+    generation.current += 1;
+    const gen = generation.current;
+    const list = symbolsKey ? symbolsKey.split('\n') : [];
+
+    async function load(symbol) {
+      try {
+        const response = await fetch(
+          `/.netlify/functions/analyze?${new URLSearchParams({ symbol, rs: 'false' })}`,
+        );
+        const payload = await response.json().catch(() => null);
+        if (gen !== generation.current) return;
+        if (response.ok && payload?.trendTemplate) {
+          setScores((s) => ({
+            ...s,
+            [symbol]: { passed: payload.trendTemplate.passed, total: payload.trendTemplate.total, eligible: payload.trendTemplate.eligible },
+          }));
+        } else {
+          setScores((s) => ({ ...s, [symbol]: null }));
+        }
+      } catch {
+        if (gen === generation.current) setScores((s) => ({ ...s, [symbol]: null }));
+      }
+    }
+
+    (async () => {
+      for (const symbol of list) {
+        if (gen !== generation.current) return;
+        // eslint-disable-next-line no-await-in-loop
+        await load(symbol);
+      }
+    })();
+
+    return () => { generation.current += 1; };
+  }, [symbolsKey]);
+
+  return scores;
+}
+
 // Baris data yang diambil per simbol, berurutan agar tidak memicu rate limit.
 function useWatchlistData(symbolsKey) {
   const [rows, setRows] = useState({});
@@ -59,6 +103,17 @@ function useWatchlistData(symbolsKey) {
   }, [symbolsKey]);
 
   return rows;
+}
+
+function TrendScoreBadge({ score }) {
+  if (score === undefined) return <span className="trend-score trend-score--loading">…</span>;
+  if (score === null) return <span className="trend-score trend-score--na">—</span>;
+  return (
+    <span className={`trend-score ${score.eligible ? 'trend-score--pass' : 'trend-score--fail'}`}
+      title={score.eligible ? 'Eligible (Stage 2 lengkap)' : 'Belum memenuhi seluruh kriteria Stage 2'}>
+      {score.passed}/{score.total}
+    </span>
+  );
 }
 
 function CheckBadgeMini({ passed }) {
@@ -142,14 +197,24 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled 
   );
 }
 
-function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, disabled }) {
+function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, disabled, trendScore }) {
   const { symbol, priceToWatch } = entry;
+  const symbolLink = (
+    <a
+      className="symbol-badge symbol-badge--light symbol-badge--link"
+      href={`/stock/${encodeURIComponent(symbol)}`}
+      onClick={(e) => e.stopPropagation()}
+      title={`Buka detail ${symbol}`}
+    >
+      {symbol}
+    </a>
+  );
 
   if (!row || row.status === 'loading') {
     return (
       <tr>
-        <td><span className="symbol-badge symbol-badge--light">{symbol}</span></td>
-        <td colSpan={7} className="watchlist-note">Memuat…</td>
+        <td>{symbolLink}</td>
+        <td colSpan={8} className="watchlist-note">Memuat…</td>
         <td className="watchlist-actions">
           <button type="button" className="watchlist-remove" disabled={disabled} title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`} onClick={() => onRemove(symbol)}>×</button>
         </td>
@@ -160,8 +225,8 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
   if (row.status === 'error') {
     return (
       <tr>
-        <td><span className="symbol-badge symbol-badge--light">{symbol}</span></td>
-        <td colSpan={7} className="watchlist-note watchlist-note--error">{row.message}</td>
+        <td>{symbolLink}</td>
+        <td colSpan={8} className="watchlist-note watchlist-note--error">{row.message}</td>
         <td className="watchlist-actions">
           <button type="button" className="watchlist-remove" disabled={disabled} title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`} onClick={() => onRemove(symbol)}>×</button>
         </td>
@@ -179,7 +244,8 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
     <tr className="watchlist-row" onClick={() => onOpen(symbol)} tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(symbol); } }}
       aria-label={`Buka detail ${symbol}`}>
-      <td><span className="symbol-badge symbol-badge--light">{symbol}</span></td>
+      <td>{symbolLink}</td>
+      <td><TrendScoreBadge score={trendScore} /></td>
       <td className="watchlist-name">{quote.name}</td>
       <td className={`num ${up ? 'trend--up' : 'trend--down'}`}>{formatPrice(quote.close, quote.currency)}</td>
       <td className="num">{formatPrice(quote.buyTrigger?.level, quote.currency)}</td>
@@ -208,6 +274,7 @@ const stateRank = { breakout: 0, near: 1, none: 2 };
 export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove, onSetWatchPrice, disabled }) {
   const symbolsKey = entries.map((entry) => entry.symbol).join('\n');
   const rows = useWatchlistData(symbolsKey);
+  const trendScores = useTrendScores(symbolsKey);
 
   const ordered = [...entries].sort((a, b) => {
     const rowA = rows[a.symbol];
@@ -223,6 +290,7 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
         <thead>
           <tr>
             <th>Simbol</th>
+            <th title="Trend Template Minervini (Stage 2)">Stage 2</th>
             <th>Nama</th>
             <th className="num">Close</th>
             <th className="num">Buy Trigger</th>
@@ -244,6 +312,7 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
               onRemove={onRemove}
               onSetWatchPrice={onSetWatchPrice}
               disabled={disabled}
+              trendScore={trendScores[entry.symbol]}
             />
           ))}
         </tbody>
