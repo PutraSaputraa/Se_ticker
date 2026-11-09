@@ -191,11 +191,10 @@ export default function JournalPage({ account }) {
 
     return runAction(side, async () => {
       const input = form.ticker.trim().toUpperCase();
-      const market = input.startsWith('US:') ? 'us' : 'auto';
-      const rawTicker = market === 'us' ? input.slice(3).trim() : input;
-      const symbol = normalizeTicker(rawTicker, market);
+      const symbol = normalizeTicker(input);
+      const fallback = symbol !== input && /^[A-Z0-9]+$/.test(input) ? input : null;
       const setup = form.setup.trim();
-      if (!symbol || !setup) throw new Error('Isi kode saham dan setup posisi.');
+      if (!symbol || !setup) throw new Error('Isi kode ticker dan setup posisi.');
 
       const amount = form.positionUsd.trim();
       const positionUsd = Number(amount.replace(',', '.'));
@@ -203,7 +202,7 @@ export default function JournalPage({ account }) {
         throw new Error('Isi nilai posisi USD lebih dari 0, misalnya 500 atau 125,50.');
       }
 
-      const quote = await fetchJournalQuote(symbol, form.date, symbol === rawTicker ? null : rawTicker);
+      const quote = await fetchJournalQuote(symbol, form.date, fallback);
       const trade = normalizeTrade({
         date: quote.date,
         pair: quote.symbol ?? symbol,
@@ -262,16 +261,16 @@ export default function JournalPage({ account }) {
               <input type="date" value={form.date} onChange={(event) => setField('date', event.target.value)} disabled={disabled} required />
             </label>
             <label>
-              Kode saham
+              Kode ticker
               <input
                 type="text"
                 value={form.ticker}
                 onChange={(event) => setField('ticker', event.target.value)}
-                placeholder="BBCA, ABBV, 7203.T"
+                placeholder="BBCA, ABBV, BTC-USD"
                 autoCapitalize="characters"
                 autoComplete="off"
                 spellCheck={false}
-                maxLength={35}
+                maxLength={39}
                 aria-describedby="journal-ticker-note"
                 disabled={disabled}
                 required
@@ -304,7 +303,7 @@ export default function JournalPage({ account }) {
             </label>
           </div>
           <p className="journal-help" id="journal-price-note">
-            <span id="journal-ticker-note">Gunakan kode Yahoo Finance. Awali dengan US: untuk memilih ticker AS jika kodenya sama.</span>{' '}
+            <span id="journal-ticker-note">Pakai <code>BTC-USD</code> atau <code>CRYPTO:BTC</code> untuk crypto. Awali dengan <code>US:</code> untuk memilih ticker AS jika kodenya sama.</span>{' '}
             Tanggal mengikuti zona waktu bursa. Jurnal memakai harga penutupan untuk tanggal lampau dan kuotasi terakhir untuk hari ini serta saat Close.
           </p>
           <div className="journal-actions">

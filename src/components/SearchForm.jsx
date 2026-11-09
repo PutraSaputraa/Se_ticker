@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 export const markets = {
   auto: { label: 'Otomatis' },
+  crypto: { label: 'Crypto' },
   us: { label: 'AS' },
   id: { label: 'Indonesia', suffix: '.JK' },
   jp: { label: 'Jepang', suffix: '.T' },
@@ -22,9 +23,15 @@ const usCommon = new Set([
 ]);
 
 export function normalizeTicker(ticker, market = 'auto') {
-  const symbol = ticker.trim().toUpperCase();
-  if (!symbol || symbol.includes('.') || market === 'us') return symbol;
-  const { suffix, digits } = markets[market] ?? {};
+  const input = ticker.trim().toUpperCase();
+  const prefix = /^(US|CRYPTO):\s*/.exec(input);
+  const symbol = prefix ? input.slice(prefix[0].length) : input;
+  const selectedMarket = prefix ? prefix[1].toLowerCase() : market;
+  if (!symbol || symbol.includes('.') || selectedMarket === 'us') return symbol;
+  if (selectedMarket === 'crypto') {
+    return /^[A-Z0-9]+$/.test(symbol) ? `${symbol}-USD` : symbol.replace(/\s*\/\s*/, '-');
+  }
+  const { suffix, digits } = markets[selectedMarket] ?? {};
   if (suffix) {
     const code = /^\d+$/.test(symbol) ? symbol.padStart(digits ?? 0, '0') : symbol;
     return `${code}${suffix}`;
@@ -75,7 +82,7 @@ export default function SearchForm({ initialTicker = '', initialMarket = 'auto',
               type="text"
               value={ticker}
               onChange={(event) => setTicker(event.target.value)}
-              placeholder="Mis. NVDA atau BBCA"
+              placeholder={market === 'crypto' ? 'Mis. BTC, ETH, atau SOL' : 'Mis. NVDA atau BBCA'}
               autoCapitalize="characters"
               autoComplete="off"
               spellCheck={false}
@@ -90,6 +97,7 @@ export default function SearchForm({ initialTicker = '', initialMarket = 'auto',
         </button>
       </div>
       <p className="hint">
+        <span>BTC → BTC-USD (Crypto)</span>
         <span>NVDA, MSFT, AAPL (pilih AS)</span>
         <span>BBCA → BBCA.JK (Indonesia)</span>
         <span>7203 → 7203.T (Jepang)</span>
