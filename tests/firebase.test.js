@@ -135,10 +135,11 @@ test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil
   const readJournal = async () => (await getDocFromServer(reference)).data().journal;
   const date = '2026-01-05';
   const position = { date, pair: 'BBCA.JK', setup: 'Breakout', entryPrice: 1000, quoteCurrency: 'IDR', status: 'open' };
+  const levels = { stopLoss: 900, takeProfit: 1300 };
   await updateAccountData(owner.db, uid, (current) => ({
     ...current,
     journal: addTrade(
-      addTrade(current.journal, { ...position, id: 'test-long', side: 'long', positionUsd: 500 }),
+      addTrade(current.journal, { ...position, ...levels, id: 'test-long', side: 'long', positionUsd: 500 }),
       { ...position, id: 'test-short', side: 'short' },
     ),
   }));
@@ -147,7 +148,9 @@ test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil
   const open = await readJournal();
   assert.equal(open.length, 2);
   assert.ok(open.every((trade) => trade.status === 'open' && trade.pnl === null));
-  assert.equal(open.find((trade) => trade.id === 'test-long').positionUsd, 500);
+  const openLong = open.find((trade) => trade.id === 'test-long');
+  assert.equal(openLong.positionUsd, 500);
+  assert.deepEqual([openLong.stopLoss, openLong.takeProfit], [levels.stopLoss, levels.takeProfit]);
 
   const exitDate = '2026-01-06';
   const close = (id, price) => (current) => ({
@@ -165,6 +168,8 @@ test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil
   const short = closed.find((trade) => trade.id === 'test-short');
   assert.deepEqual([long.exitPrice, long.exitDate, long.status, long.pnl, long.pnlPct], [2000, exitDate, 'win', 1000, 100]);
   assert.deepEqual([short.exitPrice, short.exitDate, short.status, short.pnl, short.pnlPct], [500, exitDate, 'win', 500, 50]);
+  assert.deepEqual([long.stopLoss, long.takeProfit], [levels.stopLoss, levels.takeProfit]);
+  assert.equal(short.stopLoss, undefined);
   assert.equal(positionPnlUsd(long), 500);
   assert.equal(positionPnlUsd(short), null);
 });

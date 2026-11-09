@@ -33,10 +33,10 @@ export function formatDateCompact(date) {
   }
 }
 
-export function formatPrice(price, currency) {
+export function formatPrice(price, currency, maxFractionDigits) {
   if (!Number.isFinite(price)) return 'Tidak tersedia';
-  const integer = { maximumFractionDigits: 0 };
-  const decimal = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  const integer = { maximumFractionDigits: maxFractionDigits ?? 0 };
+  const decimal = { minimumFractionDigits: 2, maximumFractionDigits: maxFractionDigits ?? 2 };
   if (currency === 'JPY') return `¥${price.toLocaleString('id-ID', integer)}`;
   if (currency === 'IDR') return `Rp${price.toLocaleString('id-ID', integer)}`;
   if (currency === 'USD') return `$${price.toLocaleString('en-US', decimal)}`;

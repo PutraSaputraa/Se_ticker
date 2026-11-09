@@ -1,4 +1,4 @@
-// Posisi baru menyimpan harga masuk dan PnL per saham setelah ditutup.
+// Posisi baru menyimpan level harga dan PnL per saham setelah ditutup.
 // Catatan lama menyimpan PnL manual dalam mata uang akun.
 
 export const journalStatuses = {
@@ -34,6 +34,8 @@ export function normalizeTrade(entry) {
     return Number.isFinite(parsed) ? parsed : null;
   };
   const entryPrice = num(entry.entryPrice);
+  const stopLoss = num(entry.stopLoss);
+  const takeProfit = num(entry.takeProfit);
   const positionUsd = num(entry.positionUsd);
   const quoteCurrency = typeof entry.quoteCurrency === 'string' ? entry.quoteCurrency.trim() : '';
   const hasPrice = entryPrice > 0 && Boolean(quoteCurrency);
@@ -53,6 +55,8 @@ export function normalizeTrade(entry) {
     notes: typeof entry.notes === 'string' ? entry.notes.trim() : '',
     ...(hasPrice && {
       entryPrice,
+      ...(stopLoss > 0 && { stopLoss }),
+      ...(takeProfit > 0 && { takeProfit }),
       entryTimestamp: Number.isSafeInteger(entry.entryTimestamp) ? entry.entryTimestamp : null,
       quoteCurrency,
       exitPrice: num(entry.exitPrice),

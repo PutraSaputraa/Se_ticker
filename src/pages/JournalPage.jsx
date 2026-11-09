@@ -12,8 +12,30 @@ import {
 } from '../journal.js';
 import { formatPct, formatPrice } from '../format.js';
 
+const levelPrecision = 16;
+const levelPattern = new RegExp(`^\\d*(?:[.,]\\d{1,${levelPrecision}})?$`);
+const levelFields = [
+  ['entryPrice', 'Harga masuk'],
+  ['stopLoss', 'Stop Loss'],
+  ['takeProfit', 'Take Profit (TP)'],
+];
+
 function emptyForm() {
-  return { date: new Date().toLocaleDateString('sv-SE'), ticker: '', setup: '', positionUsd: '' };
+  return {
+    date: new Date().toLocaleDateString('sv-SE'),
+    ticker: '',
+    setup: '',
+    positionUsd: '',
+    entryPrice: '',
+    stopLoss: '',
+    takeProfit: '',
+  };
+}
+
+function parseLevel(input) {
+  const text = input.trim();
+  const price = Number(text.replace(',', '.'));
+  return levelPattern.test(text) && Number.isFinite(price) && price > 0 ? price : null;
 }
 
 async function fetchJournalQuote(symbol, date, fallback) {
@@ -28,8 +50,8 @@ async function fetchJournalQuote(symbol, date, fallback) {
   return quote;
 }
 
-function formatJournalPrice(value, currency) {
-  return Number.isFinite(value) ? formatPrice(value, currency) : '–';
+function formatJournalPrice(value, currency, precision) {
+  return Number.isFinite(value) ? formatPrice(value, currency, precision) : '–';
 }
 
 function formatPnl(value, currency) {
@@ -65,6 +87,8 @@ function TradeTable({ trades, closed = false, manualCurrency, disabled, activeAc
               <th>Posisi</th>
               <th>Setup</th>
               <th className="num">Harga masuk</th>
+              <th className="num">Stop Loss</th>
+              <th className="num">Take Profit (TP)</th>
               <th className="num">Nilai posisi (USD)</th>
               {closed && (
                 <>
@@ -84,6 +108,7 @@ function TradeTable({ trades, closed = false, manualCurrency, disabled, activeAc
               const side = journalSides[trade.side];
               const currency = trade.quoteCurrency ?? manualCurrency;
               const pnlTone = trade.pnl > 0 ? 'trend--up' : trade.pnl < 0 ? 'trend--down' : '';
+              const entryPrecision = trade.stopLoss != null ? levelPrecision : undefined;
               return (
                 <tr key={trade.id}>
                   <td>{trade.date}</td>
@@ -94,7 +119,9 @@ function TradeTable({ trades, closed = false, manualCurrency, disabled, activeAc
                     {trade.riskPct != null && <small className="journal-trade-note">Risiko {trade.riskPct}%</small>}
                     {trade.notes && <small className="journal-trade-note">{trade.notes}</small>}
                   </td>
-                  <td className="num">{formatJournalPrice(trade.entryPrice, currency)}</td>
+                  <td className="num">{formatJournalPrice(trade.entryPrice, currency, entryPrecision)}</td>
+                  <td className="num">{formatJournalPrice(trade.stopLoss, currency, levelPrecision)}</td>
+                  <td className="num">{formatJournalPrice(trade.takeProfit, currency, levelPrecision)}</td>
                   <td className="num">{formatJournalPrice(trade.positionUsd, 'USD')}</td>
                   {closed && (
                     <>
@@ -202,6 +229,19 @@ export default function JournalPage({ account }) {
         throw new Error('Isi nilai posisi USD lebih dari 0, misalnya 500 atau 125,50.');
       }
 
+      const entryPrice = parseLevel(form.entryPrice);
+      const stopLoss = parseLevel(form.stopLoss);
+      const takeProfit = parseLevel(form.takeProfit);
+      if (entryPrice === null || stopLoss === null || takeProfit === null) {
+        throw new Error(`Isi harga masuk, Stop Loss, dan Take Profit dengan angka positif hingga ${levelPrecision} desimal.`);
+      }
+      const [lower, upper] = side === 'long' ? [stopLoss, takeProfit] : [takeProfit, stopLoss];
+      if (!(lower < entryPrice && entryPrice < upper)) {
+        throw new Error(side === 'long'
+          ? 'Untuk Long, Stop Loss harus di bawah harga masuk dan Take Profit di atasnya.'
+          : 'Untuk Short, Take Profit harus di bawah harga masuk dan Stop Loss di atasnya.');
+      }
+
       const quote = await fetchJournalQuote(symbol, form.date, fallback);
       const trade = normalizeTrade({
         date: quote.date,
@@ -210,8 +250,9 @@ export default function JournalPage({ account }) {
         setup,
         positionUsd,
         status: 'open',
-        entryPrice: quote.price,
-        entryTimestamp: quote.timestamp,
+        entryPrice,
+        stopLoss,
+        takeProfit,
         quoteCurrency: quote.currency,
       });
       const saved = await account.update((current) => ({
@@ -302,16 +343,34 @@ export default function JournalPage({ account }) {
               />
             </label>
           </div>
+          <div className="journal-form-grid">
+            {levelFields.map(([field, label]) => (
+              <label key={field}>
+                {label}
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={form[field]}
+                  onChange={(event) => setField(field, event.target.value)}
+                  aria-describedby="journal-level-note"
+                  maxLength={25}
+                  disabled={disabled}
+                  required
+                />
+              </label>
+            ))}
+          </div>
           <p className="journal-help" id="journal-price-note">
             <span id="journal-ticker-note">Pakai <code>BTC-USD</code> atau <code>CRYPTO:BTC</code> untuk crypto. Awali dengan <code>US:</code> untuk memilih ticker AS jika kodenya sama.</span>{' '}
-            Tanggal mengikuti zona waktu bursa. Jurnal memakai harga penutupan untuk tanggal lampau dan kuotasi terakhir untuk hari ini serta saat Close.
+            <span id="journal-level-note">Isi ketiga harga dalam mata uang ticker, misalnya USD untuk BTC-USD atau rupiah untuk BBCA.JK. Tulis tanpa pemisah ribuan. Titik atau koma dipakai untuk desimal.</span>{' '}
+            Tanggal masuk mengikuti zona waktu bursa. Saat Close, jurnal memakai kuotasi terakhir Yahoo Finance sebagai harga keluar.
           </p>
           <div className="journal-actions">
             <button type="submit" value="long" className="scan-button" disabled={disabled}>
-              {activeAction === 'long' ? 'Mengambil harga…' : 'Buka Long'}
+              {activeAction === 'long' ? 'Menyimpan…' : 'Buka Long'}
             </button>
             <button type="submit" value="short" className="scan-button journal-short-button" disabled={disabled}>
-              {activeAction === 'short' ? 'Mengambil harga…' : 'Buka Short'}
+              {activeAction === 'short' ? 'Menyimpan…' : 'Buka Short'}
             </button>
           </div>
         </form>
