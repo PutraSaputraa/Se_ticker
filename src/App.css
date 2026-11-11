@@ -2465,7 +2465,8 @@ h1 {
 
 .journal-form .journal-help { margin: 0; }
 
-.journal-form input {
+.journal-form input,
+.journal-form select {
   width: 100%;
   min-width: 0;
   padding: 0.5rem 0.65rem;
@@ -2475,6 +2476,8 @@ h1 {
   font: inherit;
   color: inherit;
 }
+
+.journal-form input[readonly] { background: var(--surface-muted); }
 
 .journal-page .detail-metrics { padding: 0; margin-bottom: 1rem; }
 

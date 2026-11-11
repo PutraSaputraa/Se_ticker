@@ -14,6 +14,7 @@ export const journalSides = {
 };
 
 export const journalCurrencies = ['USD', 'IDR', 'USDT'];
+export const journalRewardMultiples = [2, 3, 4];
 
 let counter = 0;
 function makeId() {
@@ -35,6 +36,7 @@ export function normalizeTrade(entry) {
   };
   const entryPrice = num(entry.entryPrice);
   const stopLoss = num(entry.stopLoss);
+  const rewardMultiple = num(entry.rewardMultiple);
   const takeProfit = num(entry.takeProfit);
   const positionUsd = num(entry.positionUsd);
   const quoteCurrency = typeof entry.quoteCurrency === 'string' ? entry.quoteCurrency.trim() : '';
@@ -56,6 +58,7 @@ export function normalizeTrade(entry) {
     ...(hasPrice && {
       entryPrice,
       ...(stopLoss > 0 && { stopLoss }),
+      ...(journalRewardMultiples.includes(rewardMultiple) && { rewardMultiple }),
       ...(takeProfit > 0 && { takeProfit }),
       entryTimestamp: Number.isSafeInteger(entry.entryTimestamp) ? entry.entryTimestamp : null,
       quoteCurrency,

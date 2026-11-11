@@ -4,6 +4,7 @@ import {
   addTrade,
   calculateTradePnl,
   closeTrade,
+  journalRewardMultiples,
   journalSides,
   journalStatuses,
   normalizeTrade,
@@ -17,11 +18,6 @@ import useJournalQuotes, { fetchJournalQuote } from '../useJournalQuotes.js';
 
 const levelPrecision = 16;
 const levelPattern = new RegExp(`^\\d*(?:[.,]\\d{1,${levelPrecision}})?$`);
-const levelFields = [
-  ['entryPrice', 'Harga masuk'],
-  ['stopLoss', 'Stop Loss'],
-  ['takeProfit', 'Take Profit (TP)'],
-];
 const quoteTimeFormat = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric', month: 'short', year: 'numeric',
   hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
@@ -33,16 +29,68 @@ function emptyForm() {
     ticker: '',
     setup: '',
     positionUsd: '',
+    side: 'long',
     entryPrice: '',
+    stopLossPct: '',
     stopLoss: '',
+    rewardMultiple: '',
     takeProfit: '',
   };
 }
 
-function parseLevel(input) {
+function parseLevelUnits(input) {
   const text = input.trim();
-  const price = Number(text.replace(',', '.'));
-  return levelPattern.test(text) && Number.isFinite(price) && price > 0 ? price : null;
+  if (!levelPattern.test(text)) return null;
+
+  const [whole, fraction = ''] = text.split(/[.,]/);
+  const units = BigInt(whole + fraction.padEnd(levelPrecision, '0'));
+  return units > 0n ? units : null;
+}
+
+function formatLevel(units) {
+  if (units === null || units <= 0n) return '';
+  const digits = String(units).padStart(levelPrecision + 1, '0');
+  const whole = digits.slice(0, -levelPrecision);
+  const fraction = digits.slice(-levelPrecision).replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction}` : whole;
+}
+
+function calculateLevels(form) {
+  const entry = parseLevelUnits(form.entryPrice);
+  const direction = form.side === 'long' ? 1n : -1n;
+  let stop = parseLevelUnits(form.stopLoss);
+  if (form.stopLossPct) {
+    const percent = 100n - direction * BigInt(form.stopLossPct);
+    // Round to the nearest unit at the form's decimal precision.
+    stop = entry === null ? null : (entry * percent + 50n) / 100n;
+  }
+
+  let target = parseLevelUnits(form.takeProfit);
+  if (form.rewardMultiple) {
+    const risk = entry !== null && stop !== null ? (entry - stop) * direction : 0n;
+    target = risk > 0n ? entry + direction * risk * BigInt(form.rewardMultiple) : null;
+  }
+
+  return { entryPrice: formatLevel(entry), stopLoss: formatLevel(stop), takeProfit: formatLevel(target) };
+}
+
+function PriceField({ label, value, onChange, disabled, readOnly = false }) {
+  return (
+    <label>
+      {label}
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-describedby="journal-level-note"
+        maxLength={25}
+        disabled={disabled}
+        readOnly={readOnly}
+        required={!readOnly}
+      />
+    </label>
+  );
 }
 
 function formatJournalPrice(value, currency, precision) {
@@ -126,6 +174,7 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, dis
               <th>Setup</th>
               <th className="num">Harga masuk</th>
               <th className="num">Stop Loss</th>
+              <th className="num">Risk Reward Ratio</th>
               <th className="num">Take Profit (TP)</th>
               <th className="num">Nilai posisi (USD)</th>
               {closed && (
@@ -160,6 +209,7 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, dis
                   </td>
                   <td className="num">{formatJournalPrice(trade.entryPrice, currency, entryPrecision)}</td>
                   <td className="num">{formatJournalPrice(trade.stopLoss, currency, levelPrecision)}</td>
+                  <td className="num">{trade.rewardMultiple == null ? '–' : `1:${trade.rewardMultiple}`}</td>
                   <td className="num">{formatJournalPrice(trade.takeProfit, currency, levelPrecision)}</td>
                   <td className="num">{formatJournalPrice(trade.positionUsd, 'USD')}</td>
                   {closed && (
@@ -215,6 +265,8 @@ export default function JournalPage({ account }) {
   const [error, setError] = useState('');
   const running = useRef(false);
   const disabled = !account.ready || account.pending || activeAction !== null;
+  const { side, stopLossPct, rewardMultiple } = form;
+  const levels = calculateLevels(form);
 
   const openTrades = journal.filter((trade) => trade.status === 'open');
   const { quotes, refresh } = useJournalQuotes(openTrades);
@@ -257,8 +309,6 @@ export default function JournalPage({ account }) {
 
   function handleOpen(event) {
     event.preventDefault();
-    const side = event.nativeEvent.submitter?.value;
-    if (side !== 'long' && side !== 'short') return;
 
     return runAction(side, async () => {
       const input = form.ticker.trim().toUpperCase();
@@ -273,17 +323,25 @@ export default function JournalPage({ account }) {
         throw new Error('Isi nilai posisi USD lebih dari 0, misalnya 500 atau 125,50.');
       }
 
-      const entryPrice = parseLevel(form.entryPrice);
-      const stopLoss = parseLevel(form.stopLoss);
-      const takeProfit = parseLevel(form.takeProfit);
-      if (entryPrice === null || stopLoss === null || takeProfit === null) {
-        throw new Error(`Isi harga masuk, Stop Loss, dan Take Profit dengan angka positif hingga ${levelPrecision} desimal.`);
+      const entryPrice = Number(levels.entryPrice);
+      const stopLoss = Number(levels.stopLoss);
+      const takeProfit = Number(levels.takeProfit);
+      const prices = rewardMultiple ? [entryPrice, stopLoss] : [entryPrice, stopLoss, takeProfit];
+      if (!prices.every((price) => Number.isFinite(price) && price > 0)) {
+        throw new Error(`Gunakan angka positif hingga ${levelPrecision} desimal untuk harga yang diisi manual.`);
       }
-      const [lower, upper] = side === 'long' ? [stopLoss, takeProfit] : [takeProfit, stopLoss];
-      if (!(lower < entryPrice && entryPrice < upper)) {
+      if (side === 'long' ? stopLoss >= entryPrice : stopLoss <= entryPrice) {
         throw new Error(side === 'long'
-          ? 'Untuk Long, Stop Loss harus di bawah harga masuk dan Take Profit di atasnya.'
-          : 'Untuk Short, Take Profit harus di bawah harga masuk dan Stop Loss di atasnya.');
+          ? 'Untuk Long, Stop Loss harus di bawah harga masuk.'
+          : 'Untuk Short, Stop Loss harus di atas harga masuk.');
+      }
+      if (rewardMultiple && (!Number.isFinite(takeProfit) || takeProfit <= 0)) {
+        throw new Error('Take Profit otomatis harus lebih dari 0. Sesuaikan Stop Loss atau Risk Reward Ratio.');
+      }
+      if (side === 'long' ? takeProfit <= entryPrice : takeProfit >= entryPrice) {
+        throw new Error(side === 'long'
+          ? 'Untuk Long, Take Profit harus di atas harga masuk.'
+          : 'Untuk Short, Take Profit harus di bawah harga masuk.');
       }
 
       const quote = await fetchJournalQuote(symbol, { date: form.date, fallback });
@@ -296,6 +354,7 @@ export default function JournalPage({ account }) {
         status: 'open',
         entryPrice,
         stopLoss,
+        rewardMultiple,
         takeProfit,
         quoteCurrency: quote.currency,
       });
@@ -382,35 +441,57 @@ export default function JournalPage({ account }) {
                 required
               />
             </label>
+            <label>
+              Posisi
+              <select value={side} onChange={(event) => setField('side', event.target.value)} disabled={disabled}>
+                {Object.entries(journalSides).map(([value, { label }]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
           </div>
           <div className="journal-form-grid">
-            {levelFields.map(([field, label]) => (
-              <label key={field}>
-                {label}
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={form[field]}
-                  onChange={(event) => setField(field, event.target.value)}
-                  aria-describedby="journal-level-note"
-                  maxLength={25}
-                  disabled={disabled}
-                  required
-                />
-              </label>
-            ))}
+            <PriceField label="Harga masuk" value={form.entryPrice} onChange={(value) => setField('entryPrice', value)} disabled={disabled} />
+            <label>
+              Metode Stop Loss
+              <select value={stopLossPct} onChange={(event) => setField('stopLossPct', event.target.value)} disabled={disabled}>
+                <option value="">Isi sendiri</option>
+                <option value="5">5% dari harga masuk</option>
+                <option value="7">7% dari harga masuk</option>
+              </select>
+            </label>
+            <PriceField
+              label="Stop Loss"
+              value={stopLossPct ? levels.stopLoss : form.stopLoss}
+              onChange={(value) => setField('stopLoss', value)}
+              disabled={disabled}
+              readOnly={Boolean(stopLossPct)}
+            />
+            <label>
+              Risk Reward Ratio
+              <select value={rewardMultiple} onChange={(event) => setField('rewardMultiple', event.target.value)} disabled={disabled}>
+                <option value="">Isi TP sendiri</option>
+                {journalRewardMultiples.map((multiple) => (
+                  <option key={multiple} value={multiple}>1:{multiple}</option>
+                ))}
+              </select>
+            </label>
+            <PriceField
+              label="Take Profit (TP)"
+              value={rewardMultiple ? levels.takeProfit : form.takeProfit}
+              onChange={(value) => setField('takeProfit', value)}
+              disabled={disabled}
+              readOnly={Boolean(rewardMultiple)}
+            />
           </div>
           <p className="journal-help" id="journal-price-note">
             <span id="journal-ticker-note">Pakai <code>BTC-USD</code> atau <code>CRYPTO:BTC</code> untuk crypto. Awali dengan <code>US:</code> untuk memilih ticker AS jika kodenya sama.</span>{' '}
-            <span id="journal-level-note">Isi ketiga harga dalam mata uang ticker, misalnya USD untuk BTC-USD atau rupiah untuk BBCA.JK. Tulis tanpa pemisah ribuan. Titik atau koma dipakai untuk desimal.</span>{' '}
+            <span id="journal-level-note">Tulis harga dalam mata uang ticker tanpa pemisah ribuan. Gunakan titik atau koma untuk desimal.</span>{' '}
             Tanggal masuk mengikuti zona waktu bursa. Saat Close, jurnal memakai kuotasi terakhir Yahoo Finance sebagai harga keluar.
           </p>
           <div className="journal-actions">
-            <button type="submit" value="long" className="scan-button" disabled={disabled}>
-              {activeAction === 'long' ? 'Menyimpan…' : 'Buka Long'}
-            </button>
-            <button type="submit" value="short" className="scan-button journal-short-button" disabled={disabled}>
-              {activeAction === 'short' ? 'Menyimpan…' : 'Buka Short'}
+            <button type="submit" className={`scan-button${side === 'short' ? ' journal-short-button' : ''}`} disabled={disabled}>
+              {activeAction === side ? 'Menyimpan…' : `Buka ${journalSides[side].label}`}
             </button>
           </div>
         </form>

@@ -135,7 +135,7 @@ test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil
   const readJournal = async () => (await getDocFromServer(reference)).data().journal;
   const date = '2026-01-05';
   const position = { date, pair: 'BBCA.JK', setup: 'Breakout', entryPrice: 1000, quoteCurrency: 'IDR', status: 'open' };
-  const levels = { stopLoss: 900, takeProfit: 1300 };
+  const levels = { stopLoss: 900, rewardMultiple: 3, takeProfit: 1300 };
   await updateAccountData(owner.db, uid, (current) => ({
     ...current,
     journal: addTrade(
@@ -151,6 +151,7 @@ test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil
   const openLong = open.find((trade) => trade.id === 'test-long');
   assert.equal(openLong.positionUsd, 500);
   assert.deepEqual([openLong.stopLoss, openLong.takeProfit], [levels.stopLoss, levels.takeProfit]);
+  assert.equal(openLong.rewardMultiple, levels.rewardMultiple);
 
   const exitDate = '2026-01-06';
   const close = (id, price) => (current) => ({
@@ -169,7 +170,9 @@ test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil
   assert.deepEqual([long.exitPrice, long.exitDate, long.status, long.pnl, long.pnlPct], [2000, exitDate, 'win', 1000, 100]);
   assert.deepEqual([short.exitPrice, short.exitDate, short.status, short.pnl, short.pnlPct], [500, exitDate, 'win', 500, 50]);
   assert.deepEqual([long.stopLoss, long.takeProfit], [levels.stopLoss, levels.takeProfit]);
+  assert.equal(long.rewardMultiple, levels.rewardMultiple);
   assert.equal(short.stopLoss, undefined);
+  assert.equal(short.rewardMultiple, undefined);
   assert.equal(positionPnlUsd(long), 500);
   assert.equal(positionPnlUsd(short), null);
 });
