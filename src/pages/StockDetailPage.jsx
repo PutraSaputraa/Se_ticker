@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import CandlestickChart from '../CandlestickChart.jsx';
 import MinerviniPanel from '../components/MinerviniPanel.jsx';
+import TableScroll from '../components/TableScroll.jsx';
 import {
   formatCompactNumber,
   formatDate,
-  formatDateCompact,
   formatPct,
   formatPrice,
   formatVolume,
-  priceDecimals,
 } from '../format.js';
 import { addSymbol, removeSymbol } from '../watchlist.js';
+import '../styles/stock.css';
 
 const serviceError = 'Layanan harga tidak dapat diakses. Coba lagi.';
 
@@ -28,37 +28,35 @@ const trends = {
   '-1': { label: 'Turun', className: 'down' },
 };
 
-function parseWatchPrice(input, decimals) {
-  const text = input.trim();
-  const pattern = decimals === 0 ? /^\d+$/ : /^\d+(?:[.,]\d{1,2})?$/;
-  if (!pattern.test(text)) return null;
-  const value = Number(text.replace(',', '.'));
-  return Number.isFinite(value) ? value : null;
-}
-
 function StatusBadge({ status }) {
   const meta = breakoutStatusMeta[status] ?? breakoutStatusMeta.menunggu;
   return <span className={`detail-status ${meta.className}`}>{meta.label}</span>;
 }
 
-function MetricCard({ label, value, hint, tone }) {
+function TradingLevel({ label, value, hint, tone }) {
   return (
-    <div className={`metric-card${tone ? ` metric-card--${tone}` : ''}`}>
-      <span className="metric-label">{label}</span>
-      <strong className="metric-value">{value}</strong>
-      {hint && <span className="metric-hint">{hint}</span>}
+    <div className={`stock-level${tone ? ` stock-level--${tone}` : ''}`}>
+      <dt>{label}</dt>
+      <dd>
+        <strong>{value}</strong>
+        {hint && <small>{hint}</small>}
+      </dd>
     </div>
   );
 }
 
-function FundamentalsTable({ fundamentals, currency }) {
-  if (!fundamentals) return null;
-  const { quarterlyEps = [], quarterlyRevenue = [], annualEps = [], annualRevenue = [] } = fundamentals;
-  if (!quarterlyEps.length && !annualRevenue.length) return null;
+function FundamentalsTable({ fundamentals }) {
+  const { quarterlyEps = [], annualRevenue = [] } = fundamentals ?? {};
+  if (!quarterlyEps.length && !annualRevenue.length) {
+    return (
+      <section className="stock-data-section" aria-labelledby="fundamentals-title">
+        <h2 id="fundamentals-title">Fundamental</h2>
+        <p className="stock-muted">Data EPS dan pendapatan belum tersedia.</p>
+      </section>
+    );
+  }
 
   const latestQ = quarterlyEps.slice(-4);
-  const latestRev = quarterlyRevenue.slice(-4);
-  const latestAnnualEps = annualEps.slice(-3);
   const latestAnnualRev = annualRevenue.slice(-3);
 
   // EPS growth Q-to-Q (kuartal terhadap kuartal sebelumnya).
@@ -75,15 +73,16 @@ function FundamentalsTable({ fundamentals, currency }) {
   });
 
   return (
-    <section className="fundamentals" aria-labelledby="fundamentals-title">
-      <h3 id="fundamentals-title">Fundamental</h3>
-      <div className="fundamentals-grid">
+    <section className="stock-data-section" aria-labelledby="fundamentals-title">
+      <h2 id="fundamentals-title">Fundamental</h2>
+      <div className="stock-fundamentals-grid">
         {latestQ.length > 0 && (
-          <div className="fund-block">
-            <h4>EPS kuartalan</h4>
-            <table className="fund-table">
+          <div>
+            <h3>EPS kuartalan</h3>
+            <TableScroll className="stock-table-scroll" label="Tabel EPS kuartalan">
+              <table className="fund-table">
               <thead>
-                <tr><th>Kuartal</th><th className="num">EPS</th><th className="num">Growth Q-to-Q</th></tr>
+                <tr><th>Kuartal</th><th className="num">EPS</th><th className="num">Perubahan QoQ</th></tr>
               </thead>
               <tbody>
                 {latestQ.map((point, idx) => (
@@ -91,20 +90,22 @@ function FundamentalsTable({ fundamentals, currency }) {
                     <td>{point.date}</td>
                     <td className="num">{point.value.toLocaleString('id-ID', { maximumFractionDigits: 2 })}</td>
                     <td className={`num ${epsGrowth[idx] != null && epsGrowth[idx] >= 0 ? 'trend--up' : 'trend--down'}`}>
-                      {epsGrowth[idx] == null ? '—' : formatPct(epsGrowth[idx])}
+                      {epsGrowth[idx] == null ? '–' : formatPct(epsGrowth[idx])}
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </TableScroll>
           </div>
         )}
         {latestAnnualRev.length > 0 && (
-          <div className="fund-block">
-            <h4>Revenue tahunan</h4>
-            <table className="fund-table">
+          <div>
+            <h3>Pendapatan tahunan</h3>
+            <TableScroll className="stock-table-scroll" label="Tabel pendapatan tahunan">
+              <table className="fund-table">
               <thead>
-                <tr><th>Tahun</th><th className="num">Revenue</th><th className="num">Growth</th></tr>
+                <tr><th>Tahun</th><th className="num">Pendapatan</th><th className="num">Perubahan YoY</th></tr>
               </thead>
               <tbody>
                 {latestAnnualRev.map((point, idx) => (
@@ -112,12 +113,13 @@ function FundamentalsTable({ fundamentals, currency }) {
                     <td>{point.date?.slice(0, 4)}</td>
                     <td className="num">{formatCompactNumber(point.value)}</td>
                     <td className={`num ${revGrowth[idx] != null && revGrowth[idx] >= 0 ? 'trend--up' : 'trend--down'}`}>
-                      {revGrowth[idx] == null ? '—' : formatPct(revGrowth[idx])}
+                      {revGrowth[idx] == null ? '–' : formatPct(revGrowth[idx])}
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </TableScroll>
           </div>
         )}
       </div>
@@ -131,9 +133,9 @@ export default function StockDetailPage({ account }) {
   const [range, setRange] = useState('3m');
   const [result, setResult] = useState({ status: 'idle' });
   const [chartData, setChartData] = useState({ status: 'idle' });
+  const [chartAttempt, setChartAttempt] = useState(0);
   const activeSearch = useRef(null);
   const activeChart = useRef(null);
-  const [watchInput, setWatchInput] = useState('');
 
   const { watchlist } = account;
   const watchlistDisabled = !account.ready || account.pending;
@@ -188,7 +190,10 @@ export default function StockDetailPage({ account }) {
     const controller = new AbortController();
     activeChart.current?.abort();
     activeChart.current = controller;
-    setChartData({ status: 'loading' });
+    setChartData((previous) => ({
+      status: 'loading',
+      snapshot: previous.snapshot?.symbol === decoded ? previous.snapshot : null,
+    }));
 
     (async () => {
       try {
@@ -197,17 +202,21 @@ export default function StockDetailPage({ account }) {
         const payload = await response.json().catch(() => null);
         if (cancelled || controller.signal.aborted) return;
         if (!response.ok || !payload) {
-          setChartData({ status: 'error' });
+          setChartData((previous) => ({ ...previous, status: 'error', message: payload?.error || serviceError }));
           return;
         }
         setChartData({
           status: 'success',
-          priceHistory: payload.priceHistory,
-          availableRanges: payload.availableRanges,
+          snapshot: {
+            symbol: decoded,
+            range: payload.range ?? range,
+            priceHistory: payload.priceHistory,
+            availableRanges: payload.availableRanges,
+          },
         });
       } catch {
         if (!cancelled && !controller.signal.aborted) {
-          setChartData({ status: 'error' });
+          setChartData((previous) => ({ ...previous, status: 'error', message: serviceError }));
         }
       }
     })();
@@ -217,7 +226,7 @@ export default function StockDetailPage({ account }) {
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [decoded, range]);
+  }, [decoded, range, chartAttempt]);
 
   function toggleWatchlist() {
     account.update((current) => ({
@@ -239,7 +248,7 @@ export default function StockDetailPage({ account }) {
         const payload = await response.json().catch(() => null);
         if (cancelled) return;
         if (!response.ok || !payload) {
-          setMinervini({ status: 'error' });
+          setMinervini({ status: 'error', message: payload?.error });
           return;
         }
         setMinervini({ status: 'success', data: payload });
@@ -252,21 +261,20 @@ export default function StockDetailPage({ account }) {
 
   const quote = result.status === 'success' ? result.quote : null;
   const currency = quote?.currency;
-  const decimals = quote ? priceDecimals(currency) : 0;
-  const watchPrice = quote ? parseWatchPrice(watchInput, decimals) : null;
   const trend = quote ? trends[Math.sign(quote.close - quote.open)] : null;
+  const changeFromOpen = quote?.open > 0 ? (quote.close / quote.open - 1) * 100 : null;
   const analysis = quote?.analysis ?? {};
   const buyTrigger = quote?.buyTrigger ?? {};
-  const statusMeta = breakoutStatusMeta[analysis.status] ?? breakoutStatusMeta.menunggu;
+  const chartSnapshot = chartData.snapshot?.symbol === decoded ? chartData.snapshot : null;
 
   return (
     <div className="stock-detail">
-      <nav className="breadcrumb" aria-label="Navigasi">
-        <a href="/">← Cari saham</a>
+      <nav className="stock-breadcrumb" aria-label="Jalur halaman">
+        <Link to="/">← Cari saham</Link>
       </nav>
 
       {result.status === 'loading' && (
-        <div className="status-card">
+        <div className="status-card" role="status">
           <span className="spinner" aria-hidden="true" />
           <div>
             <p className="status-title">Memuat {decoded}…</p>
@@ -276,7 +284,7 @@ export default function StockDetailPage({ account }) {
       )}
 
       {result.status === 'error' && (
-        <div className="status-card status-card--error">
+        <div className="status-card status-card--error" role="alert">
           <span className="status-mark" aria-hidden="true">!</span>
           <div>
             <p className="status-title">Gagal memuat</p>
@@ -286,18 +294,26 @@ export default function StockDetailPage({ account }) {
       )}
 
       {quote && (
-        <article className="quote-card stock-detail-card">
-          <div className="quote-heading">
-            <div>
-              <span className="symbol-badge">{quote.symbol}</span>
-              {quote.exchange && <span className="exchange-label">{quote.exchange}</span>}
-              <h2>{quote.name}</h2>
-              <StatusBadge status={analysis.status} />
+        <article className="stock-detail-card">
+          <header className="stock-identity">
+            <div className="stock-identity-info">
+              <div className="stock-instrument">
+                <span className="symbol-badge">{quote.symbol}</span>
+                {quote.exchange && <span>{quote.exchange}</span>}
+                <span>{currency}</span>
+              </div>
+              <h1>{quote.name}</h1>
+              <p className="stock-muted">Sesi acuan · <time dateTime={quote.date}>{formatDate(quote.date)}</time></p>
             </div>
-            <div className="quote-heading-side">
-              <div className="quote-date">
-                <span>Sesi acuan</span>
-                <time dateTime={quote.date}>{formatDate(quote.date)}</time>
+            <div className="stock-quote-actions">
+              <div className="stock-quote-price">
+                <span>Harga penutupan</span>
+                <strong>{formatPrice(quote.close, currency)}</strong>
+                {changeFromOpen != null && trend && (
+                  <span className={`trend--${trend.className}`}>
+                    {trend.label} {formatPct(changeFromOpen)} vs buka
+                  </span>
+                )}
               </div>
               <button
                 type="button"
@@ -309,105 +325,114 @@ export default function StockDetailPage({ account }) {
                 {inWatchlist ? '✓ Dipantau' : '+ Pantau'}
               </button>
             </div>
-          </div>
+          </header>
 
-          <div className="detail-metrics">
-            <MetricCard
-              label="Buy Trigger"
-              value={formatPrice(buyTrigger.level, currency)}
-              hint="Level entry"
-            />
-            <MetricCard
-              label="Stop Loss"
-              value={formatPrice(analysis.stop, currency)}
-              hint={analysis.riskPct != null ? `Risiko ${formatPct(-Math.abs(analysis.riskPct))}` : 'Jarak ke stop'}
-              tone="risk"
-            />
-            <MetricCard
-              label="Target"
-              value={formatPrice(analysis.target, currency)}
-              hint={analysis.potentialPct != null ? `Potensi ${formatPct(analysis.potentialPct)}` : 'Proyeksi'}
-              tone="gain"
-            />
-            <MetricCard
-              label="Resistance 50 hari"
-              value={formatPrice(analysis.resistance50, currency)}
-              hint={analysis.baseTightPct != null ? `Konsolidasi ${analysis.baseTightPct}%` : 'Base'}
-            />
-          </div>
+          <section className="stock-plan" aria-labelledby="stock-plan-title">
+            <div className="stock-section-heading">
+              <h2 id="stock-plan-title">Rencana trading</h2>
+              <StatusBadge status={analysis.status} />
+            </div>
+            <dl className="stock-levels">
+              <TradingLevel label="Buy trigger" value={formatPrice(buyTrigger.level, currency)} />
+              <TradingLevel
+                label="Stop loss"
+                value={formatPrice(analysis.stop, currency)}
+                hint={analysis.riskPct != null ? `Risiko ${formatPct(-Math.abs(analysis.riskPct))}` : undefined}
+                tone="risk"
+              />
+              <TradingLevel
+                label="Target"
+                value={formatPrice(analysis.target, currency)}
+                hint={analysis.potentialPct != null ? `Potensi ${formatPct(analysis.potentialPct)}` : undefined}
+                tone="gain"
+              />
+              <TradingLevel
+                label="Resistance 50 hari"
+                value={formatPrice(analysis.resistance50, currency)}
+                hint={analysis.baseTightPct != null ? `Konsolidasi ${analysis.baseTightPct.toLocaleString('id-ID')}%` : undefined}
+              />
+            </dl>
+          </section>
+
+          <CandlestickChart
+            sessions={chartSnapshot?.priceHistory ?? quote.priceHistory ?? []}
+            referenceDate={quote.date}
+            buyLevel={buyTrigger.level}
+            sellLevel={buyTrigger.sellLevel}
+            averageVolume={buyTrigger.averageVolume}
+            formatPrice={(price) => formatPrice(price, currency)}
+            formatDate={formatDate}
+            formatVolume={formatVolume}
+            timeframe={chartSnapshot?.range ?? quote.range ?? '3m'}
+            selectedRange={range}
+            onTimeframeChange={setRange}
+            ranges={chartSnapshot?.availableRanges ?? quote.availableRanges}
+            loading={chartData.status === 'loading'}
+            error={chartData.status === 'error' ? chartData.message : null}
+            onRetry={() => setChartAttempt((attempt) => attempt + 1)}
+          />
+
+          <section className="stock-data-section stock-session" aria-labelledby="stock-session-title">
+            <h2 id="stock-session-title">Rincian sesi acuan</h2>
+            <dl className="stock-session-values" aria-label="Harga dan volume saham">
+              <div><dt>Buka</dt><dd>{formatPrice(quote.open, currency)}</dd></div>
+              <div><dt>Tertinggi</dt><dd>{formatPrice(quote.high, currency)}</dd></div>
+              <div><dt>Terendah</dt><dd>{formatPrice(quote.low, currency)}</dd></div>
+              <div><dt>Tutup</dt><dd>{formatPrice(quote.close, currency)}</dd></div>
+              <div><dt>Volume</dt><dd>{formatVolume(quote.volume)}</dd></div>
+              <div><dt>Rata-rata volume 50 sesi</dt><dd>{formatVolume(buyTrigger.averageVolume)}</dd></div>
+            </dl>
+          </section>
 
           {minervini.status === 'success' && (
             <MinerviniPanel
+              key={decoded}
               analysis={{ ...minervini.data, close: quote.close, stop: analysis.stop }}
               currency={currency}
             />
           )}
+          {minervini.status === 'loading' && (
+            <section className="stock-data-section" aria-labelledby="minervini-title">
+              <h2 id="minervini-title">Analisis Minervini</h2>
+              <p className="stock-muted" role="status">Memuat analisis tren dan pivot…</p>
+            </section>
+          )}
+          {minervini.status === 'error' && (
+            <section className="stock-data-section" aria-labelledby="minervini-title">
+              <h2 id="minervini-title">Analisis Minervini</h2>
+              <p className="stock-muted" role="alert">{minervini.message || 'Analisis Minervini gagal dimuat.'}</p>
+            </section>
+          )}
 
-          <div className="quote-layout">
-            <div className="quote-panel">
-              <dl className="quote-details" aria-label="OHLCV sesi acuan">
-                <div><dt>Buka</dt><dd>{formatPrice(quote.open, currency)}</dd></div>
-                <div><dt>Tertinggi</dt><dd>{formatPrice(quote.high, currency)}</dd></div>
-                <div><dt>Terendah</dt><dd>{formatPrice(quote.low, currency)}</dd></div>
-                <div>
-                  <dt>Tutup</dt>
-                  <dd className={`trend trend--${trend.className}`}>
-                    {formatPrice(quote.close, currency)}
-                    <span className="trend-label">{trend.label}</span>
-                  </dd>
-                </div>
-                <div><dt>Volume</dt><dd>{formatVolume(quote.volume)}</dd></div>
-              </dl>
-
-              <FundamentalsTable fundamentals={quote.fundamentals} currency={currency} />
-            </div>
-
-            <div className="chart-area">
-              {chartData.status === 'loading' && (
-                <div className="chart-loading" aria-live="polite">
-                  <span className="spinner" aria-hidden="true" />
-                </div>
-              )}
-              <CandlestickChart
-                sessions={chartData.status === 'success' ? chartData.priceHistory : (quote.priceHistory ?? [])}
-                referenceDate={quote.date}
-                buyLevel={buyTrigger.level}
-                sellLevel={buyTrigger.sellLevel}
-                averageVolume={buyTrigger.averageVolume}
-                formatPrice={(price) => formatPrice(price, currency)}
-                formatDate={formatDate}
-                formatVolume={formatVolume}
-                timeframe={range}
-                onTimeframeChange={setRange}
-                ranges={quote.availableRanges}
-              />
-            </div>
-          </div>
-
-          {/* Tabel OHLCV diletakkan full-width di bawah layout agar tidak sempit. */}
-          <section className="detail-section detail-section--wide" aria-labelledby="daily-title">
-            <h3 id="daily-title">Harga harian (OHLCV)</h3>
-            <table className="fund-table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th><th className="num">Open</th><th className="num">High</th>
-                  <th className="num">Low</th><th className="num">Close</th><th className="num">Volume</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(quote.recentBars ?? []).map((bar) => (
-                  <tr key={bar.date}>
-                    <td>{formatDate(bar.date)}</td>
-                    <td className="num">{formatPrice(bar.open, currency)}</td>
-                    <td className="num">{formatPrice(bar.high, currency)}</td>
-                    <td className="num">{formatPrice(bar.low, currency)}</td>
-                    <td className="num">{formatPrice(bar.close, currency)}</td>
-                    <td className="num">{formatCompactNumber(bar.volume)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <section className="stock-data-section" aria-labelledby="daily-title">
+            <h2 id="daily-title">Harga harian (OHLCV)</h2>
+            {quote.recentBars?.length ? (
+              <TableScroll className="stock-table-scroll" label="Tabel harga harian">
+                <table className="fund-table stock-ohlcv-table">
+                  <thead>
+                    <tr>
+                      <th>Tanggal</th><th className="num">Buka</th><th className="num">Tertinggi</th>
+                      <th className="num">Terendah</th><th className="num">Tutup</th><th className="num">Volume</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quote.recentBars.map((bar) => (
+                      <tr key={bar.date}>
+                        <td><time dateTime={bar.date}>{formatDate(bar.date)}</time></td>
+                        <td className="num">{formatPrice(bar.open, currency)}</td>
+                        <td className="num">{formatPrice(bar.high, currency)}</td>
+                        <td className="num">{formatPrice(bar.low, currency)}</td>
+                        <td className="num">{formatPrice(bar.close, currency)}</td>
+                        <td className="num" title={formatVolume(bar.volume)}>{formatCompactNumber(bar.volume)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableScroll>
+            ) : <p className="stock-muted">Riwayat harga harian belum tersedia.</p>}
           </section>
+
+          <FundamentalsTable fundamentals={quote.fundamentals} />
         </article>
       )}
     </div>

@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth';
 import { auth, firebaseSetupError } from './firebase.js';
 import ThemeToggle from './components/ThemeToggle.jsx';
+import WorkspaceIcon from './components/WorkspaceIcon.jsx';
 
 const App = lazy(() => import('./App.jsx'));
 
@@ -36,7 +37,7 @@ function AuthForm() {
   const submitting = useRef(false);
   const registering = mode === 'register';
   const resetting = mode === 'reset';
-  const title = resetting ? 'Reset password' : registering ? 'Buat akun' : 'Selamat datang kembali';
+  const title = resetting ? 'Reset password' : registering ? 'Buat akun' : 'Masuk ke Cek Saham';
   const submitLabel = resetting ? 'Kirim tautan reset' : registering ? 'Daftar dan mulai' : 'Masuk';
 
   function changeMode(nextMode) {
@@ -78,30 +79,21 @@ function AuthForm() {
   return (
     <main className="auth-page">
       <div className="auth-layout">
-        <section className="auth-intro" aria-labelledby="auth-brand">
-          <p className="auth-eyebrow" id="auth-brand">Cek Saham</p>
-          <h1>Pantau pasar.<br />Simpan rencanamu.</h1>
-          <p>Satu akun untuk ticker pilihan, harga pantauan, dan riwayat pencarianmu.</p>
-          <div className="auth-benefit">
-            <span aria-hidden="true">↗</span>
-            <div>
-              <strong>Lanjutkan dari perangkat lain</strong>
-              <p>Daftar pantauan tersimpan di akun dan siap dibuka kembali.</p>
-            </div>
-          </div>
-        </section>
         <section className="auth-card" aria-labelledby="auth-title">
-          <div className="auth-theme"><ThemeToggle /></div>
+          <div className="auth-brand-row">
+            <span className="brand"><span className="brand-mark"><WorkspaceIcon name="brand" size={21} /></span>Cek Saham</span>
+            <ThemeToggle />
+          </div>
+          <h1 id="auth-title">{title}</h1>
+          <p className="auth-description">
+            {resetting ? 'Masukkan email akunmu untuk menerima tautan reset.' : 'Akses pantauan, riwayat pencarian, dan jurnal yang tersimpan di akunmu.'}
+          </p>
           {!resetting && (
             <div className="auth-tabs" aria-label="Akses akun">
               <button type="button" aria-pressed={!registering} disabled={busy} onClick={() => changeMode('login')}>Masuk</button>
               <button type="button" aria-pressed={registering} disabled={busy} onClick={() => changeMode('register')}>Daftar</button>
             </div>
           )}
-          <h2 id="auth-title">{title}</h2>
-          <p className="auth-description">
-            {resetting ? 'Masukkan email akunmu untuk menerima tautan reset.' : 'Gunakan email dan password untuk membuka dashboard.'}
-          </p>
           {(firebaseSetupError || error) && <p className="account-message account-message--error" role="alert">{firebaseSetupError || error}</p>}
           {notice && <p className="account-message" role="status">{notice}</p>}
           <form onSubmit={handleSubmit}>
@@ -169,7 +161,7 @@ export default function AuthGate() {
   }
 
   return user ? (
-    <Suspense fallback={<main className="auth-page" role="status">Memuat dashboard…</main>}>
+    <Suspense fallback={<main className="auth-page" role="status">Memuat ruang kerja…</main>}>
       <App key={user.uid} user={user} />
     </Suspense>
   ) : <AuthForm />;

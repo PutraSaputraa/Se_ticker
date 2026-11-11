@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useRef, useState } from 'react';
+import { formatCompactNumber } from './format.js';
 
 const axisDateFormat = new Intl.DateTimeFormat('id-ID', {
   timeZone: 'UTC',
@@ -7,74 +7,115 @@ const axisDateFormat = new Intl.DateTimeFormat('id-ID', {
   month: 'short',
 });
 
-function CandleTooltip({ session, point, isReference, formatDate, formatPrice, formatVolume }) {
-  const tooltipRef = useRef(null);
+const defaultRanges = [
+  { value: '1d', label: 'Harian' },
+  { value: '1wk', label: 'Mingguan' },
+];
 
-  useLayoutEffect(() => {
-    const tooltip = tooltipRef.current;
-    const { clientWidth, clientHeight } = document.documentElement;
-    const margin = 8;
-    const gap = 8;
-    const right = Math.max(point.x, point.candleRight) + gap;
-    const left = Math.min(point.x, point.candleLeft) - gap;
-    const rightSpace = clientWidth - margin - right;
-    const leftSpace = left - margin;
-
-    tooltip.style.setProperty('--tooltip-room', `${Math.max(leftSpace, rightSpace, 0)}px`);
-    const { width, height } = tooltip.getBoundingClientRect();
-    const onRight = rightSpace >= leftSpace || width <= rightSpace;
-    const maxTop = Math.max(margin, clientHeight - height - margin);
-
-    tooltip.style.left = `${onRight ? right : left - width}px`;
-    tooltip.style.top = `${Math.min(maxTop, Math.max(margin, point.y - height / 2))}px`;
-  }, [point, session]);
-
-  return createPortal(
-    <div className="candle-tooltip" id="candle-tooltip" role="tooltip" ref={tooltipRef}>
-      <p><time dateTime={session.date}>{formatDate(session.date)}</time></p>
-      {isReference && <small>Sesi acuan</small>}
+function CandleReadout({ session, active, isReference, formatDate, formatPrice, formatVolume }) {
+  return (
+    <div className={active ? 'candle-readout candle-tooltip' : 'candle-readout'} id="candle-tooltip" role={active ? 'tooltip' : undefined}>
+      <div className="candle-readout-date">
+        <time dateTime={session.date}>{formatDate(session.date)}</time>
+        {isReference && <span>Sesi acuan</span>}
+      </div>
       <dl>
-        <div><dt>Open</dt><dd>{formatPrice(session.open)}</dd></div>
-        <div><dt>High</dt><dd>{formatPrice(session.high)}</dd></div>
-        <div><dt>Low</dt><dd>{formatPrice(session.low)}</dd></div>
-        <div><dt>Close</dt><dd>{formatPrice(session.close)}</dd></div>
+        <div><dt>Buka</dt><dd>{formatPrice(session.open)}</dd></div>
+        <div><dt>Tertinggi</dt><dd>{formatPrice(session.high)}</dd></div>
+        <div><dt>Terendah</dt><dd>{formatPrice(session.low)}</dd></div>
+        <div><dt>Tutup</dt><dd>{formatPrice(session.close)}</dd></div>
         <div><dt>Volume</dt><dd>{formatVolume(session.volume)}</dd></div>
       </dl>
-    </div>,
-    document.body,
+    </div>
+  );
+}
+
+function ChartHeader({ count, timeframe, selectedRange, ranges, onTimeframeChange, latestDate, formatDate, loading, error, onRetry }) {
+  const isWeekly = ['1wk', '1y', '2y'].includes(timeframe);
+  const loadedRange = ranges.find(({ value }) => value === timeframe)?.label;
+  const requestedRange = ranges.find(({ value }) => value === selectedRange)?.label;
+  return (
+    <>
+      <div className="candle-chart-head">
+        <div>
+          <h2 id="candle-title">Grafik harga</h2>
+          {latestDate && (
+            <p className="stock-muted">
+              {loadedRange && `${loadedRange} · `}Interval {isWeekly ? 'mingguan' : 'harian'} · {count} candle hingga {formatDate(latestDate)}
+            </p>
+          )}
+        </div>
+        {typeof onTimeframeChange === 'function' && (
+          <div className="candle-timeframe stock-chart-ranges" role="group" aria-label="Rentang waktu grafik">
+            {ranges.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                className={`candle-timeframe-btn${selectedRange === value ? ' candle-timeframe-btn--active' : ''}`}
+                onClick={() => onTimeframeChange(value)}
+                aria-pressed={selectedRange === value}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {loading && (
+        <div className="candle-request-status" role="status">
+          <span className="spinner" aria-hidden="true" />
+          <span>Memuat grafik{requestedRange ? ` ${requestedRange}` : ''}…</span>
+        </div>
+      )}
+      {error && (
+        <div className="candle-request-status candle-request-status--error" role="alert">
+          <span>Grafik{requestedRange ? ` ${requestedRange}` : ''} gagal dimuat. {error}</span>
+          {onRetry && <button className="watch-toggle" type="button" onClick={onRetry}>Coba lagi</button>}
+        </div>
+      )}
+    </>
   );
 }
 
 export default function CandlestickChart({
   sessions, referenceDate, buyLevel, sellLevel, averageVolume, formatPrice, formatDate, formatVolume,
-  timeframe = '1d', onTimeframeChange, ranges,
+  timeframe = '1d', selectedRange = timeframe, onTimeframeChange, ranges, loading, error, onRetry,
 }) {
   const plotRef = useRef(null);
-  const [active, setActive] = useState(null);
-  const tooltipOpen = active !== null;
+  const [selection, setSelection] = useState(null);
+  const activeIndex = selection?.sessions === sessions ? selection.index : null;
+  const tooltipOpen = activeIndex !== null;
 
   useEffect(() => {
     if (!tooltipOpen) return;
-    const dismiss = () => setActive(null);
     const dismissOutside = (event) => {
-      if (!plotRef.current?.contains(event.target)) dismiss();
+      if (!plotRef.current?.contains(event.target)) setSelection(null);
     };
     document.addEventListener('pointerdown', dismissOutside);
-    window.addEventListener('scroll', dismiss, true);
-    window.addEventListener('resize', dismiss);
-    return () => {
-      document.removeEventListener('pointerdown', dismissOutside);
-      window.removeEventListener('scroll', dismiss, true);
-      window.removeEventListener('resize', dismiss);
-    };
+    return () => document.removeEventListener('pointerdown', dismissOutside);
   }, [tooltipOpen]);
 
   const latest = sessions.at(-1);
+  const header = (
+    <ChartHeader
+      count={sessions.length}
+      timeframe={timeframe}
+      selectedRange={selectedRange}
+      ranges={ranges?.length ? ranges : defaultRanges}
+      onTimeframeChange={onTimeframeChange}
+      latestDate={latest?.date}
+      formatDate={formatDate}
+      loading={loading}
+      error={error}
+      onRetry={onRetry}
+    />
+  );
+
   if (!latest) {
     return (
       <section className="candle-chart" aria-labelledby="candle-title">
-        <h3 id="candle-title">Grafik candlestick</h3>
-        <p>Riwayat harga belum tersedia.</p>
+        {header}
+        {!loading && !error && <p className="stock-muted">Riwayat harga belum tersedia.</p>}
       </section>
     );
   }
@@ -87,72 +128,52 @@ export default function CandlestickChart({
   const y = (price) => 100 * (ceiling - price) / (ceiling - floor);
   const step = 100 / sessions.length;
   const bodyWidth = Math.min(7, step * 0.56);
+  const candleCenter = (index) => (index + 0.5) * step;
   const dateTicks = new Set([0, Math.floor((sessions.length - 1) / 2), sessions.length - 1]);
   const triggers = [
-    { label: 'Buy', type: 'buy', level: buyLevel },
-    { label: 'Sell', type: 'sell', level: sellLevel },
-  ].filter(({ level }) => Number.isFinite(level) && level >= floor && level <= ceiling);
-  const triggerMidpoint = triggers.length === 2 ? `${(y(buyLevel) + y(sellLevel)) / 2}%` : undefined;
+    { label: 'Buy trigger', type: 'buy', level: buyLevel },
+    { label: 'Sell trigger', type: 'sell', level: sellLevel },
+  ].filter(({ level }) => Number.isFinite(level));
+  const isOnScale = (level) => level >= floor && level <= ceiling;
   const hasAverage = Number.isFinite(averageVolume);
   const maxVolume = Math.max(...sessions.map(({ volume }) => volume ?? 0), hasAverage ? averageVolume : 0) || 1;
   const volumeY = (volume) => 100 * (1 - volume / (maxVolume * 1.06));
-
-  function inspectSession(index, x, y, bounds) {
-    const center = bounds.left + (index + 0.5) * step * bounds.width / 100;
-    const halfBody = bodyWidth * bounds.width / 200;
-    setActive({ index, x, y, candleLeft: center - halfBody, candleRight: center + halfBody });
-  }
+  const inspected = tooltipOpen ? sessions[activeIndex] : latest;
 
   function inspectPointer(event) {
     const bounds = event.currentTarget.getBoundingClientRect();
     if (bounds.width === 0) return;
     const slot = Math.floor((event.clientX - bounds.left) * sessions.length / bounds.width);
     const index = Math.max(0, Math.min(sessions.length - 1, slot));
-    inspectSession(index, event.clientX, event.clientY, bounds);
+    setSelection({ sessions, index });
   }
 
   function inspectKey(event) {
     if (event.key === 'Escape') {
-      setActive(null);
+      setSelection(null);
       return;
     }
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
     const shift = event.key === 'ArrowLeft' ? -1 : 1;
-    const index = active
-      ? Math.max(0, Math.min(sessions.length - 1, active.index + shift))
+    const index = tooltipOpen
+      ? Math.max(0, Math.min(sessions.length - 1, activeIndex + shift))
       : sessions.length - 1;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const x = bounds.left + (index + 0.5) * step * bounds.width / 100;
-    const cursorY = bounds.top + y(sessions[index].close) * bounds.height / 100;
-    inspectSession(index, x, cursorY, bounds);
+    setSelection({ sessions, index });
   }
 
   return (
     <section className="candle-chart" aria-labelledby="candle-title">
-      <div className="candle-chart-head">
-        <h3 id="candle-title">Grafik candlestick</h3>
-        {typeof onTimeframeChange === 'function' && (
-          <div className="candle-timeframe" role="group" aria-label="Rentang waktu grafik">
-            {(Array.isArray(ranges) && ranges.length > 0 ? ranges : [
-              { value: '1d', label: 'Harian' },
-              { value: '1wk', label: 'Mingguan' },
-            ]).map((range) => (
-              <button
-                key={range.value}
-                type="button"
-                className={`candle-timeframe-btn${timeframe === range.value ? ' candle-timeframe-btn--active' : ''}`}
-                onClick={() => onTimeframeChange(range.value)}
-                aria-pressed={timeframe === range.value}
-              >
-                {range.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <p>{sessions.length} {timeframe === '1wk' || timeframe === '1y' || timeframe === '2y' ? 'minggu' : 'sesi'} perdagangan hingga {formatDate(latest.date)}.</p>
-      <div className="candle-grid">
+      {header}
+      <CandleReadout
+        session={inspected}
+        active={tooltipOpen}
+        isReference={inspected.date === referenceDate}
+        formatPrice={formatPrice}
+        formatDate={formatDate}
+        formatVolume={formatVolume}
+      />
+      <div className="candle-grid" aria-busy={loading}>
         <div className="candle-axis-y" aria-hidden="true">
           {[ceiling, (ceiling + floor) / 2, floor].map((price) => (
             <span key={price}>{formatPrice(price)}</span>
@@ -169,24 +190,24 @@ export default function CandlestickChart({
             if (event.pointerType !== 'touch') inspectPointer(event);
           }}
           onPointerLeave={(event) => {
-            if (event.pointerType !== 'touch') setActive(null);
+            if (event.pointerType !== 'touch') setSelection(null);
           }}
           onClick={inspectPointer}
           onKeyDown={inspectKey}
-          onBlur={() => setActive(null)}
+          onBlur={() => setSelection(null)}
         >
           <svg
             className="candle-plot"
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
             role="img"
-            aria-label={`Grafik OHLC ${sessions.length} sesi. Harga tutup terakhir ${formatPrice(latest.close)}.`}
+            aria-label={`Grafik OHLC ${sessions.length} candle. Harga tutup terakhir ${formatPrice(latest.close)}.`}
           >
             {latest.date === referenceDate && (
               <rect className="candle-reference" x={100 - step} y="0" width={step} height="100" />
             )}
-            <path className="candle-guide" d="M0 0H100 M0 50H100 M0 100H100" vectorEffect="non-scaling-stroke" />
-            {triggers.map(({ type, level }) => (
+            <path className="candle-guide" d="M0 0H100 M0 25H100 M0 50H100 M0 75H100 M0 100H100" vectorEffect="non-scaling-stroke" />
+            {triggers.filter(({ level }) => isOnScale(level)).map(({ type, level }) => (
               <line
                 className={`candle-trigger candle-trigger--${type}`}
                 key={type}
@@ -195,7 +216,7 @@ export default function CandlestickChart({
               />
             ))}
             {sessions.map(({ date, open, high, low, close }, index) => {
-              const x = (index + 0.5) * step;
+              const x = candleCenter(index);
               const direction = close >= open ? 'up' : 'down';
               return (
                 <g className={`candle candle--${direction}`} key={date}>
@@ -210,28 +231,23 @@ export default function CandlestickChart({
                 </g>
               );
             })}
+            {tooltipOpen && (
+              <line className="candle-crosshair" x1={candleCenter(activeIndex)} x2={candleCenter(activeIndex)} y1="0" y2="100" vectorEffect="non-scaling-stroke" />
+            )}
           </svg>
         </div>
-        {triggers.length > 0 && (
-          <div className="candle-trigger-labels" style={{ '--trigger-midpoint': triggerMidpoint }}>
-            {triggers.map(({ label, type, level }) => (
-              <span
-                className={`candle-trigger-label candle-trigger-label--${type}`}
-                style={{ '--level-y': `${y(level)}%` }}
-                key={type}
-              >
-                {label} {formatPrice(level)}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="candle-volume-axis" aria-hidden="true">
+          <span>Volume</span>
+          <span>{formatCompactNumber(maxVolume)}</span>
+        </div>
         <svg
           className="candle-plot candle-volume"
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           role="img"
-          aria-label={hasAverage ? `Volume per sesi. Rata-rata 50 sesi ${formatVolume(averageVolume)}.` : 'Volume per sesi.'}
+          aria-label={hasAverage ? `Volume per candle. Rata-rata 50 sesi ${formatVolume(averageVolume)}.` : 'Volume per candle.'}
         >
+          <path className="candle-guide" d="M0 0H100 M0 100H100" vectorEffect="non-scaling-stroke" />
           {sessions.map(({ date, open, close, volume }, index) => {
             if (!Number.isFinite(volume)) return null;
             const top = volumeY(volume);
@@ -240,7 +256,7 @@ export default function CandlestickChart({
               <rect
                 className={`candle-volume-bar candle--${direction}`}
                 key={date}
-                x={(index + 0.5) * step - bodyWidth / 2}
+                x={candleCenter(index) - bodyWidth / 2}
                 y={top}
                 width={bodyWidth}
                 height={100 - top}
@@ -254,6 +270,9 @@ export default function CandlestickChart({
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {tooltipOpen && (
+            <line className="candle-crosshair" x1={candleCenter(activeIndex)} x2={candleCenter(activeIndex)} y1="0" y2="100" vectorEffect="non-scaling-stroke" />
+          )}
         </svg>
         <div className="candle-axis-x" aria-hidden="true">
           {[...dateTicks].map((index) => {
@@ -266,15 +285,15 @@ export default function CandlestickChart({
           })}
         </div>
       </div>
-      {active && (
-        <CandleTooltip
-          session={sessions[active.index]}
-          point={active}
-          isReference={sessions[active.index].date === referenceDate}
-          formatDate={formatDate}
-          formatPrice={formatPrice}
-          formatVolume={formatVolume}
-        />
+      {(triggers.length > 0 || hasAverage) && (
+        <ul className="candle-legend" aria-label="Legenda grafik">
+          {triggers.map(({ type, label, level }) => (
+            <li className={`candle-legend--${type}`} key={type}>
+              {label} <strong>{formatPrice(level)}</strong>{!isOnScale(level) && ' · di luar skala'}
+            </li>
+          ))}
+          {hasAverage && <li className="candle-legend--average">Volume rata-rata 50 sesi</li>}
+        </ul>
       )}
     </section>
   );

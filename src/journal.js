@@ -124,6 +124,44 @@ export function positionPnlUsd(trade, pnlPct = trade.pnlPct) {
   return trade.positionUsd * (pnlPct / 100);
 }
 
+export function summarizeProfitFactors(journal, manualCurrency) {
+  const totalsByCurrency = new Map();
+  for (const trade of journal) {
+    if (trade.status === 'open') continue;
+
+    const currency = trade.quoteCurrency ? 'USD' : manualCurrency;
+    const pnl = trade.quoteCurrency ? positionPnlUsd(trade) : trade.pnl;
+    if (!Number.isFinite(pnl)) continue;
+
+    const totals = totalsByCurrency.get(currency) ?? { count: 0, grossProfit: 0, grossLoss: 0 };
+    totals.count += 1;
+    if (pnl > 0) totals.grossProfit += pnl;
+    else totals.grossLoss -= pnl;
+    totalsByCurrency.set(currency, totals);
+  }
+
+  return [...totalsByCurrency]
+    .map(([currency, { count, grossProfit, grossLoss }]) => {
+      const value = grossLoss > 0
+        ? Number((grossProfit / grossLoss).toPrecision(15))
+        : (grossProfit > 0 ? Infinity : null);
+      return { currency, count, value };
+    })
+    .sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+export function interpretProfitFactor(value) {
+  if (value == null) return 'Belum ada untung atau rugi tercatat';
+  if (value === Infinity) return 'Belum ada posisi rugi';
+  if (value < 1) return 'Losing system';
+  if (value === 1) return 'Break-even sebelum biaya';
+  if (value < 1.3) return 'Tipis';
+  if (value < 1.5) return 'Lumayan';
+  if (value < 2) return 'Bagus';
+  if (value <= 3) return 'Sangat bagus';
+  return 'Excellent. Cek apakah sampel cukup besar';
+}
+
 export function removeTrade(journal, id) {
   return journal.filter((trade) => trade.id !== id);
 }

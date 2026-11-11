@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import WorkspaceIcon from './WorkspaceIcon.jsx';
 
 export const markets = {
   auto: { label: 'Otomatis' },
@@ -42,7 +43,15 @@ export function normalizeTicker(ticker, market = 'auto') {
   return symbol;
 }
 
-export default function SearchForm({ initialTicker = '', initialMarket = 'auto', autoSearch = false }) {
+const tickerExamples = [
+  ['BBCA.JK', 'Indonesia'],
+  ['NVDA', 'AS'],
+  ['7203.T', 'Jepang'],
+  ['0700.HK', 'Hong Kong'],
+  ['BTC-USD', 'Crypto'],
+];
+
+export default function SearchForm({ initialTicker = '', initialMarket = 'auto' }) {
   const [ticker, setTicker] = useState(initialTicker);
   const [market, setMarket] = useState(initialMarket);
   const navigate = useNavigate();
@@ -55,27 +64,18 @@ export default function SearchForm({ initialTicker = '', initialMarket = 'auto',
   return (
     <form
       className="search-form"
+      role="search"
+      aria-label="Cari ticker saham"
       onSubmit={(event) => {
         event.preventDefault();
         go();
       }}
     >
       <div className="ticker-row">
-        <div className="market-field">
-          <label htmlFor="market">Bursa</label>
-          <select id="market" value={market} onChange={(event) => setMarket(event.target.value)}>
-            {Object.entries(markets).map(([value, { label }]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </div>
         <div className="ticker-field">
           <label htmlFor="ticker">Kode ticker</label>
           <div className="input-wrap">
-            <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-              <circle cx="10.8" cy="10.8" r="5.8" />
-              <path d="m15.1 15.1 4.3 4.3" />
-            </svg>
+            <WorkspaceIcon name="search" size={20} />
             <input
               id="ticker"
               name="ticker"
@@ -86,23 +86,28 @@ export default function SearchForm({ initialTicker = '', initialMarket = 'auto',
               autoCapitalize="characters"
               autoComplete="off"
               spellCheck={false}
+              required
             />
           </div>
         </div>
+        <div className="market-field">
+          <label htmlFor="market">Bursa</label>
+          <select id="market" value={market} onChange={(event) => setMarket(event.target.value)}>
+            {Object.entries(markets).map(([value, { label }]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
         <button type="submit" className="check-button">
-          Cek
-          <svg aria-hidden="true" viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 10h11m-4-4 4 4-4 4" />
-          </svg>
+          Buka detail
         </button>
       </div>
-      <p className="hint">
-        <span>BTC → BTC-USD (Crypto)</span>
-        <span>NVDA, MSFT, AAPL (pilih AS)</span>
-        <span>BBCA → BBCA.JK (Indonesia)</span>
-        <span>7203 → 7203.T (Jepang)</span>
-        <span>0700 (Hong Kong)</span>
-      </p>
+      <div className="ticker-examples">
+        <p>Contoh format ticker</p>
+        <ul>{tickerExamples.map(([symbol, label]) => (
+          <li key={symbol}><Link to={`/stock/${encodeURIComponent(symbol)}`} title={label}>{symbol}</Link></li>
+        ))}</ul>
+      </div>
     </form>
   );
 }

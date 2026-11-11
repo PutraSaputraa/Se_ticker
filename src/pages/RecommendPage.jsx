@@ -1,18 +1,18 @@
 import BreakoutScanner from '../BreakoutScanner.jsx';
 import { formatDate, formatPrice } from '../format.js';
 import { addSymbol } from '../watchlist.js';
+import '../styles/research.css';
 
 export default function RecommendPage({ account }) {
   const { watchlist } = account;
   const watchlistDisabled = !account.ready || account.pending;
 
   return (
-    <div className="recommend-page">
-      <div className="intro">
-        <p className="eyebrow">Rekomendasi</p>
-        <h1>Breakout & riset AI</h1>
-        <p>Scan matematis base breakout (resistance 50 hari + konsolidasi + volume) atau riset AI lintas bursa.</p>
-      </div>
+    <div className="research-workspace recommend-page">
+      <header className="page-heading">
+        <h1>Rekomendasi</h1>
+        <p>Temukan saham dari pemindaian teknikal atau telusuri kandidat melalui riset AI.</p>
+      </header>
       <BreakoutScanner
         watchlist={watchlist}
         disabled={watchlistDisabled}

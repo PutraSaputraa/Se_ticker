@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import TableScroll from './components/TableScroll.jsx';
+import TickerLink from './components/TickerLink.jsx';
+import { formatDateCompact } from './format.js';
 
 // Skor Trend Template Minervini per simbol (analyze.js tanpa RS agar cepat).
 function useTrendScores(symbolsKey) {
@@ -106,21 +109,20 @@ function useWatchlistData(symbolsKey) {
 }
 
 function TrendScoreBadge({ score }) {
-  if (score === undefined) return <span className="trend-score trend-score--loading">…</span>;
-  if (score === null) return <span className="trend-score trend-score--na">—</span>;
+  if (score === undefined) return <span className="research-cell-note">Memuat…</span>;
+  if (score === null) return <span className="research-cell-note">Belum tersedia</span>;
   return (
-    <span className={`trend-score ${score.eligible ? 'trend-score--pass' : 'trend-score--fail'}`}
-      title={score.eligible ? 'Eligible (Stage 2 lengkap)' : 'Belum memenuhi seluruh kriteria Stage 2'}>
+    <span className={`research-badge${score.eligible ? ' research-badge--positive' : ''}`}
+      title={`${score.passed} dari ${score.total} kriteria Stage 2 lolos`}>
       {score.passed}/{score.total}
     </span>
   );
 }
 
 function CheckBadgeMini({ passed }) {
-  if (passed == null) return <span className="check-status check-status--missing">—</span>;
   return (
-    <span className={`check-status ${passed ? 'check-status--pass' : 'check-status--below'}`}>
-      {passed ? 'YES' : 'NO'}
+    <span className={`research-cell-note${passed === true ? ' research-cell-note--positive' : ''}`}>
+      {passed == null ? 'Ambang belum tersedia' : passed ? 'Memenuhi ambang' : 'Di bawah ambang'}
     </span>
   );
 }
@@ -143,9 +145,9 @@ function breakoutStatus(quote, priceToWatch) {
 }
 
 function BreakoutBadge({ state }) {
-  if (state === 'breakout') return <span className="breakout-badge breakout-badge--on">BREAKOUT</span>;
-  if (state === 'near') return <span className="breakout-badge breakout-badge--near">Dekat</span>;
-  return <span className="breakout-badge breakout-badge--off">—</span>;
+  if (state === 'breakout') return <span className="research-badge research-badge--positive">Breakout</span>;
+  if (state === 'near') return <span className="research-badge research-badge--warning">Mendekati</span>;
+  return <span className="research-badge">Menunggu</span>;
 }
 
 function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled }) {
@@ -182,7 +184,7 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled 
       className="ptw-input"
       type="text"
       inputMode={decimals === 0 ? 'numeric' : 'decimal'}
-      placeholder="—"
+      placeholder="Isi harga"
       value={text}
       disabled={disabled}
       onClick={(event) => event.stopPropagation()}
@@ -199,37 +201,28 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled 
 
 function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, disabled, trendScore }) {
   const { symbol, priceToWatch } = entry;
-  const symbolLink = (
-    <a
-      className="symbol-badge symbol-badge--light symbol-badge--link"
-      href={`/stock/${encodeURIComponent(symbol)}`}
-      onClick={(e) => e.stopPropagation()}
-      title={`Buka detail ${symbol}`}
+  const removeButton = (
+    <button
+      type="button"
+      className="research-remove"
+      disabled={disabled}
+      title={`Hapus ${symbol}`}
+      aria-label={`Hapus ${symbol} dari daftar`}
+      onClick={(event) => { event.stopPropagation(); onRemove(symbol); }}
     >
-      {symbol}
-    </a>
+      Hapus
+    </button>
   );
 
-  if (!row || row.status === 'loading') {
+  if (row?.status !== 'success') {
     return (
       <tr>
-        <td>{symbolLink}</td>
-        <td colSpan={8} className="watchlist-note">Memuat…</td>
-        <td className="watchlist-actions">
-          <button type="button" className="watchlist-remove" disabled={disabled} title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`} onClick={() => onRemove(symbol)}>×</button>
+        <th scope="row"><TickerLink symbol={symbol} /></th>
+        <td><TrendScoreBadge score={trendScore} /></td>
+        <td colSpan={6} className={row?.status === 'error' ? 'research-quote-error' : 'research-cell-note'}>
+          {row?.status === 'error' ? row.message : 'Memuat harga dan volume…'}
         </td>
-      </tr>
-    );
-  }
-
-  if (row.status === 'error') {
-    return (
-      <tr>
-        <td>{symbolLink}</td>
-        <td colSpan={8} className="watchlist-note watchlist-note--error">{row.message}</td>
-        <td className="watchlist-actions">
-          <button type="button" className="watchlist-remove" disabled={disabled} title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`} onClick={() => onRemove(symbol)}>×</button>
-        </td>
+        <td className="num">{removeButton}</td>
       </tr>
     );
   }
@@ -241,13 +234,18 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
   const breakout = breakoutStatus(quote, priceToWatch);
 
   return (
-    <tr className="watchlist-row" onClick={() => onOpen(symbol)} tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(symbol); } }}
-      aria-label={`Buka detail ${symbol}`}>
-      <td>{symbolLink}</td>
+    <tr className="watchlist-row" onClick={(event) => {
+      if (!event.target.closest('a, button, input')) onOpen(symbol);
+    }}>
+      <th scope="row" className="research-instrument">
+        <TickerLink symbol={symbol} />
+        {quote.name && quote.name !== symbol && <span className="research-cell-note">{quote.name}</span>}
+      </th>
       <td><TrendScoreBadge score={trendScore} /></td>
-      <td className="watchlist-name">{quote.name}</td>
-      <td className={`num ${up ? 'trend--up' : 'trend--down'}`}>{formatPrice(quote.close, quote.currency)}</td>
+      <td className={`num ${up ? 'trend--up' : 'trend--down'}`}>
+        {formatPrice(quote.close, quote.currency)}
+        {quote.date && <time className="research-cell-note" dateTime={quote.date}>{formatDateCompact(quote.date)}</time>}
+      </td>
       <td className="num">{formatPrice(quote.buyTrigger?.level, quote.currency)}</td>
       <td className="num">{formatPrice(quote.buyTrigger?.sellLevel, quote.currency)}</td>
       <td className="num">
@@ -259,12 +257,12 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
           disabled={disabled}
         />
       </td>
-      <td><CheckBadgeMini passed={volumePass} /></td>
-      <td><BreakoutBadge state={breakout.state} /></td>
-      <td className="watchlist-actions">
-        <button type="button" className="watchlist-remove" disabled={disabled} title={`Hapus ${symbol}`} aria-label={`Hapus ${symbol} dari daftar`}
-          onClick={(e) => { e.stopPropagation(); onRemove(symbol); }}>×</button>
+      <td className="num">
+        {Number.isFinite(quote.volume) ? quote.volume.toLocaleString('id-ID') : 'Belum tersedia'}
+        <CheckBadgeMini passed={volumePass} />
       </td>
+      <td><BreakoutBadge state={breakout.state} /></td>
+      <td className="num">{removeButton}</td>
     </tr>
   );
 }
@@ -285,20 +283,19 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
   });
 
   return (
-    <div className="watchlist-table-wrap">
-      <table className="watchlist-table">
+    <TableScroll className="research-table-scroll" label="Tabel daftar pantauan">
+      <table className="fund-table research-table watchlist-table">
         <thead>
           <tr>
-            <th>Simbol</th>
-            <th title="Trend Template Minervini (Stage 2)">Stage 2</th>
-            <th>Nama</th>
-            <th className="num">Close</th>
-            <th className="num">Buy Trigger</th>
-            <th className="num">Sell Trigger</th>
-            <th className="num">Price to Watch</th>
-            <th>Volume</th>
-            <th>Status</th>
-            <th aria-label="Aksi" />
+            <th scope="col">Saham</th>
+            <th scope="col" title="Jumlah kriteria Trend Template Minervini yang lolos">Stage 2</th>
+            <th scope="col" className="num">Harga tutup</th>
+            <th scope="col" className="num">Buy trigger</th>
+            <th scope="col" className="num">Sell trigger</th>
+            <th scope="col" className="num">Harga pantauan</th>
+            <th scope="col" className="num">Volume (lembar)</th>
+            <th scope="col">Status</th>
+            <th scope="col" className="num">Aksi</th>
           </tr>
         </thead>
         <tbody>
@@ -317,6 +314,6 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScroll>
   );
 }

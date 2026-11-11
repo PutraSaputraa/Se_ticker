@@ -1,40 +1,41 @@
+import { Link } from 'react-router-dom';
 import SearchForm from '../components/SearchForm.jsx';
+import WorkspaceIcon from '../components/WorkspaceIcon.jsx';
 
-export default function HomePage({ history }) {
+export default function HomePage({ account }) {
+  const { history, ready, readError } = account;
   return (
-    <>
-      <div className="intro">
-        <p className="eyebrow">Ringkasan pasar</p>
-        <h1>Cek Buy Trigger</h1>
-        <p>Masukkan kode ticker untuk melihat detail lengkap: level Buy Trigger, target, risiko, status breakout, OHLCV, dan grafik.</p>
-      </div>
-
-      <div className="search-card">
-        <SearchForm />
-        {history.length > 0 && (
-          <section className="history" aria-labelledby="history-label">
-            <h2 id="history-label">Pencarian terakhir</h2>
+    <div className="search-page">
+      <header className="page-heading">
+        <h1>Cari saham</h1>
+        <p>Buka grafik, level trading, dan analisis dari sesi perdagangan terakhir yang sudah tutup.</p>
+      </header>
+      <div className="search-layout">
+        <section className="search-panel" aria-label="Pencarian ticker">
+          <SearchForm />
+          <nav className="search-shortcuts" aria-label="Pintasan riset">
+            <Link to="/watchlist"><WorkspaceIcon name="watch" size={17} /> Buka pantauan</Link>
+            <Link to="/rekomendasi"><WorkspaceIcon name="scan" size={17} /> Cari kandidat</Link>
+          </nav>
+        </section>
+        <section className="search-history" aria-labelledby="history-label">
+          <h2 id="history-label">Pencarian terakhir</h2>
+          {history.length > 0 ? (
             <ul>
               {history.map((symbol) => (
                 <li key={symbol}>
-                  <a className="chip" href={`/stock/${encodeURIComponent(symbol)}`}>{symbol}</a>
+                  <Link to={`/stock/${encodeURIComponent(symbol)}`}>
+                    <span className="symbol-badge">{symbol}</span>
+                    <WorkspaceIcon name="arrow" size={16} />
+                  </Link>
                 </li>
               ))}
             </ul>
-          </section>
-        )}
+          ) : <p role="status">{readError
+            ? 'Riwayat gagal dimuat.'
+            : ready ? 'Cari ticker untuk mulai mengisi riwayat.' : 'Memuat riwayat akun…'}</p>}
+        </section>
       </div>
-
-      <div className="home-cards">
-        <a className="home-card" href="/rekomendasi">
-          <h3>Rekomendasi breakout</h3>
-          <p>Scan matematis base breakout & riset AI lintas bursa.</p>
-        </a>
-        <a className="home-card" href="/watchlist">
-          <h3>Daftar pantauan</h3>
-          <p>Saham yang kamu tandai untuk dipantau.</p>
-        </a>
-      </div>
-    </>
+    </div>
   );
 }

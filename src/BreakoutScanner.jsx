@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import TableScroll from './components/TableScroll.jsx';
+import TickerLink from './components/TickerLink.jsx';
+import { formatDateCompact, formatPct } from './format.js';
 
 const scanErrorMessage = 'Pemindaian breakout gagal. Coba lagi nanti.';
 
@@ -13,83 +16,80 @@ const regions = [
   { value: 'sz', label: 'Shenzhen' },
 ];
 
-function formatChange(changePct) {
-  if (!Number.isFinite(changePct)) return '—';
-  return `${changePct >= 0 ? '+' : ''}${changePct.toLocaleString('id-ID')}%`;
-}
-
-function formatRatio(volumeRatio) {
-  if (!Number.isFinite(volumeRatio)) return '—';
-  return `${volumeRatio.toLocaleString('id-ID', { maximumFractionDigits: 1 })}×`;
-}
-
-function cleanSymbol(symbol, region) {
-  return region === 'auto' || region === 'jp' || region === 'hk' || region === 'ks' || region === 'kq' || region === 'ss' || region === 'sz'
-    ? symbol.replace(/\.(JK|T|HK|KS|KQ|SS|SZ)$/, '')
-    : symbol;
-}
-
-function ScanRow({ pick, index, inWatchlist, disabled, onAdd, formatPrice, region }) {
+function WatchAction({ symbol, inWatchlist, disabled, onAdd }) {
   return (
-    <li className="breakout-item">
-      <span className="breakout-rank" aria-hidden="true">{index + 1}</span>
-      <div className="breakout-info">
-        <div className="breakout-head">
-          <span className="symbol-badge symbol-badge--light">{cleanSymbol(pick.symbol, region)}</span>
-          {pick.universe && <span className="breakout-universe">{pick.universe}</span>}
-          {pick.name && <span className="breakout-name">{pick.name}</span>}
-        </div>
-        {pick.aiNote && <p className="breakout-note">{pick.aiNote}</p>}
-      </div>
-      <div className="breakout-stats">
-        <span className="breakout-close">{formatPrice(pick.close, pick.currency)}</span>
-        <span className={Number.isFinite(pick.changePct) && pick.changePct >= 0 ? 'trend--up' : 'trend--down'}>
-          {formatChange(pick.changePct)}
-        </span>
-        <span className="breakout-volume">Vol {formatRatio(pick.volumeRatio)}</span>
-        {Number.isFinite(pick.breakoutPct) && (
-          <span className="breakout-level">+{pick.breakoutPct.toLocaleString('id-ID')}% di atas res.</span>
-        )}
-      </div>
-      <button
-        type="button"
-        className={`breakout-add${inWatchlist ? ' breakout-add--added' : ''}`}
-        disabled={disabled || inWatchlist}
-        onClick={() => onAdd(pick.symbol)}
-        aria-label={inWatchlist ? `${pick.symbol} sudah dipantau` : `Pantau ${pick.symbol}`}
-      >
-        {inWatchlist ? '✓' : '+'}
-      </button>
-    </li>
+    <button
+      type="button"
+      className={`research-watch${inWatchlist ? ' research-watch--added' : ''}`}
+      disabled={disabled || inWatchlist}
+      onClick={() => onAdd(symbol)}
+      aria-label={inWatchlist ? `${symbol} sudah dipantau` : `Pantau ${symbol}`}
+    >
+      {inWatchlist ? 'Dipantau' : 'Pantau'}
+    </button>
   );
 }
 
-function ResearchRow({ pick, index, inWatchlist, disabled, onAdd }) {
+function ScanTable({ results, watched, disabled, onAdd, formatPrice }) {
   return (
-    <li className="breakout-item breakout-item--research">
-      <span className="breakout-rank" aria-hidden="true">{index + 1}</span>
-      <div className="breakout-info">
-        <div className="breakout-head">
-          <span className="symbol-badge symbol-badge--light">{pick.symbol}</span>
-          {pick.name && <span className="breakout-name">{pick.name}</span>}
-        </div>
-        {pick.note && <p className="breakout-note">{pick.note}</p>}
-        {(pick.catalyst || pick.level) && (
-          <p className="breakout-meta">
-            {pick.level && <span><strong>Level:</strong> {pick.level}</span>}
-            {pick.catalyst && <span><strong>Katalis:</strong> {pick.catalyst}</span>}
-          </p>
-        )}
+    <TableScroll className="research-table-scroll" label="Tabel hasil scan matematis">
+      <table className="fund-table research-table scan-table">
+        <thead>
+          <tr>
+            <th scope="col">Saham</th>
+            <th scope="col">Sesi</th>
+            <th scope="col" className="num">Harga tutup</th>
+            <th scope="col" className="num">Perubahan</th>
+            <th scope="col" className="num">Resistance</th>
+            <th scope="col" className="num">Rasio volume</th>
+            <th scope="col" className="num">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {results.map((pick) => (
+            <tr key={pick.symbol}>
+              <th scope="row" className="research-instrument">
+                <TickerLink symbol={pick.symbol} />
+                {pick.name && <span className="research-cell-note">{pick.name}</span>}
+                {pick.universe && <span className="research-cell-note">{pick.universe}</span>}
+                {pick.aiNote && <p className="research-scan-note">{pick.aiNote}</p>}
+              </th>
+              <td>{pick.date ? <time dateTime={pick.date}>{formatDateCompact(pick.date)}</time> : 'Tidak tersedia'}</td>
+              <td className="num">{formatPrice(pick.close, pick.currency)}</td>
+              <td className={`num ${pick.changePct > 0 ? 'trend--up' : pick.changePct < 0 ? 'trend--down' : ''}`}>
+                {formatPct(pick.changePct)}
+              </td>
+              <td className="num">
+                {formatPrice(pick.resistance, pick.currency)}
+                {Number.isFinite(pick.breakoutPct) && <span className="research-cell-note">{formatPct(pick.breakoutPct)} di atas level</span>}
+              </td>
+              <td className="num">
+                {Number.isFinite(pick.volumeRatio)
+                  ? `${pick.volumeRatio.toLocaleString('id-ID', { maximumFractionDigits: 1 })}×`
+                  : 'Tidak tersedia'}
+              </td>
+              <td className="num"><WatchAction symbol={pick.symbol} inWatchlist={watched.has(pick.symbol)} disabled={disabled} onAdd={onAdd} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableScroll>
+  );
+}
+
+function ResearchBrief({ pick, inWatchlist, disabled, onAdd }) {
+  return (
+    <li className="research-brief">
+      <div>
+        <TickerLink symbol={pick.symbol} />
+        {pick.name && <p className="research-company">{pick.name}</p>}
       </div>
-      <button
-        type="button"
-        className={`breakout-add${inWatchlist ? ' breakout-add--added' : ''}`}
-        disabled={disabled || inWatchlist}
-        onClick={() => onAdd(pick.symbol)}
-        aria-label={inWatchlist ? `${pick.symbol} sudah dipantau` : `Pantau ${pick.symbol}`}
-      >
-        {inWatchlist ? '✓' : '+'}
-      </button>
+      <dl className="research-brief-details">
+        {pick.note && <div><dt>Analisis teknikal</dt><dd>{pick.note}</dd></div>}
+        {pick.level && <div><dt>Level pantauan</dt><dd>{pick.level}</dd></div>}
+        {pick.catalyst && <div><dt>Katalis</dt><dd>{pick.catalyst}</dd></div>}
+      </dl>
+      <WatchAction symbol={pick.symbol} inWatchlist={inWatchlist} disabled={disabled} onAdd={onAdd} />
     </li>
   );
 }
@@ -169,75 +169,66 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   }
 
   const watched = new Set(watchlist.map((entry) => entry.symbol));
-  const results = state.status === 'success' ? state.data.results : [];
-  const ai = state.status === 'success' ? state.data.ai : null;
+  const result = state.status === 'success' ? state.data : null;
+  const results = result?.results ?? [];
+  const ai = result?.ai;
   const isResearch = (state.mode ?? mode) === 'research';
   const loading = state.status === 'loading';
+  const description = isResearch
+    ? 'Kandidat disusun dari penelusuran web dan interpretasi AI.'
+    : 'Pindai resistance 50 sesi, konsolidasi, dan volume dari data harga.';
+  const action = loading
+    ? isResearch ? 'Meriset…' : 'Memindai…'
+    : state.status === 'error' ? 'Coba lagi'
+      : result ? isResearch ? 'Riset ulang' : 'Pindai ulang'
+        : isResearch ? 'Mulai riset' : 'Jalankan scan';
 
   return (
-    <section className="breakout-scanner" aria-labelledby="breakout-scanner-title">
-      <div className="breakout-scanner-head">
-        <div>
-          <h2 id="breakout-scanner-title">Breakout hari ini</h2>
-          <p>
-            {state.status === 'success'
-              ? isResearch
-                ? `Riset AI · ${state.data.universe} · ${results.length} kandidat.`
-                : `Sesi ${formatDate(state.data.date)} · ${state.data.scanned} saham ${state.data.universe} dipindai.`
-              : 'Pindai base breakout (resistance 50 hari + konsolidasi ketat + volume).'}
-          </p>
+    <>
+      <section className="research-panel" aria-labelledby="breakout-scanner-title">
+        <div className="research-panel-heading">
+          <div>
+            <h2 id="breakout-scanner-title">Pencarian kandidat</h2>
+            <p>{description}</p>
+          </div>
         </div>
-        <button
-          type="button"
-          className="scan-button"
-          disabled={loading}
-          onClick={() => run()}
-        >
-          {loading ? 'Memindai…' : state.status === 'success' ? 'Pindai ulang' : 'Cari breakout'}
-        </button>
-      </div>
-
-      <div className="breakout-controls">
-        <div className="candle-timeframe" role="group" aria-label="Mode pencarian">
-          <button
-            type="button"
-            className={`candle-timeframe-btn${mode === 'scan' ? ' candle-timeframe-btn--active' : ''}`}
-            disabled={loading}
-            onClick={() => changeMode('scan')}
-            aria-pressed={mode === 'scan'}
-          >
-            Scan Matematis
-          </button>
-          <button
-            type="button"
-            className={`candle-timeframe-btn${mode === 'research' ? ' candle-timeframe-btn--active' : ''}`}
-            disabled={loading}
-            onClick={() => changeMode('research')}
-            aria-pressed={mode === 'research'}
-          >
-            Riset AI
-          </button>
-        </div>
-        <label className="breakout-region">
-          <span>Bursa</span>
-          <select value={region} onChange={(event) => changeRegion(event.target.value)} disabled={loading}>
-            {regions.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-      </div>
+        <form className="research-controls" onSubmit={(event) => { event.preventDefault(); if (!loading) run(); }}>
+          <fieldset className="research-mode">
+            <legend>Metode</legend>
+            <div className="candle-timeframe">
+              {[
+                { value: 'scan', label: 'Scan matematis' },
+                { value: 'research', label: 'Riset AI' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`candle-timeframe-btn${mode === value ? ' candle-timeframe-btn--active' : ''}`}
+                  disabled={loading}
+                  onClick={() => changeMode(value)}
+                  aria-pressed={mode === value}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <label className="research-field">
+            Bursa
+            <select value={region} onChange={(event) => changeRegion(event.target.value)} disabled={loading}>
+              {regions.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          <button type="submit" className="scan-button" disabled={loading}>{action}</button>
+        </form>
+      </section>
 
       {loading && (
         <div className="status-card" role="status">
           <span className="spinner" aria-hidden="true" />
           <div>
-            <p className="status-title">{isResearch ? 'AI sedang riset…' : 'Memindai pasar…'}</p>
-            <p>
-              {isResearch
-                ? 'Kenari mencari info terbaru dari internet untuk kandidat breakout.'
-                : 'Memeriksa resistance 50 hari, konsolidasi, dan volume tiap saham.'}
-            </p>
+            <p className="status-title">{isResearch ? 'Menelusuri kandidat…' : 'Memindai data harga…'}</p>
+            <p>{isResearch ? 'Kenari mencari dan menilai sumber web.' : 'Memeriksa resistance, konsolidasi, dan volume tiap saham.'}</p>
           </div>
         </div>
       )}
@@ -246,55 +237,58 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         <div className="status-card status-card--error" role="alert">
           <span className="status-mark" aria-hidden="true">!</span>
           <div>
-            <p className="status-title">Pemindaian gagal</p>
+            <p className="status-title">{isResearch ? 'Riset gagal' : 'Pemindaian gagal'}</p>
             <p>{state.message}</p>
           </div>
         </div>
       )}
 
-      {state.status === 'success' && (
-        <>
+      {result && (
+        <section className="research-panel" aria-labelledby="research-results-title">
+          <div className="research-panel-heading">
+            <div>
+              <h2 id="research-results-title">{isResearch ? 'Kandidat riset AI' : 'Hasil scan matematis'}</h2>
+              <p>
+                {isResearch
+                  ? `${result.universe} · ${results.length} kandidat`
+                  : `${result.scanned} saham dipindai · ${result.universe} · ${results.length} memenuhi kriteria`}
+              </p>
+            </div>
+            {result.date && (isResearch || results.length > 0) && (
+              <p className="research-result-date">
+                {isResearch ? 'Tanggal riset' : 'Sesi acuan'}{' '}
+                <time dateTime={result.date}>{formatDate(result.date)}</time>
+              </p>
+            )}
+          </div>
+          {ai?.summary && (
+            <div className="research-summary">
+              <h3>{isResearch ? 'Ringkasan riset' : 'Catatan AI atas hasil scan'}</h3>
+              <p>{ai.summary}</p>
+            </div>
+          )}
           {results.length === 0 ? (
-            <p className="breakout-empty">
-              {isResearch
-                ? 'Riset AI belum menemukan kandidat dengan sumber yang cukup.'
-                : 'Tidak ada saham yang memenuhi syarat base breakout pada sesi ini.'}
+            <p className="research-empty">
+              {isResearch ? 'Belum ada kandidat dengan sumber yang cukup.' : 'Belum ada saham yang memenuhi kriteria scan pada sesi ini.'}
             </p>
-          ) : (
-            <ul className="breakout-list">
-              {results.map((pick, index) => isResearch ? (
-                <ResearchRow
+          ) : isResearch ? (
+            <ul className="research-brief-list">
+              {results.map((pick, index) => (
+                <ResearchBrief
                   key={`${pick.symbol}-${index}`}
                   pick={pick}
-                  index={index}
                   inWatchlist={watched.has(pick.symbol)}
                   disabled={disabled}
                   onAdd={onAdd}
-                />
-              ) : (
-                <ScanRow
-                  key={pick.symbol}
-                  pick={pick}
-                  index={index}
-                  inWatchlist={watched.has(pick.symbol)}
-                  disabled={disabled}
-                  onAdd={onAdd}
-                  formatPrice={formatPrice}
-                  region={region}
                 />
               ))}
             </ul>
+          ) : (
+            <ScanTable results={results} watched={watched} disabled={disabled} onAdd={onAdd} formatPrice={formatPrice} />
           )}
-          {ai?.summary && (
-            <p className="breakout-summary">
-              <strong>Ringkasan AI:</strong> {ai.summary}
-            </p>
-          )}
-          {ai?.error && !ai?.summary && (
-            <p className="breakout-summary breakout-summary--muted">{ai.error}</p>
-          )}
-        </>
+          {ai?.error && !ai?.summary && <p className="research-empty" role="status">{ai.error}</p>}
+        </section>
       )}
-    </section>
+    </>
   );
 }
