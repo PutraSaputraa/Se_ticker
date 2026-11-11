@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { normalizeTicker } from '../components/SearchForm.jsx';
 import {
   addTrade,
+  calculateTradePnl,
   closeTrade,
   journalSides,
   journalStatuses,
@@ -9,8 +10,10 @@ import {
   positionPnlUsd,
   removeTrade,
   summarizeJournal,
+  tradeQuoteError,
 } from '../journal.js';
-import { formatPct, formatPrice } from '../format.js';
+import { formatPct, formatPrice, priceDecimals } from '../format.js';
+import useJournalQuotes, { fetchJournalQuote } from '../useJournalQuotes.js';
 
 const levelPrecision = 16;
 const levelPattern = new RegExp(`^\\d*(?:[.,]\\d{1,${levelPrecision}})?$`);
@@ -19,6 +22,10 @@ const levelFields = [
   ['stopLoss', 'Stop Loss'],
   ['takeProfit', 'Take Profit (TP)'],
 ];
+const quoteTimeFormat = new Intl.DateTimeFormat('id-ID', {
+  day: 'numeric', month: 'short', year: 'numeric',
+  hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+});
 
 function emptyForm() {
   return {
@@ -38,26 +45,51 @@ function parseLevel(input) {
   return levelPattern.test(text) && Number.isFinite(price) && price > 0 ? price : null;
 }
 
-async function fetchJournalQuote(symbol, date, fallback) {
-  const params = new URLSearchParams({ symbol, mode: 'journal' });
-  if (date) params.set('date', date);
-  if (fallback) params.set('fallback', fallback);
-  const response = await fetch(`/.netlify/functions/price?${params}`, { cache: 'no-store' }).catch(() => null);
-  const quote = await response?.json().catch(() => null);
-  if (!response?.ok || !Number.isFinite(quote?.price) || quote.price <= 0 || !quote.date || !quote.currency) {
-    throw new Error(quote?.error ?? 'Harga dari Yahoo Finance belum tersedia. Coba lagi.');
-  }
-  return quote;
-}
-
 function formatJournalPrice(value, currency, precision) {
   return Number.isFinite(value) ? formatPrice(value, currency, precision) : '–';
 }
 
-function formatPnl(value, currency) {
+function formatPnl(value, currency, precision) {
   if (!Number.isFinite(value)) return '–';
   const sign = value > 0 ? '+' : value < 0 ? '−' : '';
-  return `${sign}${formatPrice(Math.abs(value), currency)}`;
+  return `${sign}${formatPrice(Math.abs(value), currency, precision)}`;
+}
+
+function quotePrecision(value, currency) {
+  return Math.abs(value) < 10 ** -priceDecimals(currency) ? levelPrecision : undefined;
+}
+
+function valueOpenTrade(trade, quoteState) {
+  const quote = quoteState?.quote;
+  if (!quote) return { message: quoteState?.error ?? 'Memuat harga…' };
+  const error = tradeQuoteError(trade, quote);
+  if (error) return { message: error };
+  const result = calculateTradePnl(trade, quote.price);
+  return { quote, ...result, pnlUsd: positionPnlUsd(trade, result.pnlPct) };
+}
+
+function RunningPnlCells({ value, currency }) {
+  const { quote, pnl, pnlPct, pnlUsd, message } = value;
+  const tone = pnl > 0 ? 'trend--up' : pnl < 0 ? 'trend--down' : '';
+  const quoteTime = quote?.timestamp ? new Date(quote.timestamp * 1000) : null;
+  return (
+    <>
+      <td className={`num ${tone}`}>
+        {pnlUsd == null ? formatPnl(pnl, currency, quotePrecision(pnl, currency)) : formatPnl(pnlUsd, 'USD')}
+        {quote && <small className="journal-trade-note">{pnlUsd == null ? 'Per unit · ' : ''}{formatPct(pnlPct)}</small>}
+      </td>
+      <td className="num">
+        {quote ? (
+          <>
+            {formatJournalPrice(quote.price, currency, quotePrecision(quote.price, currency))}
+            <small className="journal-trade-note">
+              <time dateTime={quoteTime?.toISOString() ?? quote.date}>{quoteTime ? quoteTimeFormat.format(quoteTime) : quote.date}</time>
+            </small>
+          </>
+        ) : <small className="journal-trade-note journal-quote-note">{message}</small>}
+      </td>
+    </>
+  );
 }
 
 function Badge({ meta }) {
@@ -73,7 +105,7 @@ function StatCard({ label, value, tone }) {
   );
 }
 
-function TradeTable({ trades, closed = false, manualCurrency, disabled, activeAction, onClose, onRemove }) {
+function TradeTable({ trades, closed = false, manualCurrency, runningValues, disabled, activeAction, onClose, onRemove }) {
   return (
     <div className="journal-table-wrap">
       {trades.length === 0 ? (
@@ -85,6 +117,12 @@ function TradeTable({ trades, closed = false, manualCurrency, disabled, activeAc
               <th>Tanggal masuk</th>
               <th>Ticker</th>
               <th>Posisi</th>
+              {!closed && (
+                <>
+                  <th className="num">PnL berjalan</th>
+                  <th className="num">Harga terbaru</th>
+                </>
+              )}
               <th>Setup</th>
               <th className="num">Harga masuk</th>
               <th className="num">Stop Loss</th>
@@ -114,6 +152,7 @@ function TradeTable({ trades, closed = false, manualCurrency, disabled, activeAc
                   <td>{trade.date}</td>
                   <td><span className="symbol-badge symbol-badge--light">{trade.pair}</span></td>
                   <td><Badge meta={side} /></td>
+                  {!closed && <RunningPnlCells value={runningValues.get(trade.id)} currency={currency} />}
                   <td className="journal-setup">
                     {trade.setup || '–'}
                     {trade.riskPct != null && <small className="journal-trade-note">Risiko {trade.riskPct}%</small>}
@@ -178,6 +217,11 @@ export default function JournalPage({ account }) {
   const disabled = !account.ready || account.pending || activeAction !== null;
 
   const openTrades = journal.filter((trade) => trade.status === 'open');
+  const { quotes, refresh } = useJournalQuotes(openTrades);
+  const runningValues = new Map(openTrades.map((trade) => [trade.id, valueOpenTrade(trade, quotes[trade.pair])]));
+  const runningAmounts = [...runningValues.values()].map(({ pnlUsd }) => pnlUsd).filter(Number.isFinite);
+  const totalRunningPnl = runningAmounts.length ? runningAmounts.reduce((total, pnl) => total + pnl, 0) : null;
+  const refreshing = openTrades.some(({ pair }) => !quotes[pair] || quotes[pair].loading);
   const closedTrades = journal.filter((trade) => trade.status !== 'open')
     .sort((a, b) => (b.exitDate ?? b.date).localeCompare(a.exitDate ?? a.date));
   const quoted = summarizeJournal(closedTrades.filter((trade) => trade.quoteCurrency), 'pnlPct');
@@ -242,7 +286,7 @@ export default function JournalPage({ account }) {
           : 'Untuk Short, Take Profit harus di bawah harga masuk dan Stop Loss di atasnya.');
       }
 
-      const quote = await fetchJournalQuote(symbol, form.date, fallback);
+      const quote = await fetchJournalQuote(symbol, { date: form.date, fallback });
       const trade = normalizeTrade({
         date: quote.date,
         pair: quote.symbol ?? symbol,
@@ -266,12 +310,8 @@ export default function JournalPage({ account }) {
   function handleClose(trade) {
     return runAction(trade.id, async () => {
       const quote = await fetchJournalQuote(trade.pair);
-      if (quote.currency !== trade.quoteCurrency) {
-        throw new Error('Mata uang harga terakhir berbeda dari harga masuk.');
-      }
-      if (quote.date < trade.date || (trade.entryTimestamp !== null && quote.timestamp < trade.entryTimestamp)) {
-        throw new Error('Harga terakhir mendahului harga masuk. Coba lagi setelah kuotasi diperbarui.');
-      }
+      const quoteError = tradeQuoteError(trade, quote);
+      if (quoteError) throw new Error(quoteError);
       await account.update((current) => ({
         ...current,
         journal: closeTrade(current.journal, trade.id, quote),
@@ -288,7 +328,7 @@ export default function JournalPage({ account }) {
       <div className="intro">
         <p className="eyebrow">Jurnal Trading</p>
         <h1>Catat posisi trading</h1>
-        <p>Buka posisi Long atau Short, lalu klik Close untuk menghitung hasilnya.</p>
+        <p>Catat posisi Long atau Short dan pantau PnL sejak harga masuk.</p>
       </div>
 
       {error && <p className="account-message account-message--error" role="alert">{error}</p>}
@@ -374,7 +414,21 @@ export default function JournalPage({ account }) {
             </button>
           </div>
         </form>
-        <TradeTable trades={openTrades} disabled={disabled} activeAction={activeAction} onClose={handleClose} onRemove={handleRemove} />
+        {openTrades.length > 0 && (
+          <div className="journal-running">
+            <StatCard label="Total PnL berjalan (USD)" value={formatPnl(totalRunningPnl, 'USD')} />
+            <div>
+              <p className="journal-help">
+                PnL dari harga masuk ke kuotasi terakhir Yahoo Finance. {runningAmounts.length} dari {openTrades.length} posisi dihitung dalam USD.
+                Untuk ticker non-USD, perhitungan mengasumsikan kurs tetap.
+              </p>
+              <button type="button" className="scan-button" onClick={refresh} disabled={refreshing}>
+                {refreshing ? 'Memperbarui harga…' : 'Perbarui harga'}
+              </button>
+            </div>
+          </div>
+        )}
+        <TradeTable trades={openTrades} runningValues={runningValues} disabled={disabled} activeAction={activeAction} onClose={handleClose} onRemove={handleRemove} />
       </section>
 
       <section className="journal-section" aria-labelledby="journal-closed">

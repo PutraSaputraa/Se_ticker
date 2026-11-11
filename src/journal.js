@@ -87,24 +87,38 @@ export function addTrade(journal, trade) {
   return [normalized, ...journal];
 }
 
+export function tradeQuoteError(trade, quote) {
+  if (quote.currency !== trade.quoteCurrency) {
+    return 'Mata uang harga terakhir berbeda dari harga masuk.';
+  }
+  if (quote.date < trade.date || (trade.entryTimestamp != null && quote.timestamp < trade.entryTimestamp)) {
+    return 'Harga terakhir mendahului harga masuk. Coba lagi setelah kuotasi diperbarui.';
+  }
+  return '';
+}
+
+export function calculateTradePnl(trade, price) {
+  const pnl = trade.side === 'short' ? trade.entryPrice - price : price - trade.entryPrice;
+  return { pnl, pnlPct: (pnl / trade.entryPrice) * 100 };
+}
+
 export function closeTrade(journal, id, quote) {
   return journal.map((trade) => {
     if (trade.id !== id || trade.status !== 'open') return trade;
-    const pnl = trade.side === 'short' ? trade.entryPrice - quote.price : quote.price - trade.entryPrice;
+    const result = calculateTradePnl(trade, quote.price);
     return {
       ...trade,
       exitPrice: quote.price,
       exitDate: quote.date,
-      pnl,
-      pnlPct: (pnl / trade.entryPrice) * 100,
-      status: pnl > 0 ? 'win' : pnl < 0 ? 'loss' : 'be',
+      ...result,
+      status: result.pnl > 0 ? 'win' : result.pnl < 0 ? 'loss' : 'be',
     };
   });
 }
 
-export function positionPnlUsd(trade) {
-  if (!Number.isFinite(trade.positionUsd) || !Number.isFinite(trade.pnlPct)) return null;
-  return trade.positionUsd * (trade.pnlPct / 100);
+export function positionPnlUsd(trade, pnlPct = trade.pnlPct) {
+  if (!Number.isFinite(trade.positionUsd) || !Number.isFinite(pnlPct)) return null;
+  return trade.positionUsd * (pnlPct / 100);
 }
 
 export function removeTrade(journal, id) {

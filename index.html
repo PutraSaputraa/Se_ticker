@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Cek OHLCV saham, level Buy Trigger, dan volume per sesi perdagangan." />
     <title>Cek Saham</title>
+    <script>
+      (() => {
+        let preference;
+        try {
+          preference = localStorage.getItem('cek-saham:theme');
+        } catch {}
+        const systemTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme =
+          preference === 'light' || preference === 'dark' ? preference : systemTheme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

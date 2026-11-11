@@ -18,7 +18,9 @@ export let auth = null;
 export let app = null;
 export let firebaseSetupError = '';
 
-const configured = Object.values(config).every((value) => value && !/^(API_KEY_ANDA|APP_ID|SENDER_ID)$/.test(value));
+const configured = Object.values(config).every((value) =>
+  value && !value.startsWith('**') && !/^(API_KEY_ANDA|APP_ID|SENDER_ID)$/.test(value),
+);
 
 if (configured) {
   try {

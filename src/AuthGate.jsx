@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
 } from 'firebase/auth';
 import { auth, firebaseSetupError } from './firebase.js';
+import ThemeToggle from './components/ThemeToggle.jsx';
 
 const App = lazy(() => import('./App.jsx'));
 
@@ -90,6 +91,7 @@ function AuthForm() {
           </div>
         </section>
         <section className="auth-card" aria-labelledby="auth-title">
+          <div className="auth-theme"><ThemeToggle /></div>
           {!resetting && (
             <div className="auth-tabs" aria-label="Akses akun">
               <button type="button" aria-pressed={!registering} disabled={busy} onClick={() => changeMode('login')}>Masuk</button>

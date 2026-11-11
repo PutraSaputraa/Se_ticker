@@ -4,6 +4,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from './firebase.js';
 import useAccountData from './useAccountData.js';
 import { clearLegacyData, mergeLegacyData, readLegacyData } from './accountData.js';
+import ThemeToggle from './components/ThemeToggle.jsx';
 import HomePage from './pages/HomePage.jsx';
 import StockDetailPage from './pages/StockDetailPage.jsx';
 import WatchlistPage from './pages/WatchlistPage.jsx';
@@ -57,6 +58,7 @@ function TopBar({ user }) {
           </nav>
           <div className="account-controls">
             <span className="account-email" title={user.email}>{user.email}</span>
+            <ThemeToggle />
             <button type="button" className="account-signout" disabled={signingOut} onClick={handleSignOut}>
               {signingOut ? 'Keluar…' : 'Keluar'}
             </button>
