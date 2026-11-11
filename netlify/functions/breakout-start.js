@@ -1,13 +1,10 @@
 import { getStore } from '@netlify/blobs';
+import { scanWaitMs } from './shared/scanCore.js';
 
-const jobs = () => getStore('breakout-jobs');
+const dispatchError = 'Pekerja pemindaian belum bisa dimulai. Coba lagi.';
 
 // Memulai job breakout scan/riset secara background dan langsung mengembalikan
 // jobId. Frontend kemudian mem-poll breakout-status dengan jobId itu.
-//
-// Pola ini menghindari timeout function sinkron Netlify (~10 detik plan gratis)
-// karena pekerjaan berat (scan Yahoo + Kenari) berjalan di background function
-// yang punya batas 15 menit.
 export default async function breakoutStart(request) {
   if (request.method !== 'POST' && request.method !== 'GET') {
     return Response.json({ error: 'Gunakan metode POST atau GET.' }, {
@@ -22,26 +19,33 @@ export default async function breakoutStart(request) {
     const region = params.get('region') ?? 'auto';
 
     const jobId = crypto.randomUUID();
-    await jobs().setJSON(jobId, {
-      status: 'pending',
-      mode,
-      region,
-      createdAt: Date.now(),
-    });
+    const store = getStore('breakout-jobs');
+    const job = { status: 'pending', mode, region, createdAt: Date.now() };
+    const { etag } = await store.setJSON(jobId, job);
 
-    // Picu background function tanpa menunggu hasilnya (fire-and-forget).
-    const origin = new URL(request.url).origin;
-    const workerUrl = `${origin}/.netlify/functions/breakout-scan-background`;
-    fetch(workerUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId, mode, region }),
-    }).catch(() => {
-      // Abaikan kegagalan pemicu; status tetap 'pending' dan akan kedaluwarsa.
-    });
+    try {
+      const worker = await fetch(new URL('/.netlify/functions/breakout-scan-background', request.url), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId }),
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (worker.status !== 202) throw new Error(`Worker returned HTTP ${worker.status}`);
+    } catch (error) {
+      console.warn('Gagal mengirim job breakout', jobId, error.message);
+      if (etag) {
+        await store.setJSON(jobId, { ...job, status: 'error', error: dispatchError }, { onlyIfMatch: etag })
+          .catch(() => {});
+      }
+      return Response.json({ error: dispatchError }, { status: 502 });
+    }
 
-    return Response.json({ jobId, status: 'pending' }, { status: 202 });
-  } catch {
+    return Response.json({ jobId, status: 'pending', waitMs: scanWaitMs(mode, region) }, {
+      status: 202,
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  } catch (error) {
+    console.error('Gagal membuat job breakout', error.message);
     return Response.json({ error: 'Gagal memulai pemindaian. Coba lagi.' }, { status: 500 });
   }
 }

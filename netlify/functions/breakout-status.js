@@ -1,6 +1,7 @@
 import { getStore } from '@netlify/blobs';
 
-const jobs = () => getStore('breakout-jobs');
+const jobs = () => getStore({ name: 'breakout-jobs', consistency: 'strong' });
+const headers = { 'Cache-Control': 'no-store' };
 
 // Endpoint polling ringan: mengembalikan status job dan hasilnya bila selesai.
 export default async function breakoutStatus(request) {
@@ -19,17 +20,17 @@ export default async function breakoutStatus(request) {
 
     const job = await jobs().get(jobId, { type: 'json' });
     if (!job) {
-      return Response.json({ error: 'Job tidak ditemukan atau sudah kedaluwarsa.' }, { status: 404 });
+      return Response.json({ error: 'Job tidak ditemukan atau sudah kedaluwarsa.' }, { status: 404, headers });
     }
 
     if (job.status === 'done') {
-      return Response.json({ status: 'done', result: job.result });
+      return Response.json({ status: 'done', result: job.result }, { headers });
     }
     if (job.status === 'error') {
-      return Response.json({ status: 'error', error: job.error ?? 'Pemindaian gagal.' });
+      return Response.json({ status: 'error', error: job.error ?? 'Pemindaian gagal.' }, { headers });
     }
     // pending / running
-    return Response.json({ status: job.status });
+    return Response.json({ status: job.status }, { headers });
   } catch {
     return Response.json({ error: 'Gagal membaca status pemindaian.' }, { status: 500 });
   }

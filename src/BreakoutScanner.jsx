@@ -112,6 +112,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
       // 1. Mulai job di background (menghindari timeout function sinkron).
       const query = new URLSearchParams({ mode: targetMode, region: targetRegion });
       const startResponse = await fetch(`/.netlify/functions/breakout-start?${query}`, {
+        method: 'POST',
         signal: controller.signal,
       });
       const startPayload = await startResponse.json().catch(() => null);
@@ -121,23 +122,15 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         return;
       }
 
-      // 2. Poll status sampai selesai (atau timeout di sisi klien).
       const jobId = startPayload.jobId;
-      const deadline = Date.now() + 90_000;
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        if (controller.signal.aborted) return;
-        if (Date.now() > deadline) {
-          setState({ status: 'error', message: 'Pemindaian terlalu lama. Coba lagi.' });
-          return;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        if (controller.signal.aborted) return;
+      const statusUrl = `/.netlify/functions/breakout-status?${new URLSearchParams({ jobId })}`;
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(startPayload.waitMs ?? 150_000)]);
 
-        const statusResponse = await fetch(
-          `/.netlify/functions/breakout-status?${new URLSearchParams({ jobId })}`,
-          { signal: controller.signal },
-        );
+      while (true) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        signal.throwIfAborted();
+
+        const statusResponse = await fetch(statusUrl, { signal, cache: 'no-store' });
         const statusPayload = await statusResponse.json().catch(() => null);
         if (controller.signal.aborted) return;
 
@@ -146,7 +139,9 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           return;
         }
         if (statusPayload?.status === 'done') {
-          setState({ status: 'success', mode: targetMode, data: statusPayload.result });
+          const result = statusPayload.result;
+          const error = targetMode === 'research' && result.ai?.error;
+          setState(error ? { status: 'error', message: error } : { status: 'success', mode: targetMode, data: result });
           return;
         }
         if (statusPayload?.status === 'error') {
@@ -155,9 +150,10 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         }
         // pending / running → lanjut poll
       }
-    } catch {
+    } catch (error) {
       if (!controller.signal.aborted) {
-        setState({ status: 'error', message: scanErrorMessage });
+        const message = error.name === 'TimeoutError' ? 'Pemindaian terlalu lama. Coba lagi.' : scanErrorMessage;
+        setState({ status: 'error', message });
       }
     }
   }
@@ -176,6 +172,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   const results = state.status === 'success' ? state.data.results : [];
   const ai = state.status === 'success' ? state.data.ai : null;
   const isResearch = (state.mode ?? mode) === 'research';
+  const loading = state.status === 'loading';
 
   return (
     <section className="breakout-scanner" aria-labelledby="breakout-scanner-title">
@@ -193,10 +190,10 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         <button
           type="button"
           className="scan-button"
-          disabled={state.status === 'loading'}
+          disabled={loading}
           onClick={() => run()}
         >
-          {state.status === 'loading' ? 'Memindai…' : state.status === 'success' ? 'Pindai ulang' : 'Cari breakout'}
+          {loading ? 'Memindai…' : state.status === 'success' ? 'Pindai ulang' : 'Cari breakout'}
         </button>
       </div>
 
@@ -205,6 +202,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           <button
             type="button"
             className={`candle-timeframe-btn${mode === 'scan' ? ' candle-timeframe-btn--active' : ''}`}
+            disabled={loading}
             onClick={() => changeMode('scan')}
             aria-pressed={mode === 'scan'}
           >
@@ -213,6 +211,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           <button
             type="button"
             className={`candle-timeframe-btn${mode === 'research' ? ' candle-timeframe-btn--active' : ''}`}
+            disabled={loading}
             onClick={() => changeMode('research')}
             aria-pressed={mode === 'research'}
           >
@@ -221,7 +220,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         </div>
         <label className="breakout-region">
           <span>Bursa</span>
-          <select value={region} onChange={(event) => changeRegion(event.target.value)}>
+          <select value={region} onChange={(event) => changeRegion(event.target.value)} disabled={loading}>
             {regions.map(({ value, label }) => (
               <option key={value} value={value}>{label}</option>
             ))}
@@ -229,8 +228,8 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         </label>
       </div>
 
-      {state.status === 'loading' && (
-        <div className="status-card">
+      {loading && (
+        <div className="status-card" role="status">
           <span className="spinner" aria-hidden="true" />
           <div>
             <p className="status-title">{isResearch ? 'AI sedang riset…' : 'Memindai pasar…'}</p>
@@ -244,7 +243,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
       )}
 
       {state.status === 'error' && (
-        <div className="status-card status-card--error">
+        <div className="status-card status-card--error" role="alert">
           <span className="status-mark" aria-hidden="true">!</span>
           <div>
             <p className="status-title">Pemindaian gagal</p>
@@ -257,8 +256,9 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         <>
           {results.length === 0 ? (
             <p className="breakout-empty">
-              Tidak ada saham yang memenuhi syarat base breakout pada sesi ini — tembus
-              resistance 50 hari setelah konsolidasi ketat dengan volume di atas ambang.
+              {isResearch
+                ? 'Riset AI belum menemukan kandidat dengan sumber yang cukup.'
+                : 'Tidak ada saham yang memenuhi syarat base breakout pada sesi ini.'}
             </p>
           ) : (
             <ul className="breakout-list">
