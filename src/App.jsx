@@ -4,6 +4,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from './firebase.js';
 import useAccountData from './useAccountData.js';
 import { clearLegacyData, mergeLegacyData, readLegacyData } from './accountData.js';
+import BrandMark from './components/BrandMark.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
 import WorkspaceIcon from './components/WorkspaceIcon.jsx';
 import HomePage from './pages/HomePage.jsx';
@@ -24,7 +25,7 @@ const navigation = [
 function Brand() {
   return (
     <Link to="/" className="brand">
-      <span className="brand-mark"><WorkspaceIcon name="brand" size={21} /></span>
+      <BrandMark />
       Cek Saham
     </Link>
   );

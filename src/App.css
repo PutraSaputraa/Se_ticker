@@ -52,22 +52,22 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #20262d;
-  --surface: #29323b;
-  --surface-muted: #242c34;
-  --surface-tint: #313c47;
-  --sidebar: #242c34;
-  --text: #ebf1f6;
-  --muted: #b6c3ce;
-  --border: #465563;
-  --field: #242c34;
-  --field-border: #6d7d8d;
+  --page: #101010;
+  --surface: #1e1e20;
+  --surface-muted: #181819;
+  --surface-tint: #28282b;
+  --sidebar: #161617;
+  --text: #f0f0f2;
+  --muted: #babac1;
+  --border: #39393d;
+  --field: #161617;
+  --field-border: #727279;
   --accent: #a4c0ec;
   --accent-fill: #3a5f92;
   --accent-text: #a4c0ec;
   --accent-hover: #456da5;
-  --accent-soft: #2d415c;
-  --accent-soft-hover: #354b69;
+  --accent-soft: #252e3a;
+  --accent-soft-hover: #2c3747;
   --focus: #a4c0ec;
   --positive: #85cca8;
   --positive-soft: #234539;
@@ -80,8 +80,8 @@
   --warning: #f1cd87;
   --warning-soft: #493b24;
   --info: #c0d3f0;
-  --info-soft: #2d4055;
-  --chart-overlay: rgb(32 38 45 / 0.8);
+  --info-soft: #232d3a;
+  --chart-overlay: rgb(16 16 16 / 0.8);
   --shadow-raised: 0 0.55rem 1.6rem rgb(0 0 0 / 0.36);
 }
 
@@ -143,11 +143,7 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; opacity:
 .brand-mark {
   width: 2.15rem;
   height: 2.15rem;
-  display: grid;
-  place-items: center;
   border-radius: 0.45rem;
-  background: var(--accent-fill);
-  color: var(--accent-ink);
   flex: none;
 }
 

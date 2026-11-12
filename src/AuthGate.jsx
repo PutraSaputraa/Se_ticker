@@ -6,8 +6,8 @@ import {
   signInWithEmailAndPassword,
 } from 'firebase/auth';
 import { auth, firebaseSetupError } from './firebase.js';
+import BrandMark from './components/BrandMark.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
-import WorkspaceIcon from './components/WorkspaceIcon.jsx';
 
 const App = lazy(() => import('./App.jsx'));
 
@@ -81,7 +81,7 @@ function AuthForm() {
       <div className="auth-layout">
         <section className="auth-card" aria-labelledby="auth-title">
           <div className="auth-brand-row">
-            <span className="brand"><span className="brand-mark"><WorkspaceIcon name="brand" size={21} /></span>Cek Saham</span>
+            <span className="brand"><BrandMark />Cek Saham</span>
             <ThemeToggle />
           </div>
           <h1 id="auth-title">{title}</h1>
