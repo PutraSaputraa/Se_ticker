@@ -1,12 +1,11 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { normalizeTicker } from '../components/SearchForm.jsx';
-import JournalDailyPnl from '../components/JournalDailyPnl.jsx';
+import JournalCharts from '../components/JournalCharts.jsx';
 import JournalTickerField from '../components/JournalTickerField.jsx';
+import JournalWallet from '../components/JournalWallet.jsx';
 import TableScroll from '../components/TableScroll.jsx';
 import {
-  addTrade,
   calculateTradePnl,
-  closeTrade,
   interpretProfitFactor,
   journalCurrencies,
   journalRewardMultiples,
@@ -15,13 +14,13 @@ import {
   normalizeTrade,
   positionPnlUsd,
   realizedTradePnl,
-  removeTrade,
   summarizeJournal,
   summarizeRealizedPnl,
   tradeQuoteError,
 } from '../journal.js';
 import { formatPct, formatPnl, formatPrice, priceDecimals } from '../format.js';
 import useJournalQuotes, { fetchJournalQuote } from '../useJournalQuotes.js';
+import { closeWalletPosition, openWalletPosition, parseWalletUsd, recordWalletCash, removeWalletPosition, summarizeWallet } from '../wallet.js';
 import '../styles/journal.css';
 
 const levelPrecision = 16;
@@ -369,6 +368,7 @@ export default function JournalPage({ account }) {
   const disabled = !account.ready || account.pending || activeAction !== null;
   const { side, stopLossPct, rewardMultiple } = form;
   const levels = calculateLevels(form);
+  const wallet = useMemo(() => summarizeWallet(account.wallet), [account.wallet]);
   const knownTickers = [...account.history, ...account.watchlist.map(({ symbol }) => symbol), ...journal.map(({ pair }) => pair)];
 
   const openTrades = journal.filter((trade) => trade.status === 'open');
@@ -404,19 +404,32 @@ export default function JournalPage({ account }) {
   }
 
   async function runAction(action, section, operation) {
-    if (disabled || running.current) return;
+    if (disabled || running.current) return false;
     running.current = true;
     setActiveAction(action);
     setFeedback(null);
     try {
       const message = await operation();
       setFeedback({ section, type: 'success', message });
+      return true;
     } catch (failure) {
       setFeedback({ section, type: 'error', message: failure.message || 'Jurnal gagal diperbarui. Coba lagi.' });
+      return false;
     } finally {
       running.current = false;
       setActiveAction(null);
     }
+  }
+
+  function handleWalletMove(kind, amount) {
+    return runAction('wallet', 'wallet', async () => {
+      const cents = parseWalletUsd(amount);
+      if (cents == null) throw new Error('Isi jumlah USD lebih dari nol dengan maksimal dua desimal.');
+      const movement = { id: crypto.randomUUID(), kind, cents, at: Date.now() };
+      const saved = await account.update((current) => recordWalletCash(current, movement));
+      if (!saved) throw new Error('Perubahan saldo gagal disimpan. Coba lagi.');
+      return kind === 'deposit' ? 'Saldo ditambahkan.' : 'Penarikan saldo tercatat.';
+    });
   }
 
   function handleCapital(event) {
@@ -450,11 +463,12 @@ export default function JournalPage({ account }) {
       const { setup } = form;
       if (!symbol || !setupOptions.includes(setup)) throw new Error('Isi kode ticker dan pilih setup posisi.');
 
-      const amount = form.positionUsd.trim();
-      const positionUsd = Number(amount.replace(',', '.'));
-      if (!/^\d+(?:[.,]\d{1,2})?$/.test(amount) || positionUsd <= 0) {
+      const positionCents = parseWalletUsd(form.positionUsd);
+      if (positionCents == null) {
         throw new Error('Isi nilai posisi USD lebih dari 0, misalnya 500 atau 125,50.');
       }
+      if (positionCents > wallet.availableCents) throw new Error('Saldo wallet tidak cukup untuk nilai posisi ini.');
+      const positionUsd = positionCents / 100;
 
       const entryPrice = Number(levels.entryPrice);
       const stopLoss = Number(levels.stopLoss);
@@ -491,10 +505,8 @@ export default function JournalPage({ account }) {
         takeProfit,
         quoteCurrency: quote.currency,
       });
-      const saved = await account.update((current) => ({
-        ...current,
-        journal: addTrade(current.journal, trade),
-      }));
+      const at = Date.now();
+      const saved = await account.update((current) => openWalletPosition(current, trade, at));
       if (!saved) throw new Error('Posisi gagal disimpan. Coba lagi.');
       setForm(emptyForm());
       return `Posisi ${trade.pair} tersimpan.`;
@@ -504,12 +516,8 @@ export default function JournalPage({ account }) {
   function handleClose(trade) {
     return runAction(trade.id, 'open', async () => {
       const quote = await fetchJournalQuote(trade.pair);
-      const quoteError = tradeQuoteError(trade, quote);
-      if (quoteError) throw new Error(quoteError);
-      const saved = await account.update((current) => ({
-        ...current,
-        journal: closeTrade(current.journal, trade.id, quote),
-      }));
+      const at = Date.now();
+      const saved = await account.update((current) => closeWalletPosition(current, trade.id, quote, at));
       if (!saved) throw new Error('Posisi gagal ditutup. Coba lagi.');
       return `Posisi ${trade.pair} ditutup.`;
     });
@@ -517,9 +525,12 @@ export default function JournalPage({ account }) {
 
   function handleRemove(id, section) {
     return runAction(`remove:${id}`, section, async () => {
-      const saved = await account.update((current) => ({ ...current, journal: removeTrade(current.journal, id) }));
+      const at = Date.now();
+      const saved = await account.update((current) => removeWalletPosition(current, id, at));
       if (!saved) throw new Error('Posisi gagal dihapus. Coba lagi.');
-      return 'Posisi dihapus dari jurnal.';
+      return section === 'open' && wallet.positions.has(id)
+        ? 'Posisi dibatalkan dan dana dikembalikan ke wallet.'
+        : 'Posisi dihapus dari jurnal.';
     });
   }
 
@@ -531,11 +542,17 @@ export default function JournalPage({ account }) {
           <p>Catat rencana posisi dan evaluasi hasil setelah ditutup.</p>
         </div>
         <nav className="journal-jump-links" aria-label="Bagian jurnal">
+          <a href="#journal-wallet">Wallet</a>
           <a href="#journal-entry">Catat posisi</a>
           <a href="#journal-open">Posisi terbuka</a>
           <a href="#journal-closed">Posisi ditutup</a>
         </nav>
       </header>
+
+      <JournalWallet wallet={wallet} ready={ready} readError={readError} disabled={disabled}
+        saving={activeAction === 'wallet'} onMove={handleWalletMove}>
+        <JournalFeedback feedback={feedback} section="wallet" />
+      </JournalWallet>
 
       <section id="journal-entry" className="journal-section journal-entry" aria-labelledby="journal-entry-title">
         <div className="journal-entry-header">
@@ -543,7 +560,7 @@ export default function JournalPage({ account }) {
           {ready && (
             <dl className="journal-account-context">
               <div><dt>Mata uang akun</dt><dd>{currency}</dd></div>
-              {capital > 0 && <div><dt>Modal tercatat</dt><dd>{formatJournalPrice(capital, currency)}</dd></div>}
+              <div><dt>Saldo wallet</dt><dd>{formatPrice(wallet.availableCents / 100, 'USD')}</dd></div>
             </dl>
           )}
         </div>
@@ -574,6 +591,7 @@ export default function JournalPage({ account }) {
                     onChange={(event) => setField('positionUsd', event.target.value)}
                     placeholder="500 atau 125,50"
                     maxLength={13}
+                    aria-describedby="journal-wallet-note"
                     disabled={disabled}
                     required
                   />
@@ -592,6 +610,7 @@ export default function JournalPage({ account }) {
                   </select>
                 </label>
               </div>
+              <p className="journal-help" id="journal-wallet-note">Nilai posisi diambil dari <a href="#journal-wallet">saldo wallet USD</a>.</p>
               <p className="journal-help" id="journal-ticker-note">
                 Untuk kripto, gunakan <code>BTC-USD</code> atau <code>CRYPTO:BTC</code>. Awali dengan <code>US:</code> untuk memilih ticker AS jika kodenya sama.
                 Tanggal masuk mengikuti zona waktu bursa.
@@ -699,7 +718,7 @@ export default function JournalPage({ account }) {
         {(ready || closedTrades.length > 0) && <div className="journal-performance">
           <div className="journal-capital">
             <div className="journal-section-header">
-              <StatCard label={`Modal trading (${currency})`} value={formatJournalPrice(capital, currency)} />
+              <StatCard label={`Modal acuan (${currency})`} value={formatJournalPrice(capital, currency)} />
               {!capitalDraft && (
                 <button type="button" className="journal-secondary-button" disabled={disabled}
                   onClick={() => {
@@ -761,7 +780,7 @@ export default function JournalPage({ account }) {
             Profit Factor membagi total untung dengan nilai absolut total rugi.
           </p>
         </div>}
-        {(ready || closedTrades.length > 0) && <JournalDailyPnl series={realizedPnl} preferredCurrency={currency} />}
+        {(ready || closedTrades.length > 0) && <JournalCharts series={realizedPnl} preferredCurrency={currency} walletHistory={wallet.history} />}
         <TradeTable
           trades={closedTrades}
           closed

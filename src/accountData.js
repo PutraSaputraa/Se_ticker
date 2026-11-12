@@ -4,6 +4,8 @@ import { journalCurrencies, normalizeJournal } from './journal.js';
 
 const historyKey = 'cek-saham:recent';
 
+export class AccountChangeError extends Error {}
+
 export function normalizeHistory(value) {
   if (!Array.isArray(value)) return [];
   const symbols = value.filter((symbol) => typeof symbol === 'string' && symbol.trim());
@@ -25,6 +27,7 @@ export function normalizeAccountData(value) {
     journal: normalizeJournal(value?.journal),
     capital: normalizeCapital(value?.capital),
     currency,
+    ...(Array.isArray(value?.wallet) && value.wallet.length > 0 && { wallet: value.wallet }),
   };
 }
 

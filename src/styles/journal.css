@@ -73,12 +73,41 @@
 
 .journal-entry,
 .journal-performance,
-.journal-daily-pnl {
+.journal-wallet,
+.journal-charts {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
 }
+
+.journal-wallet {
+  padding: 0.85rem 1rem;
+}
+
+.journal-wallet-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--field-radius);
+  background: var(--surface-muted);
+}
+
+.journal-wallet-totals dt { color: var(--muted); font-size: 0.85rem; }
+.journal-wallet-totals dd { font-size: 1.2rem; font-weight: 650; overflow-wrap: anywhere; }
+
+.journal-wallet-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.55rem 0.75rem;
+}
+
+.journal-wallet-form label { flex: 0 1 15rem; }
+.journal-wallet-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.journal-wallet-history { min-width: 27rem; }
 
 .journal-entry {
   --journal-padding: clamp(0.85rem, 2vw, 1.25rem);
@@ -364,20 +393,27 @@
   border-top: 1px solid var(--border);
 }
 
-.journal-daily-pnl {
-  display: grid;
-  gap: 0.85rem;
+.journal-charts {
   padding: 0.85rem 1rem;
 }
 
-.journal-chart-currency {
+.journal-charts h3 + .journal-help { margin-top: 0.3rem; }
+
+.journal-chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+}
+
+.journal-chart-controls label {
   display: grid;
   gap: 0.25rem;
+  min-width: min(100%, 8.5rem);
   color: var(--muted);
   font-size: 0.8125rem;
 }
 
-.journal-chart-currency select {
+.journal-chart-controls select {
   min-height: 2.25rem;
   padding: 0.3rem 0.55rem;
   border: 1px solid var(--field-border);
@@ -412,6 +448,10 @@
 .journal-pnl-flat { stroke-width: 3; }
 .journal-pnl-up { fill: var(--positive); }
 .journal-pnl-down { fill: var(--negative); }
+.journal-pnl-value { fill: var(--accent); }
+.journal-pnl-area { fill: var(--accent); fill-opacity: 0.18; }
+.journal-pnl-line { fill: none; stroke: var(--accent-text); stroke-width: 2; }
+.journal-pnl-point { stroke: var(--accent-text); stroke-width: 4; stroke-linecap: round; }
 
 .journal-pnl-axis-x {
   grid-column: 2;
@@ -569,4 +609,5 @@
   .journal-setup-field { grid-column: 1 / -1; }
   .journal-running { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
   .journal-pnl-values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .journal-wallet-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

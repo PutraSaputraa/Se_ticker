@@ -65,6 +65,7 @@ export function normalizeTrade(entry) {
       exitPrice: num(entry.exitPrice),
       exitDate: typeof entry.exitDate === 'string' ? entry.exitDate : null,
       ...(positionUsd > 0 && { positionUsd }),
+      ...(Number.isSafeInteger(entry.walletPnlCents) && { walletPnlCents: entry.walletPnlCents }),
     }),
   };
 }
@@ -127,7 +128,7 @@ export function positionPnlUsd(trade, pnlPct = trade.pnlPct) {
 export function realizedTradePnl(trade, manualCurrency) {
   if (trade.status === 'open') return null;
   const currency = trade.quoteCurrency ? 'USD' : manualCurrency;
-  const amount = trade.quoteCurrency ? positionPnlUsd(trade) : trade.pnl;
+  const amount = trade.quoteCurrency ? (trade.walletPnlCents == null ? positionPnlUsd(trade) : trade.walletPnlCents / 100) : trade.pnl;
   return Number.isFinite(amount) ? { currency, amount } : null;
 }
 

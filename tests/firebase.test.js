@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { mergeLegacyData, normalizeAccountData, updateAccountData } from '../src/accountData.js';
 import { addTrade, closeTrade, positionPnlUsd } from '../src/journal.js';
+import { closeWalletPosition, openWalletPosition, recordWalletCash, summarizeWallet } from '../src/wallet.js';
 import { addSymbol, removeSymbol, setPriceToWatch } from '../src/watchlist.js';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
@@ -87,6 +88,7 @@ test('aturan menolak dokumen di luar skema akun', async () => {
   await assert.rejects(setDoc(reference, { ...valid, watchlist: 'invalid' }), { code: 'permission-denied' });
   await assert.rejects(setDoc(reference, { ...valid, history: Array(6).fill('BBCA.JK') }), { code: 'permission-denied' });
   await assert.rejects(setDoc(reference, { ...valid, journal: {} }), { code: 'permission-denied' });
+  await assert.rejects(setDoc(reference, { ...valid, wallet: {} }), { code: 'permission-denied' });
 });
 
 test('perubahan serentak dari dua perangkat mempertahankan kedua ticker', async () => {
@@ -175,4 +177,33 @@ test('jurnal mempertahankan posisi Long dan Short saat impor dan menyimpan hasil
   assert.equal(short.rewardMultiple, undefined);
   assert.equal(positionPnlUsd(long), 500);
   assert.equal(positionPnlUsd(short), null);
+});
+
+test('dua perangkat memakai saldo wallet yang sama dan penutupan hanya mengembalikan dana sekali', async () => {
+  const reference = doc(owner.db, 'users', uid);
+  const at = Date.parse('2026-01-07T03:00:00Z');
+  await updateAccountData(owner.db, uid, (current) => recordWalletCash(current, { id: 'deposit', kind: 'deposit', cents: 50_000, at }));
+  const trade = { date: '2026-01-07', pair: 'NVDA', entryPrice: 100, quoteCurrency: 'USD', status: 'open', positionUsd: 300 };
+  const attempts = await Promise.allSettled([
+    updateAccountData(owner.db, uid, (current) => openWalletPosition(current, { ...trade, id: 'wallet-a' }, at)),
+    updateAccountData(secondDevice.db, uid, (current) => openWalletPosition(current, { ...trade, id: 'wallet-b' }, at)),
+  ]);
+  assert.equal(attempts.filter(({ status }) => status === 'fulfilled').length, 1);
+  assert.match(attempts.find(({ status }) => status === 'rejected').reason.message, /Saldo wallet tidak cukup/);
+
+  const opened = (await getDocFromServer(reference)).data();
+  const balance = summarizeWallet(opened.wallet);
+  assert.deepEqual([balance.availableCents, balance.reservedCents, balance.positions.size], [20_000, 30_000, 1]);
+  const [id] = balance.positions.keys();
+  const close = (current) => closeWalletPosition(current, id, { date: '2026-01-08', price: 110, currency: 'USD' }, at);
+  await Promise.all([updateAccountData(owner.db, uid, close), updateAccountData(secondDevice.db, uid, close)]);
+  const settled = (await getDocFromServer(reference)).data();
+  assert.equal(summarizeWallet(settled.wallet).availableCents, 53_000);
+  assert.deepEqual(settled.wallet.map(({ kind }) => kind), ['deposit', 'open', 'close']);
+  assert.equal(settled.journal.find((item) => item.id === id).walletPnlCents, 3000);
+
+  const olderVersion = { ...settled };
+  delete olderVersion.wallet;
+  await assert.rejects(setDoc(reference, { ...olderVersion, updatedAt: serverTimestamp() }), { code: 'permission-denied' });
+  await assert.rejects(setDoc(doc(outsider.db, 'users', uid), { ...settled, updatedAt: serverTimestamp() }), { code: 'permission-denied' });
 });

@@ -7,18 +7,25 @@ service cloud.firestore {
         return request.auth != null && request.auth.uid == userId;
       }
 
+      function validAccount() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['watchlist', 'history', 'updatedAt'])
+          && data.keys().hasOnly(['watchlist', 'history', 'updatedAt', 'journal', 'capital', 'currency', 'wallet'])
+          && data.watchlist is list
+          && data.history is list
+          && data.history.size() <= 5
+          && data.get('journal', []) is list
+          && data.get('capital', 0) is number
+          && data.get('capital', 0) >= 0
+          && data.get('currency', 'USD') in ['USD', 'IDR', 'USDT']
+          && data.get('wallet', []) is list
+          && data.updatedAt == request.time;
+      }
+
       allow read, delete: if isOwner();
-      allow create, update: if isOwner()
-        && request.resource.data.keys().hasAll(['watchlist', 'history', 'updatedAt'])
-        && request.resource.data.keys().hasOnly(['watchlist', 'history', 'updatedAt', 'journal', 'capital', 'currency'])
-        && request.resource.data.watchlist is list
-        && request.resource.data.history is list
-        && request.resource.data.history.size() <= 5
-        && request.resource.data.get('journal', []) is list
-        && request.resource.data.get('capital', 0) is number
-        && request.resource.data.get('capital', 0) >= 0
-        && request.resource.data.get('currency', 'USD') in ['USD', 'IDR', 'USDT']
-        && request.resource.data.updatedAt == request.time;
+      allow create: if isOwner() && validAccount();
+      allow update: if isOwner() && validAccount()
+        && request.resource.data.get('wallet', []).size() >= resource.data.get('wallet', []).size();
     }
   }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { connectFirestoreEmulator, doc, getFirestore, onSnapshot } from 'firebase/firestore';
 import { app, auth, useEmulators } from './firebase.js';
-import { normalizeAccountData, updateAccountData } from './accountData.js';
+import { AccountChangeError, normalizeAccountData, updateAccountData } from './accountData.js';
 
 const db = getFirestore(app);
 if (useEmulators) connectFirestoreEmulator(db, '127.0.0.1', 8080);
@@ -49,6 +49,7 @@ export default function useAccountData(uid) {
       await updateAccountData(db, uid, change);
       return true;
     } catch (error) {
+      if (error instanceof AccountChangeError) throw error;
       setWriteError(dataError(error));
       return false;
     } finally {
