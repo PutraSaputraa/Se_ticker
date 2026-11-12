@@ -52,36 +52,36 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #101c28;
-  --surface: #182a39;
-  --surface-muted: #1d3040;
-  --surface-tint: #24394a;
-  --sidebar: #132330;
-  --text: #e8f0f5;
-  --muted: #b2c3cf;
-  --border: #354b5b;
-  --field: #142532;
-  --field-border: #698292;
-  --accent: #83cae3;
-  --accent-fill: #206781;
-  --accent-text: #9ad7eb;
-  --accent-hover: #17566e;
-  --accent-soft: #223f50;
-  --accent-soft-hover: #2b4d61;
-  --focus: #9ad7eb;
-  --positive: #8ad1b1;
+  --page: #20262d;
+  --surface: #29323b;
+  --surface-muted: #242c34;
+  --surface-tint: #313c47;
+  --sidebar: #242c34;
+  --text: #ebf1f6;
+  --muted: #b6c3ce;
+  --border: #465563;
+  --field: #242c34;
+  --field-border: #6d7d8d;
+  --accent: #a4c0ec;
+  --accent-fill: #3a5f92;
+  --accent-text: #a4c0ec;
+  --accent-hover: #456da5;
+  --accent-soft: #2d415c;
+  --accent-soft-hover: #354b69;
+  --focus: #a4c0ec;
+  --positive: #85cca8;
   --positive-soft: #234539;
   --positive-border: #3d6958;
-  --negative: #f4a39b;
+  --negative: #f1a6a0;
   --negative-soft: #4b2e33;
   --negative-border: #795052;
   --negative-button: #903e40;
   --negative-button-hover: #773236;
   --warning: #f1cd87;
   --warning-soft: #493b24;
-  --info: #b3d2e4;
-  --info-soft: #263f51;
-  --chart-overlay: rgb(16 28 40 / 0.8);
+  --info: #c0d3f0;
+  --info-soft: #2d4055;
+  --chart-overlay: rgb(32 38 45 / 0.8);
   --shadow-raised: 0 0.55rem 1.6rem rgb(0 0 0 / 0.36);
 }
 
