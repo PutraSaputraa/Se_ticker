@@ -59,6 +59,8 @@
   font-weight: 650;
 }
 
+.journal-section h3 { font-size: 1rem; }
+
 .journal-section-header .journal-help { margin-top: 0.3rem; }
 
 .journal-help {
@@ -70,7 +72,8 @@
 }
 
 .journal-entry,
-.journal-performance {
+.journal-performance,
+.journal-daily-pnl {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -156,6 +159,49 @@
   font-weight: 600;
 }
 
+.journal-ticker-field {
+  position: relative;
+  display: grid;
+  align-self: start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.journal-ticker-suggestions {
+  position: absolute;
+  z-index: 4;
+  inset: calc(100% + 0.25rem) 0 auto;
+  margin: 0;
+  padding: 0.25rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+  list-style: none;
+}
+
+.journal-ticker-suggestions [role="option"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.15rem 0.55rem;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.journal-ticker-suggestions [role="option"]:hover,
+.journal-ticker-suggestions [aria-selected="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.journal-ticker-suggestions span { color: var(--muted); font-size: 0.8125rem; }
+
 .journal-form input,
 .journal-form select {
   width: 100%;
@@ -225,13 +271,15 @@
 }
 
 .journal-running .metric-card,
+.journal-capital .metric-card,
 .journal-stat-grid .metric-card {
   min-width: 0;
   border: 0;
   border-radius: 0;
 }
 
-.journal-running .metric-card {
+.journal-running .metric-card,
+.journal-capital .metric-card {
   padding: 0;
   background: transparent;
 }
@@ -265,10 +313,129 @@
   overflow: hidden;
 }
 
+.journal-capital,
+.journal-realized-totals {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+}
+
+.journal-capital { border-bottom: 1px solid var(--border); }
+.journal-realized-totals { border-top: 1px solid var(--border); }
+
+.journal-capital-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) auto;
+  align-items: end;
+  gap: 0.65rem;
+}
+
+.journal-capital-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.journal-capital-form > .journal-help { grid-column: 1 / -1; }
+
+.journal-pnl-currency {
+  display: grid;
+  gap: 0.45rem;
+  padding-block: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+.journal-pnl-currency-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.65rem;
+}
+
+.journal-pnl-currency-heading h4 { font-size: 0.875rem; }
+
+.journal-pnl-values {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.journal-pnl-values dt { color: var(--muted); font-size: 0.8125rem; }
+.journal-pnl-values dd { font-size: 1.05rem; font-weight: 650; overflow-wrap: anywhere; }
+
 .journal-performance > .journal-help {
   padding: 0.7rem 1rem;
   border-top: 1px solid var(--border);
 }
+
+.journal-daily-pnl {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+}
+
+.journal-chart-currency {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.journal-chart-currency select {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--field);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.journal-pnl-plot {
+  display: grid;
+  grid-template-columns: minmax(2rem, max-content) minmax(0, 1fr);
+  grid-template-rows: clamp(9rem, 24vw, 13rem) auto;
+  gap: 0.35rem 0.65rem;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.journal-pnl-axis-y {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: right;
+  line-height: 1;
+}
+
+.journal-pnl-bars { display: block; width: 100%; height: 100%; background: var(--surface-muted); }
+.journal-pnl-gridline { stroke: var(--border); }
+.journal-pnl-baseline, .journal-pnl-flat { stroke: var(--muted); }
+.journal-pnl-flat { stroke-width: 3; }
+.journal-pnl-up { fill: var(--positive); }
+.journal-pnl-down { fill: var(--negative); }
+
+.journal-pnl-axis-x {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.journal-pnl-axis-x--single { justify-content: center; }
+
+.journal-pnl-days {
+  min-width: 0;
+  border-top: 1px solid var(--border);
+}
+
+.journal-pnl-days summary {
+  padding: 0.65rem 0 0.15rem;
+  color: var(--accent-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.journal-pnl-days table { margin-top: 0.55rem; }
+.journal-pnl-days th, .journal-pnl-days td { padding: 0.5rem 0.55rem; overflow-wrap: anywhere; }
 
 .journal-table-wrap {
   min-width: 0;
@@ -388,6 +555,11 @@
 .journal-badge--long,
 .journal-badge--short { background: var(--info-soft); color: var(--info); }
 
+@media (max-width: 49rem) {
+  .journal-capital-form { grid-template-columns: minmax(0, 1fr) minmax(0, 9rem); }
+  .journal-capital-actions { grid-column: 1 / -1; }
+}
+
 @media (max-width: 35rem) {
   .journal-form input,
   .journal-form select { font-size: 1rem; }
@@ -396,4 +568,5 @@
   .journal-ticker-field,
   .journal-setup-field { grid-column: 1 / -1; }
   .journal-running { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
+  .journal-pnl-values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

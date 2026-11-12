@@ -124,30 +124,73 @@ export function positionPnlUsd(trade, pnlPct = trade.pnlPct) {
   return trade.positionUsd * (pnlPct / 100);
 }
 
-export function summarizeProfitFactors(journal, manualCurrency) {
+export function realizedTradePnl(trade, manualCurrency) {
+  if (trade.status === 'open') return null;
+  const currency = trade.quoteCurrency ? 'USD' : manualCurrency;
+  const amount = trade.quoteCurrency ? positionPnlUsd(trade) : trade.pnl;
+  return Number.isFinite(amount) ? { currency, amount } : null;
+}
+
+function realizedDate(trade) {
+  const date = trade.exitDate ?? (trade.quoteCurrency ? null : trade.date);
+  if (!date) return null;
+  const timestamp = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === date ? date : null;
+}
+
+function addPnl(totals, amount) {
+  totals.count += 1;
+  if (amount > 0) totals.grossProfit += amount;
+  if (amount < 0) totals.grossLoss -= amount;
+}
+
+function netPnl({ grossProfit, grossLoss }) {
+  const difference = grossProfit - grossLoss;
+  // Selisih aritmetika pecahan seperti 0,1 + 0,2 − 0,3 tetap tercatat sebagai nol.
+  return Number.isFinite(difference) && Math.abs(difference) <= Number.EPSILON * Math.max(grossProfit, grossLoss)
+    ? 0
+    : difference;
+}
+
+export function summarizeRealizedPnl(journal, manualCurrency) {
   const totalsByCurrency = new Map();
   for (const trade of journal) {
-    if (trade.status === 'open') continue;
-
-    const currency = trade.quoteCurrency ? 'USD' : manualCurrency;
-    const pnl = trade.quoteCurrency ? positionPnlUsd(trade) : trade.pnl;
-    if (!Number.isFinite(pnl)) continue;
-
-    const totals = totalsByCurrency.get(currency) ?? { count: 0, grossProfit: 0, grossLoss: 0 };
-    totals.count += 1;
-    if (pnl > 0) totals.grossProfit += pnl;
-    else totals.grossLoss -= pnl;
+    const realized = realizedTradePnl(trade, manualCurrency);
+    if (!realized) continue;
+    const { currency, amount } = realized;
+    const totals = totalsByCurrency.get(currency) ?? {
+      currency, count: 0, grossProfit: 0, grossLoss: 0, undatedCount: 0, days: new Map(),
+    };
+    addPnl(totals, amount);
     totalsByCurrency.set(currency, totals);
+
+    const date = realizedDate(trade);
+    if (!date) {
+      totals.undatedCount += 1;
+      continue;
+    }
+    const day = totals.days.get(date) ?? { date, count: 0, grossProfit: 0, grossLoss: 0 };
+    addPnl(day, amount);
+    totals.days.set(date, day);
   }
 
-  return [...totalsByCurrency]
-    .map(([currency, { count, grossProfit, grossLoss }]) => {
-      const value = grossLoss > 0
+  return [...totalsByCurrency.values()]
+    .map(({ days, ...totals }) => {
+      const { grossProfit, grossLoss } = totals;
+      const profitFactor = grossLoss > 0
         ? Number((grossProfit / grossLoss).toPrecision(15))
         : (grossProfit > 0 ? Infinity : null);
-      return { currency, count, value };
+      const daily = [...days.values()]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((day) => ({ date: day.date, count: day.count, pnl: netPnl(day) }));
+      return { ...totals, netProfit: netPnl(totals), profitFactor, daily };
     })
     .sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
+export function summarizeProfitFactors(journal, manualCurrency) {
+  return summarizeRealizedPnl(journal, manualCurrency)
+    .map(({ currency, count, profitFactor: value }) => ({ currency, count, value }));
 }
 
 export function interpretProfitFactor(value) {

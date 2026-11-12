@@ -11,7 +11,9 @@ export function normalizeHistory(value) {
 }
 
 export function normalizeCapital(value) {
-  const parsed = Number(String(value ?? '').replace(/[^\d.,-]/g, '').replace(',', '.'));
+  const parsed = typeof value === 'number'
+    ? value
+    : Number(String(value ?? '').replace(/[^\d.,-]/g, '').replace(',', '.'));
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 

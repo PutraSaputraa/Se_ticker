@@ -46,6 +46,12 @@ export function formatPrice(price, currency, maxFractionDigits) {
   return `${currency} ${price.toLocaleString('id-ID', decimal)}`;
 }
 
+export function formatPnl(value, currency, precision) {
+  if (!Number.isFinite(value)) return '–';
+  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
+  return `${sign}${formatPrice(Math.abs(value), currency, precision)}`;
+}
+
 export function formatVolume(volume) {
   return volume == null ? 'Tidak tersedia' : `${volumeFormat.format(volume)} lembar`;
 }

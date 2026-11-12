@@ -1,22 +1,26 @@
 import { useRef, useState } from 'react';
 import { normalizeTicker } from '../components/SearchForm.jsx';
+import JournalDailyPnl from '../components/JournalDailyPnl.jsx';
+import JournalTickerField from '../components/JournalTickerField.jsx';
 import TableScroll from '../components/TableScroll.jsx';
 import {
   addTrade,
   calculateTradePnl,
   closeTrade,
   interpretProfitFactor,
+  journalCurrencies,
   journalRewardMultiples,
   journalSides,
   journalStatuses,
   normalizeTrade,
   positionPnlUsd,
+  realizedTradePnl,
   removeTrade,
   summarizeJournal,
-  summarizeProfitFactors,
+  summarizeRealizedPnl,
   tradeQuoteError,
 } from '../journal.js';
-import { formatPct, formatPrice, priceDecimals } from '../format.js';
+import { formatPct, formatPnl, formatPrice, priceDecimals } from '../format.js';
 import useJournalQuotes, { fetchJournalQuote } from '../useJournalQuotes.js';
 import '../styles/journal.css';
 
@@ -47,6 +51,7 @@ function emptyForm() {
   return {
     date: new Date().toLocaleDateString('sv-SE'),
     ticker: '',
+    tickerSymbol: null,
     setup: '',
     positionUsd: '',
     side: 'long',
@@ -117,10 +122,12 @@ function formatJournalPrice(value, currency, precision) {
   return Number.isFinite(value) ? formatPrice(value, currency, precision) : '–';
 }
 
-function formatPnl(value, currency, precision) {
-  if (!Number.isFinite(value)) return '–';
-  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
-  return `${sign}${formatPrice(Math.abs(value), currency, precision)}`;
+function pnlTone(value) {
+  return value > 0 ? 'trend--up' : value < 0 ? 'trend--down' : '';
+}
+
+function hasManualPnl(trades) {
+  return trades.some((trade) => trade.status !== 'open' && !trade.quoteCurrency && Number.isFinite(trade.pnl));
 }
 
 function formatProfitFactor(value) {
@@ -147,11 +154,10 @@ function valueOpenTrade(trade, quoteState) {
 
 function RunningPnlCells({ value, currency }) {
   const { quote, pnl, pnlPct, pnlUsd, message } = value;
-  const tone = pnl > 0 ? 'trend--up' : pnl < 0 ? 'trend--down' : '';
   const quoteTime = quote?.timestamp ? new Date(quote.timestamp * 1000) : null;
   return (
     <>
-      <td className={`num ${tone}`}>
+      <td className={`num ${pnlTone(pnl)}`}>
         {pnlUsd == null ? formatPnl(pnl, currency, quotePrecision(pnl, currency)) : formatPnl(pnlUsd, 'USD')}
         {quote && <small className="journal-trade-note">{pnlUsd == null ? 'Per unit · ' : ''}{formatPct(pnlPct)}</small>}
       </td>
@@ -173,12 +179,39 @@ function Badge({ meta }) {
   return <span className={`journal-badge journal-badge--${meta.className}`}>{meta.label}</span>;
 }
 
-function StatCard({ label, value, hint, tone }) {
+function StatCard({ label, value, tone }) {
   return (
     <div className={`metric-card${tone ? ` metric-card--${tone}` : ''}`}>
       <span className="metric-label">{label}</span>
       <strong className="metric-value">{value}</strong>
-      {hint && <span className="metric-hint">{hint}</span>}
+    </div>
+  );
+}
+
+function RealizedTotals({ series, closedCount }) {
+  return (
+    <div className="journal-realized-totals">
+      <h3>PnL terealisasi</h3>
+      {series.length > 0 ? (
+        series.map(({ currency, count, grossProfit, grossLoss, netProfit, profitFactor }) => (
+          <section key={currency} className="journal-pnl-currency" aria-label={`PnL terealisasi ${currency}`}>
+            <div className="journal-pnl-currency-heading">
+              <h4>{currency}</h4>
+              <span className="journal-help">{count} dari {closedCount} posisi</span>
+            </div>
+            <dl className="journal-pnl-values">
+              <div><dt>Net profit</dt><dd className={pnlTone(netProfit)}>{formatPnl(netProfit, currency)}</dd></div>
+              <div><dt>Total untung</dt><dd className={pnlTone(grossProfit)}>{formatPnl(grossProfit, currency)}</dd></div>
+              <div><dt>Total rugi</dt><dd className={pnlTone(-grossLoss)}>{formatPnl(-grossLoss, currency)}</dd></div>
+              <div>
+                <dt>Profit Factor</dt>
+                <dd>{formatProfitFactor(profitFactor)}</dd>
+                <small className="journal-trade-note">{interpretProfitFactor(profitFactor)}</small>
+              </div>
+            </dl>
+          </section>
+        ))
+      ) : <p className="journal-help">Total PnL dan Profit Factor tersedia setelah ada PnL nominal yang tercatat.</p>}
     </div>
   );
 }
@@ -214,7 +247,7 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
             <th scope="col">Posisi</th>
             {closed ? (
               <>
-                <th scope="col" className="num">PnL posisi (USD)</th>
+                <th scope="col" className="num">PnL posisi</th>
                 <th scope="col" className="num">PnL %</th>
                 <th scope="col">Status</th>
               </>
@@ -246,7 +279,7 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
           {trades.map((trade) => {
             const side = journalSides[trade.side];
             const currency = trade.quoteCurrency ?? manualCurrency;
-            const pnlTone = trade.pnl > 0 ? 'trend--up' : trade.pnl < 0 ? 'trend--down' : '';
+            const realized = closed ? realizedTradePnl(trade, manualCurrency) : null;
             const entryPrecision = trade.stopLoss != null ? levelPrecision : undefined;
             const actions = (
               <td className="num">
@@ -282,8 +315,11 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
                 <td><Badge meta={side} /></td>
                 {closed ? (
                   <>
-                    <td className={`num ${pnlTone}`}>{formatPnl(positionPnlUsd(trade), 'USD')}</td>
-                    <td className={`num ${pnlTone}`}>{trade.pnlPct == null ? '–' : formatPct(trade.pnlPct)}</td>
+                    <td className={`num ${pnlTone(realized?.amount)}`}>
+                      {realized ? formatPnl(realized.amount, realized.currency) : '–'}
+                      {realized && <small className="journal-trade-note">{realized.currency}</small>}
+                    </td>
+                    <td className={`num ${pnlTone(trade.pnlPct)}`}>{trade.pnlPct == null ? '–' : formatPct(trade.pnlPct)}</td>
                     <td>{trade.status ? <Badge meta={journalStatuses[trade.status]} /> : '–'}</td>
                   </>
                 ) : (
@@ -307,7 +343,7 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
                   <>
                     <td>{trade.exitDate ? <time dateTime={trade.exitDate}>{trade.exitDate}</time> : '–'}</td>
                     <td className="num">{formatJournalPrice(trade.exitPrice, currency)}</td>
-                    <td className={`num ${pnlTone}`}>
+                    <td className={`num ${pnlTone(trade.pnl)}`}>
                       {formatPnl(trade.pnl, currency)}
                       {trade.pnl != null && <small className="journal-trade-note">{trade.quoteCurrency ? 'Per saham' : 'Manual'}</small>}
                     </td>
@@ -326,12 +362,14 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
 export default function JournalPage({ account }) {
   const { journal, currency, capital, ready, readError } = account;
   const [form, setForm] = useState(emptyForm);
+  const [capitalDraft, setCapitalDraft] = useState(null);
   const [activeAction, setActiveAction] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const running = useRef(false);
   const disabled = !account.ready || account.pending || activeAction !== null;
   const { side, stopLossPct, rewardMultiple } = form;
   const levels = calculateLevels(form);
+  const knownTickers = [...account.history, ...account.watchlist.map(({ symbol }) => symbol), ...journal.map(({ pair }) => pair)];
 
   const openTrades = journal.filter((trade) => trade.status === 'open');
   const { quotes, refresh } = useJournalQuotes(openTrades);
@@ -343,11 +381,14 @@ export default function JournalPage({ account }) {
     .sort((a, b) => (b.exitDate ?? b.date).localeCompare(a.exitDate ?? a.date));
   const quoted = summarizeJournal(closedTrades.filter((trade) => trade.quoteCurrency), 'pnlPct');
   const manual = summarizeJournal(closedTrades.filter((trade) => !trade.quoteCurrency));
+  const wins = quoted.wins + manual.wins;
+  const losses = quoted.losses + manual.losses;
   const decided = quoted.closedTrades + manual.closedTrades;
-  const winRate = decided ? ((quoted.wins + manual.wins) / decided) * 100 : null;
+  const winRate = decided ? (wins / decided) * 100 : null;
   const manualStats = !quoted.totalTrades && manual.totalTrades > 0;
   const stats = manualStats ? manual : quoted;
-  const profitFactors = summarizeProfitFactors(journal, currency);
+  const realizedPnl = summarizeRealizedPnl(closedTrades, currency);
+  const currencyLocked = hasManualPnl(closedTrades);
 
   function statValue(value) {
     if (value == null) return '–';
@@ -356,6 +397,10 @@ export default function JournalPage({ account }) {
 
   function setField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
+  }
+
+  function setTicker(ticker, tickerSymbol = null) {
+    setForm((previous) => ({ ...previous, ticker, tickerSymbol }));
   }
 
   async function runAction(action, section, operation) {
@@ -374,12 +419,33 @@ export default function JournalPage({ account }) {
     }
   }
 
+  function handleCapital(event) {
+    event.preventDefault();
+    return runAction('capital', 'capital', async () => {
+      const amount = capitalDraft.amount.trim();
+      const nextCapital = Number(amount.replace(',', '.'));
+      const nextCurrency = capitalDraft.currency;
+      if (!/^\d+(?:[.,]\d+)?$/.test(amount) || !Number.isFinite(nextCapital)) {
+        throw new Error('Isi modal dengan angka nol atau lebih, misalnya 1000000 atau 125,50.');
+      }
+      const saved = await account.update((current) => {
+        if (nextCurrency !== current.currency && hasManualPnl(current.journal)) {
+          throw new Error('Mata uang akun digunakan oleh PnL manual.');
+        }
+        return { ...current, capital: nextCapital, currency: nextCurrency };
+      });
+      if (!saved) throw new Error('Modal gagal disimpan. Coba lagi.');
+      setCapitalDraft(null);
+      return 'Modal trading tersimpan.';
+    });
+  }
+
   function handleOpen(event) {
     event.preventDefault();
 
     return runAction(side, 'entry', async () => {
       const input = form.ticker.trim().toUpperCase();
-      const symbol = normalizeTicker(input);
+      const symbol = form.tickerSymbol ?? normalizeTicker(input);
       const fallback = symbol !== input && /^[A-Z0-9]+$/.test(input) ? input : null;
       const { setup } = form;
       if (!symbol || !setupOptions.includes(setup)) throw new Error('Isi kode ticker dan pilih setup posisi.');
@@ -486,22 +552,7 @@ export default function JournalPage({ account }) {
             <fieldset className="journal-form-group">
               <legend>Rincian posisi</legend>
               <div className="journal-form-grid">
-                <label className="journal-ticker-field">
-                  Kode ticker
-                  <input
-                    type="text"
-                    value={form.ticker}
-                    onChange={(event) => setField('ticker', event.target.value)}
-                    placeholder="BBCA, ABBV, BTC-USD"
-                    autoCapitalize="characters"
-                    autoComplete="off"
-                    spellCheck={false}
-                    maxLength={39}
-                    aria-describedby="journal-ticker-note"
-                    disabled={disabled}
-                    required
-                  />
-                </label>
+                <JournalTickerField value={form.ticker} onChange={setTicker} knownSymbols={knownTickers} disabled={disabled} />
                 <label>
                   Tanggal masuk
                   <input type="date" value={form.date} onChange={(event) => setField('date', event.target.value)} disabled={disabled} required />
@@ -646,18 +697,58 @@ export default function JournalPage({ account }) {
         </div>
         <JournalFeedback feedback={feedback} section="closed" />
         {(ready || closedTrades.length > 0) && <div className="journal-performance">
+          <div className="journal-capital">
+            <div className="journal-section-header">
+              <StatCard label={`Modal trading (${currency})`} value={formatJournalPrice(capital, currency)} />
+              {!capitalDraft && (
+                <button type="button" className="journal-secondary-button" disabled={disabled}
+                  onClick={() => {
+                    setFeedback(null);
+                    setCapitalDraft({ amount: String(capital), currency });
+                  }}>
+                  Atur modal
+                </button>
+              )}
+            </div>
+            {capitalDraft && (
+              <form className="journal-form journal-capital-form" onSubmit={handleCapital}>
+                <label>
+                  Jumlah modal
+                  <input type="text" inputMode="decimal" value={capitalDraft.amount} disabled={disabled} required
+                    onChange={(event) => setCapitalDraft({ ...capitalDraft, amount: event.target.value })} />
+                </label>
+                <label>
+                  Mata uang modal
+                  <select value={capitalDraft.currency} disabled={disabled || currencyLocked}
+                    onChange={(event) => setCapitalDraft({ ...capitalDraft, currency: event.target.value })}>
+                    {journalCurrencies.map((item) => <option key={item} value={item}>{item}</option>)}
+                  </select>
+                </label>
+                <div className="journal-capital-actions">
+                  <button type="submit" className="scan-button" disabled={disabled}>
+                    {activeAction === 'capital' ? 'Menyimpan…' : 'Simpan modal'}
+                  </button>
+                  <button type="button" className="journal-secondary-button" disabled={disabled}
+                    onClick={() => {
+                      setCapitalDraft(null);
+                      setFeedback(null);
+                    }}>
+                    Batal
+                  </button>
+                </div>
+                {currencyLocked && <p className="journal-help">Mata uang akun digunakan oleh PnL manual yang sudah tercatat.</p>}
+              </form>
+            )}
+            <JournalFeedback feedback={feedback} section="capital" />
+          </div>
           <div className="journal-stat-grid">
             <StatCard label="Jumlah posisi" value={closedTrades.length} />
+            <StatCard label="Win" value={wins} tone={wins > 0 ? 'gain' : undefined} />
+            <StatCard label="Loss" value={losses} tone={losses > 0 ? 'risk' : undefined} />
+            <StatCard label="Break-even" value={quoted.be + manual.be} />
             <StatCard label="Win rate" value={winRate == null ? '–' : `${winRate.toLocaleString('id-ID', { maximumFractionDigits: 2 })}%`} />
-            {profitFactors.length > 0 ? profitFactors.map((factor) => (
-              <StatCard
-                key={factor.currency}
-                label="Profit Factor"
-                value={formatProfitFactor(factor.value)}
-                hint={<>{interpretProfitFactor(factor.value)}<br />{factor.count} dari {closedTrades.length} posisi · PnL {factor.currency}</>}
-              />
-            )) : <StatCard label="Profit Factor" value="–" hint="Belum ada PnL posisi yang dapat dihitung" />}
           </div>
+          <RealizedTotals series={realizedPnl} closedCount={closedTrades.length} />
           <div className="journal-stat-grid journal-stat-grid--secondary">
             <StatCard label="Rata-rata untung" value={statValue(stats.avgWin)} tone="gain" />
             <StatCard label="Rata-rata rugi" value={statValue(stats.avgLoss == null ? null : -stats.avgLoss)} tone="risk" />
@@ -670,6 +761,7 @@ export default function JournalPage({ account }) {
             Profit Factor membagi total untung dengan nilai absolut total rugi.
           </p>
         </div>}
+        {(ready || closedTrades.length > 0) && <JournalDailyPnl series={realizedPnl} preferredCurrency={currency} />}
         <TradeTable
           trades={closedTrades}
           closed
