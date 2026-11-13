@@ -1,9 +1,12 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import SearchForm from '../components/SearchForm.jsx';
 import WorkspaceIcon from '../components/WorkspaceIcon.jsx';
+import { accountTickerSymbols } from '../tickers.js';
 
 export default function HomePage({ account }) {
   const { history, ready, readError } = account;
+  const [params] = useSearchParams();
+  const initialTicker = params.get('ticker') ?? '';
   return (
     <div className="search-page">
       <header className="page-heading">
@@ -12,7 +15,7 @@ export default function HomePage({ account }) {
       </header>
       <div className="search-layout">
         <section className="search-panel" aria-label="Pencarian ticker">
-          <SearchForm />
+          <SearchForm key={initialTicker} initialTicker={initialTicker} knownSymbols={accountTickerSymbols(account)} />
           <nav className="search-shortcuts" aria-label="Pintasan riset">
             <Link to="/watchlist"><WorkspaceIcon name="watch" size={17} /> Buka pantauan</Link>
             <Link to="/rekomendasi"><WorkspaceIcon name="scan" size={17} /> Cari kandidat</Link>

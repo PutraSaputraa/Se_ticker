@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import CandlestickChart from '../CandlestickChart.jsx';
 import MinerviniPanel from '../components/MinerviniPanel.jsx';
@@ -10,10 +10,12 @@ import {
   formatPrice,
   formatVolume,
 } from '../format.js';
+import { suggestTickerAlternatives } from '../tickers.js';
 import { addSymbol, removeSymbol } from '../watchlist.js';
 import '../styles/stock.css';
 
 const serviceError = 'Layanan harga tidak dapat diakses. Coba lagi.';
+const defaultRange = '3m';
 
 const breakoutStatusMeta = {
   breakout: { label: 'Sedang breakout', className: 'status--breakout' },
@@ -128,79 +130,70 @@ function FundamentalsTable({ fundamentals }) {
 }
 
 export default function StockDetailPage({ account }) {
-  const { symbol } = useParams();
-  const decoded = decodeURIComponent(symbol ?? '');
-  const [range, setRange] = useState('3m');
-  const [result, setResult] = useState({ status: 'idle' });
+  const { symbol = '' } = useParams();
+  return <StockDetail key={symbol} symbol={symbol.trim().toUpperCase()} account={account} />;
+}
+
+function StockDetail({ symbol, account }) {
+  const [range, setRange] = useState(defaultRange);
+  const [result, setResult] = useState({ status: 'loading' });
+  const [detailAttempt, setDetailAttempt] = useState(0);
   const [chartData, setChartData] = useState({ status: 'idle' });
   const [chartAttempt, setChartAttempt] = useState(0);
-  const activeSearch = useRef(null);
-  const activeChart = useRef(null);
+  const [minervini, setMinervini] = useState({ status: 'loading' });
 
   const { watchlist } = account;
   const watchlistDisabled = !account.ready || account.pending;
-  const inWatchlist = watchlist.some((entry) => entry.symbol === decoded);
+  const inWatchlist = watchlist.some((entry) => entry.symbol === symbol);
+  const quote = result.status === 'success' ? result.quote : null;
 
-  useEffect(() => () => {
-    activeSearch.current?.abort();
-    activeChart.current?.abort();
-  }, []);
-
-  // Fetch DETAIL saham — hanya saat symbol berubah (tidak tergantung range).
   useEffect(() => {
-    let cancelled = false;
     const controller = new AbortController();
-    activeSearch.current?.abort();
-    activeSearch.current = controller;
-    setResult({ status: 'loading', symbol: decoded });
+    setResult({ status: 'loading' });
 
     (async () => {
       try {
-        // Detail memakai range default; chart dimuat terpisah di bawah.
-        const params = new URLSearchParams({ symbol: decoded, range: '3m' });
+        const params = new URLSearchParams({ symbol, range: defaultRange });
         const response = await fetch(`/.netlify/functions/stock?${params}`, { signal: controller.signal });
         const payload = await response.json().catch(() => null);
-        if (cancelled || controller.signal.aborted) return;
+        if (controller.signal.aborted) return;
         if (!response.ok || !payload) {
-          setResult({ status: 'error', message: payload?.error || serviceError });
+          setResult({
+            status: 'error',
+            message: payload?.error || serviceError,
+            notFound: payload?.code === 'TICKER_NOT_FOUND',
+            retryable: response.status >= 500 || !payload,
+          });
           return;
         }
         setResult({ status: 'success', quote: payload });
         account.update((current) => ({
           ...current,
-          history: [decoded, ...current.history.filter((item) => item !== decoded)].slice(0, 5),
+          history: [symbol, ...current.history.filter((item) => item !== symbol)].slice(0, 5),
         }));
       } catch {
-        if (!cancelled && !controller.signal.aborted) {
-          setResult({ status: 'error', message: serviceError });
+        if (!controller.signal.aborted) {
+          setResult({ status: 'error', message: serviceError, retryable: true });
         }
       }
     })();
 
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [decoded]);
+  }, [symbol, detailAttempt]);
 
-  // Fetch CHART saja — setiap range berubah, tanpa menyentuh detail.
+  // Detail sudah berisi grafik untuk rentang awal.
   useEffect(() => {
-    let cancelled = false;
+    if (!quote || range === defaultRange) return;
     const controller = new AbortController();
-    activeChart.current?.abort();
-    activeChart.current = controller;
-    setChartData((previous) => ({
-      status: 'loading',
-      snapshot: previous.snapshot?.symbol === decoded ? previous.snapshot : null,
-    }));
+    setChartData((previous) => ({ ...previous, status: 'loading' }));
 
     (async () => {
       try {
-        const params = new URLSearchParams({ symbol: decoded, range });
+        const params = new URLSearchParams({ symbol, range });
         const response = await fetch(`/.netlify/functions/stock?${params}`, { signal: controller.signal });
         const payload = await response.json().catch(() => null);
-        if (cancelled || controller.signal.aborted) return;
+        if (controller.signal.aborted) return;
         if (!response.ok || !payload) {
           setChartData((previous) => ({ ...previous, status: 'error', message: payload?.error || serviceError }));
           return;
@@ -208,87 +201,98 @@ export default function StockDetailPage({ account }) {
         setChartData({
           status: 'success',
           snapshot: {
-            symbol: decoded,
             range: payload.range ?? range,
             priceHistory: payload.priceHistory,
             availableRanges: payload.availableRanges,
           },
         });
       } catch {
-        if (!cancelled && !controller.signal.aborted) {
+        if (!controller.signal.aborted) {
           setChartData((previous) => ({ ...previous, status: 'error', message: serviceError }));
         }
       }
     })();
 
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [decoded, range, chartAttempt]);
+    return () => controller.abort();
+  }, [quote, symbol, range, chartAttempt]);
 
   function toggleWatchlist() {
     account.update((current) => ({
       ...current,
       watchlist: inWatchlist
-        ? removeSymbol(current.watchlist, decoded)
-        : addSymbol(current.watchlist, decoded),
+        ? removeSymbol(current.watchlist, symbol)
+        : addSymbol(current.watchlist, symbol),
     }));
   }
 
-  // Analisis Minervini terpisah (Trend Template, VCP, Pivot, RS) — endpoint analyze.js.
-  const [minervini, setMinervini] = useState({ status: 'idle' });
   useEffect(() => {
-    let cancelled = false;
-    setMinervini({ status: 'loading' });
+    if (!quote) return;
+    const controller = new AbortController();
     (async () => {
       try {
-        const response = await fetch(`/.netlify/functions/analyze?${new URLSearchParams({ symbol: decoded, rs: 'false' })}`);
+        const params = new URLSearchParams({ symbol, rs: 'false' });
+        const response = await fetch(`/.netlify/functions/analyze?${params}`, { signal: controller.signal });
         const payload = await response.json().catch(() => null);
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         if (!response.ok || !payload) {
           setMinervini({ status: 'error', message: payload?.error });
           return;
         }
         setMinervini({ status: 'success', data: payload });
       } catch {
-        if (!cancelled) setMinervini({ status: 'error' });
+        if (!controller.signal.aborted) setMinervini({ status: 'error' });
       }
     })();
-    return () => { cancelled = true; };
-  }, [decoded]);
+    return () => controller.abort();
+  }, [quote, symbol]);
 
-  const quote = result.status === 'success' ? result.quote : null;
   const currency = quote?.currency;
   const trend = quote ? trends[Math.sign(quote.close - quote.open)] : null;
   const changeFromOpen = quote?.open > 0 ? (quote.close / quote.open - 1) * 100 : null;
   const analysis = quote?.analysis ?? {};
   const buyTrigger = quote?.buyTrigger ?? {};
-  const chartSnapshot = chartData.snapshot?.symbol === decoded ? chartData.snapshot : null;
+  const chartSnapshot = range === defaultRange ? null : chartData.snapshot;
+  const alternatives = result.notFound ? suggestTickerAlternatives(symbol) : [];
+  const searchUrl = result.status === 'error' ? `/?${new URLSearchParams({ ticker: symbol })}` : '/';
 
   return (
     <div className="stock-detail">
       <nav className="stock-breadcrumb" aria-label="Jalur halaman">
-        <Link to="/">← Cari saham</Link>
+        <Link to={searchUrl}>← Cari saham</Link>
       </nav>
 
       {result.status === 'loading' && (
         <div className="status-card" role="status">
           <span className="spinner" aria-hidden="true" />
           <div>
-            <p className="status-title">Memuat {decoded}…</p>
+            <p className="status-title">Memuat {symbol}…</p>
             <p>Mengambil data detail dari Yahoo Finance.</p>
           </div>
         </div>
       )}
 
       {result.status === 'error' && (
-        <div className="status-card status-card--error" role="alert">
+        <div className="status-card status-card--error">
           <span className="status-mark" aria-hidden="true">!</span>
           <div>
-            <p className="status-title">Gagal memuat</p>
-            <p>{result.message}</p>
+            <div role="alert">
+              <p className="status-title">Gagal memuat</p>
+              <p>{result.message}</p>
+            </div>
+            {alternatives.length > 0 && (
+              <ul className="stock-ticker-alternatives" aria-label="Ticker serupa">
+                {alternatives.map(({ symbol: candidate, market }) => (
+                  <li key={candidate}>
+                    <Link to={`/stock/${encodeURIComponent(candidate)}`}>{candidate} · {market}</Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {result.retryable && (
+              <button className="text-button" type="button" onClick={() => setDetailAttempt((attempt) => attempt + 1)}>
+                Coba lagi
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -363,12 +367,12 @@ export default function StockDetailPage({ account }) {
             formatPrice={(price) => formatPrice(price, currency)}
             formatDate={formatDate}
             formatVolume={formatVolume}
-            timeframe={chartSnapshot?.range ?? quote.range ?? '3m'}
+            timeframe={chartSnapshot?.range ?? quote.range ?? defaultRange}
             selectedRange={range}
             onTimeframeChange={setRange}
             ranges={chartSnapshot?.availableRanges ?? quote.availableRanges}
-            loading={chartData.status === 'loading'}
-            error={chartData.status === 'error' ? chartData.message : null}
+            loading={range !== defaultRange && chartData.status === 'loading'}
+            error={range !== defaultRange && chartData.status === 'error' ? chartData.message : null}
             onRetry={() => setChartAttempt((attempt) => attempt + 1)}
           />
 
@@ -386,7 +390,6 @@ export default function StockDetailPage({ account }) {
 
           {minervini.status === 'success' && (
             <MinerviniPanel
-              key={decoded}
               analysis={{ ...minervini.data, close: quote.close, stop: analysis.stop }}
               currency={currency}
             />

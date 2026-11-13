@@ -189,47 +189,11 @@
 }
 
 .journal-ticker-field {
-  position: relative;
   display: grid;
   align-self: start;
   gap: 0.35rem;
   min-width: 0;
 }
-
-.journal-ticker-suggestions {
-  position: absolute;
-  z-index: 4;
-  inset: calc(100% + 0.25rem) 0 auto;
-  margin: 0;
-  padding: 0.25rem;
-  border: 1px solid var(--field-border);
-  border-radius: var(--field-radius);
-  background: var(--surface);
-  box-shadow: var(--shadow-raised);
-  list-style: none;
-}
-
-.journal-ticker-suggestions [role="option"] {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.15rem 0.55rem;
-  min-height: 2.35rem;
-  padding: 0.4rem 0.55rem;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
-}
-
-.journal-ticker-suggestions [role="option"]:hover,
-.journal-ticker-suggestions [aria-selected="true"] {
-  background: var(--accent-soft);
-  color: var(--accent-text);
-}
-
-.journal-ticker-suggestions span { color: var(--muted); font-size: 0.8125rem; }
 
 .journal-form input,
 .journal-form select {

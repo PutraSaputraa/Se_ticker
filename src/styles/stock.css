@@ -17,6 +17,21 @@
 
 .stock-breadcrumb a:hover { text-decoration: underline; }
 
+.stock-ticker-alternatives {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stock-ticker-alternatives a {
+  color: var(--accent-text);
+  font-weight: 600;
+  text-underline-offset: 0.16em;
+}
+
 .stock-detail-card {
   min-width: 0;
   border: 1px solid var(--border);

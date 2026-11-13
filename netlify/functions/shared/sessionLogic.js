@@ -41,7 +41,10 @@ export function latestCompletedIndex(sessions, meta, marketDate) {
     && lastTrade >= regularEnd
     && marketDate.format(regularEnd * 1000) === today;
 
-  return sessions.findLastIndex(({ date }) => date < today || (todayClosed && date === today));
+  // Yahoo bisa mengirim bar sesi yang sudah tutup sebelum semua harga tersedia.
+  return sessions.findLastIndex(({ date, open, high, low, close }) =>
+    (date < today || (todayClosed && date === today))
+    && [open, high, low, close].every(Number.isFinite));
 }
 
 export function calculateBuyTrigger(sessions, index) {

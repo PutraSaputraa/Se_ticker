@@ -1,6 +1,5 @@
 import {
   calculateBuyTrigger,
-  dayMilliseconds,
   latestCompletedIndex,
   readSessions,
 } from './shared/sessionLogic.js';
@@ -10,17 +9,17 @@ const symbolPattern = /^\^?[A-Z0-9]+(?:[.=-][A-Z0-9]+)*$/;
 
 // Range grafik yang bisa dipilih user: jumlah sesi ke belakang + interval Yahoo.
 const chartRanges = {
-  '1m': { lookback: 22, interval: '1d', range: '3mo', label: '1 bulan' },
-  '2m': { lookback: 44, interval: '1d', range: '6mo', label: '2 bulan' },
-  '3m': { lookback: 66, interval: '1d', range: '6mo', label: '3 bulan' },
-  '6m': { lookback: 130, interval: '1d', range: '1y', label: '6 bulan' },
+  '1m': { lookback: 22, interval: '1d', label: '1 bulan' },
+  '2m': { lookback: 44, interval: '1d', label: '2 bulan' },
+  '3m': { lookback: 66, interval: '1d', label: '3 bulan' },
+  '6m': { lookback: 130, interval: '1d', label: '6 bulan' },
   '1y': { lookback: 52, interval: '1wk', range: '2y', label: '1 tahun' },
   '2y': { lookback: 104, interval: '1wk', range: '5y', label: '2 tahun' },
 };
 const defaultRangeKey = '3m';
 
-function errorResponse(error, status) {
-  return Response.json({ error }, { status });
+function errorResponse(error, status, code) {
+  return Response.json({ error, code }, { status });
 }
 
 // Ambil sesi harian penuh (untuk analisis trigger, resistance, volume).
@@ -146,7 +145,8 @@ export default async function stock(request) {
 
   const params = new URL(request.url).searchParams;
   const symbol = params.get('symbol')?.trim().toUpperCase() ?? '';
-  const rangeKey = chartRanges[params.get('range')] ? params.get('range') : defaultRangeKey;
+  const requestedRange = params.get('range');
+  const rangeKey = Object.hasOwn(chartRanges, requestedRange) ? requestedRange : defaultRangeKey;
   const rangeCfg = chartRanges[rangeKey];
 
   if (symbol.length > 32 || !symbolPattern.test(symbol)) {
@@ -159,16 +159,13 @@ export default async function stock(request) {
   try {
     // Sesi harian 1 tahun untuk analisis trigger + resistance + volume.
     const daily = await fetchSessions(symbol, '1y', '1d');
-    if (daily.notFound) return errorResponse(notFound, 404);
+    if (daily.notFound) return errorResponse(notFound, 404, 'TICKER_NOT_FOUND');
     if (daily.failed) return errorResponse('Yahoo Finance gagal menyediakan data. Coba lagi nanti.', 502);
     if (daily.noData) return errorResponse(noData, 404);
 
     const { result, sessions, index } = daily;
     const meta = result.meta;
     const session = sessions[index];
-    if (![session.open, session.high, session.low, session.close].every(Number.isFinite)) {
-      return errorResponse(noData, 404);
-    }
     if (typeof meta?.currency !== 'string' || !meta.currency.trim()) {
       return errorResponse('Yahoo Finance tidak memberikan mata uang untuk ticker ini.', 502);
     }
@@ -177,15 +174,16 @@ export default async function stock(request) {
     const base = analyzeBaseBreakout(sessions, index);
     const analysis = buildAnalysis(sessions, index, buyTrigger, base);
 
-    // Riwayat grafik sesuai range yang diminta (bisa beda interval dgn analisis).
+    // Grafik harian memakai data acuan yang sama. Grafik mingguan perlu data terpisah.
     let chartSessions = sessions;
     let chartIndex = index;
-    if (rangeCfg.interval !== '1d' || rangeCfg.range !== '1y') {
+    if (rangeCfg.interval !== '1d') {
       const chartData = await fetchSessions(symbol, rangeCfg.range, rangeCfg.interval);
-      if (chartData.sessions) {
-        chartSessions = chartData.sessions;
-        chartIndex = chartData.index;
+      if (!chartData.sessions) {
+        return errorResponse(`Riwayat harga mingguan untuk ${symbol} belum tersedia.`, chartData.failed ? 502 : 404);
       }
+      chartSessions = chartData.sessions;
+      chartIndex = chartData.index;
     }
     const priceHistory = chartSessions
       .slice(Math.max(0, chartIndex + 1 - rangeCfg.lookback), chartIndex + 1)

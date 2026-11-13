@@ -432,10 +432,45 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; opacity:
   font-weight: 600;
 }
 
-.input-wrap { position: relative; }
-.input-wrap svg { position: absolute; inset: 50% auto auto 0.65rem; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
-.input-wrap #ticker { padding-inline-start: 2.25rem; }
+.ticker-input { position: relative; }
+.ticker-input--icon svg { position: absolute; inset: 50% auto auto 0.65rem; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.ticker-input--icon input { padding-inline-start: 2.25rem; }
 .ticker-row .check-button { min-height: 2.65rem; white-space: nowrap; }
+
+.ticker-suggestions {
+  position: absolute;
+  z-index: 4;
+  inset: calc(100% + 0.25rem) 0 auto;
+  margin: 0;
+  padding: 0.25rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+  list-style: none;
+}
+
+.ticker-suggestions [role="option"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.15rem 0.55rem;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.ticker-suggestions [role="option"]:hover,
+.ticker-suggestions [aria-selected="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.ticker-suggestions span { color: var(--muted); font-size: 0.8125rem; }
 
 .ticker-examples { margin-block-start: 1.25rem; }
 .ticker-examples p { font-size: 0.87rem; color: var(--muted); }

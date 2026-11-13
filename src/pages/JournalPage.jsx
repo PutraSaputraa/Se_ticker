@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
-import { normalizeTicker } from '../components/SearchForm.jsx';
 import JournalCharts from '../components/JournalCharts.jsx';
-import JournalTickerField from '../components/JournalTickerField.jsx';
+import TickerField from '../components/TickerField.jsx';
 import JournalWallet from '../components/JournalWallet.jsx';
 import TableScroll from '../components/TableScroll.jsx';
+import { accountTickerSymbols, normalizeTicker } from '../tickers.js';
 import {
   calculateTradePnl,
   interpretProfitFactor,
@@ -369,7 +369,7 @@ export default function JournalPage({ account }) {
   const { side, stopLossPct, rewardMultiple } = form;
   const levels = calculateLevels(form);
   const wallet = useMemo(() => summarizeWallet(account.wallet), [account.wallet]);
-  const knownTickers = [...account.history, ...account.watchlist.map(({ symbol }) => symbol), ...journal.map(({ pair }) => pair)];
+  const knownTickers = accountTickerSymbols(account);
 
   const openTrades = journal.filter((trade) => trade.status === 'open');
   const { quotes, refresh } = useJournalQuotes(openTrades);
@@ -569,7 +569,17 @@ export default function JournalPage({ account }) {
             <fieldset className="journal-form-group">
               <legend>Rincian posisi</legend>
               <div className="journal-form-grid">
-                <JournalTickerField value={form.ticker} onChange={setTicker} knownSymbols={knownTickers} disabled={disabled} />
+                <TickerField
+                  className="journal-ticker-field"
+                  placeholder="BBCA, NVDA, BTC-USD"
+                  describedBy="journal-ticker-note"
+                  value={form.ticker}
+                  onChange={setTicker}
+                  onSelect={(symbol) => setTicker(symbol, symbol)}
+                  knownSymbols={knownTickers}
+                  maxLength={39}
+                  disabled={disabled}
+                />
                 <label>
                   Tanggal masuk
                   <input type="date" value={form.date} onChange={(event) => setField('date', event.target.value)} disabled={disabled} required />
