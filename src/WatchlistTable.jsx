@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
-import { formatDateCompact } from './format.js';
+import { formatDateCompact, formatVolume } from './format.js';
 
 // Skor Trend Template Minervini per simbol (analyze.js tanpa RS agar cepat).
 function useTrendScores(symbolsKey) {
@@ -219,7 +219,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
       <tr>
         <th scope="row"><TickerLink symbol={symbol} /></th>
         <td><TrendScoreBadge score={trendScore} /></td>
-        <td colSpan={6} className={row?.status === 'error' ? 'research-quote-error' : 'research-cell-note'}>
+        <td colSpan={5} className={row?.status === 'error' ? 'research-quote-error' : 'research-cell-note'}>
           {row?.status === 'error' ? row.message : 'Memuat harga dan volume…'}
         </td>
         <td className="num">{removeButton}</td>
@@ -246,8 +246,6 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
         {formatPrice(quote.close, quote.currency)}
         {quote.date && <time className="research-cell-note" dateTime={quote.date}>{formatDateCompact(quote.date)}</time>}
       </td>
-      <td className="num">{formatPrice(quote.buyTrigger?.level, quote.currency)}</td>
-      <td className="num">{formatPrice(quote.buyTrigger?.sellLevel, quote.currency)}</td>
       <td className="num">
         <PriceToWatchInput
           symbol={symbol}
@@ -261,6 +259,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
         {Number.isFinite(quote.volume) ? quote.volume.toLocaleString('id-ID') : 'Belum tersedia'}
         <CheckBadgeMini passed={volumePass} />
       </td>
+      <td className="num">{formatVolume(quote.buyTrigger?.averageVolume)}</td>
       <td><BreakoutBadge state={breakout.state} /></td>
       <td className="num">{removeButton}</td>
     </tr>
@@ -290,10 +289,11 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
             <th scope="col">Saham</th>
             <th scope="col" title="Jumlah kriteria Trend Template Minervini yang lolos">Stage 2</th>
             <th scope="col" className="num">Harga tutup</th>
-            <th scope="col" className="num">Buy trigger</th>
-            <th scope="col" className="num">Sell trigger</th>
             <th scope="col" className="num">Harga pantauan</th>
             <th scope="col" className="num">Volume (lembar)</th>
+            <th scope="col" className="num" title="Rata-rata volume yang dipakai untuk menghitung ambang breakout">
+              Rata-rata volume 50 sesi
+            </th>
             <th scope="col">Status</th>
             <th scope="col" className="num">Aksi</th>
           </tr>

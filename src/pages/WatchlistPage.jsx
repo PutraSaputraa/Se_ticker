@@ -21,7 +21,7 @@ export default function WatchlistPage({ account }) {
       <header className="page-heading research-heading">
         <div>
           <h1>Pantauan saham</h1>
-          <p>Bandingkan harga penutupan, level trigger, dan kriteria Stage 2.</p>
+          <p>Bandingkan harga penutupan, volume, dan kriteria Stage 2.</p>
         </div>
         <Link className="scan-button" to="/">Cari saham</Link>
       </header>
