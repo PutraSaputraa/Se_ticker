@@ -1,0 +1,17 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{uid}/journal/{tradeId}/chart {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      allow get, delete: if isOwner();
+      allow create: if isOwner()
+        && request.resource.size > 0
+        && request.resource.size <= 5000000
+        && request.resource.contentType in ['image/png', 'image/jpeg', 'image/webp'];
+    }
+  }
+}

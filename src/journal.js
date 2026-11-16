@@ -58,6 +58,7 @@ export function normalizeTrade(entry) {
     pnlPct: status === 'open' ? null : num(entry.pnlPct),
     status,
     notes: typeof entry.notes === 'string' ? entry.notes.trim() : '',
+    ...(entry.chartScreenshot === true && { chartScreenshot: true }),
     ...(hasPrice && {
       entryPrice,
       ...(stopLoss > 0 && { stopLoss }),

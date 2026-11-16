@@ -247,6 +247,90 @@
   border-color: var(--border);
 }
 
+.journal-screenshot-field {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 24rem;
+  margin-top: 0.9rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface-muted);
+}
+
+.journal-screenshot-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.125rem 0.5rem 0.125rem 0.125rem;
+  border: 1px solid var(--field-border);
+  border-radius: 0.5rem;
+  background: var(--field);
+  font-size: 0.875rem;
+}
+
+.journal-screenshot-picker:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.journal-screenshot-picker:has(input:disabled) { opacity: 0.64; }
+.journal-screenshot-picker .journal-secondary-button { flex: none; }
+.journal-screenshot-filename {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journal-form .journal-screenshot-picker input {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  opacity: 0;
+}
+
+.journal-screenshot-picker input:enabled { cursor: pointer; }
+
+.journal-screenshot-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 10rem;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.text-button.journal-screenshot-button {
+  justify-self: start;
+  min-height: 2.75rem;
+  color: var(--workspace-action);
+  font-size: 0.875rem;
+  text-align: start;
+}
+
+.journal-screenshot-dialog {
+  width: min(66rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: var(--workspace-card-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--workspace-card-radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.journal-screenshot-dialog::backdrop { background: rgb(16 24 40 / 0.65); }
+.journal-screenshot-dialog .journal-section-header { flex-wrap: nowrap; }
+.journal-screenshot-dialog h2 { font-size: 1.125rem; overflow-wrap: anywhere; }
+.journal-screenshot-dialog > :not(:first-child) { margin-top: 0.875rem; }
+.journal-screenshot-dialog img {
+  display: block;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
 .journal-ticker-field .ticker-suggestions {
   border-color: var(--border);
   border-radius: 0.5rem;

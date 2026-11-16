@@ -35,15 +35,23 @@ Watchlist dan lima pencarian terakhir disinkronkan antarperangkat melalui listen
 
 Jika browser memiliki data dari versi sebelumnya, tombol **Impor ke akun** memindahkan watchlist dan riwayat lokal ke akun yang sedang masuk. Impor mempertahankan harga pantauan yang sudah tersimpan di akun dan bisa diulang dengan aman. Data lokal lama dibersihkan setelah transaksi berhasil.
 
+### Screenshot chart Jurnal
+
+Setiap posisi bisa memiliki satu screenshot dalam format PNG, JPG, atau WebP hingga 5 MB. File disimpan di Cloud Storage pada `users/{uid}/journal/{tradeId}/chart`. Firestore menyimpan penanda lampiran pada posisi. Aturan Storage membatasi akses ke pemilik akun.
+
+Untuk mengaktifkan unggahan, siapkan bucket Cloud Storage for Firebase pada paket Blaze dan isi `VITE_FIREBASE_STORAGE_BUCKET` dengan nama bucket dari Firebase Console. Publikasikan `storage.rules` lewat tab **Storage → Rules** atau jalankan `npx firebase-tools deploy --only storage --project seticker` untuk bucket default.
+
+Tambahkan origin aplikasi ke konfigurasi CORS bucket agar browser bisa membuka lampiran dengan sesi Firebase. Contoh konfigurasi untuk produksi memakai `[{"origin":["https://seticker.netlify.app"],"method":["GET"],"maxAgeSeconds":3600}]`. [Konfigurasi CORS Cloud Storage](https://cloud.google.com/storage/docs/using-cors)
+
 ## Pengujian Firebase lokal
 
 Gunakan Java 21 atau lebih baru dan Firebase Emulator Suite.
 
 ```sh
-npx firebase-tools emulators:exec --only auth,firestore --project demo-seticker "node --test tests/firebase.test.js"
+npx firebase-tools emulators:exec --only auth,firestore,storage --project demo-seticker "node --test tests/firebase.test.js"
 ```
 
-Pengujian mencakup isolasi akun, penolakan akses tamu, validasi dokumen, perubahan serentak, impor data lama, dan login ulang. Untuk mencoba tampilan, jalankan emulator dengan `emulators:start`, lalu tambahkan `VITE_FIREBASE_USE_EMULATORS=true` ke `.env.local` dan jalankan Vite. Mode emulator hanya aktif pada development dan menggunakan proyek `demo-seticker`.
+Pengujian mencakup isolasi akun, penolakan akses tamu, validasi dokumen dan lampiran, perubahan serentak, impor data lama, dan login ulang. Untuk mencoba tampilan, jalankan emulator dengan `emulators:start --only auth,firestore,storage --project demo-seticker`, lalu tambahkan `VITE_FIREBASE_USE_EMULATORS=true` ke `.env.local` dan jalankan Vite. Mode emulator hanya aktif pada development dan menggunakan proyek `demo-seticker`.
 
 ## Build dan deploy
 
@@ -58,7 +66,7 @@ git remote add origin https://github.com/akun-kamu/cek-saham.git
 git push -u origin main
 ```
 
-Impor repo GitHub di Netlify, pilih branch `main`, lalu jalankan deploy. Netlify membaca perintah build, direktori `dist`, dan direktori Functions dari `netlify.toml`. Isi keempat variabel `VITE_FIREBASE_*` dari `.env.example` pada environment Netlify sebelum build. Tambahkan domain aplikasi di **Authentication → Settings → Authorized domains**. Konfigurasi Vite dimasukkan saat build, sehingga perubahan variabel memerlukan deploy ulang.
+Impor repo GitHub di Netlify, pilih branch `main`, lalu jalankan deploy. Netlify membaca perintah build, direktori `dist`, dan direktori Functions dari `netlify.toml`. Isi variabel login `VITE_FIREBASE_*` dari `.env.example` pada environment Netlify sebelum build. Untuk lampiran Jurnal, isi juga `VITE_FIREBASE_STORAGE_BUCKET`. Tambahkan domain aplikasi di **Authentication → Settings → Authorized domains**. Konfigurasi Vite dimasukkan saat build, sehingga perubahan variabel memerlukan deploy ulang.
 
 ## Cara kerja
 

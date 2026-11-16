@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import JournalCharts from '../components/JournalCharts.jsx';
+import { JournalScreenshotDialog, JournalScreenshotField } from '../components/JournalScreenshot.jsx';
 import TickerField from '../components/TickerField.jsx';
 import JournalWallet from '../components/JournalWallet.jsx';
 import TableScroll from '../components/TableScroll.jsx';
@@ -20,6 +21,7 @@ import {
   tradeQuoteError,
 } from '../journal.js';
 import { formatPct, formatPnl, formatPrice, priceDecimals } from '../format.js';
+import { deleteJournalScreenshot, uploadJournalScreenshot } from '../journalScreenshot.js';
 import useJournalQuotes, { fetchJournalInstrument, fetchJournalQuote } from '../useJournalQuotes.js';
 import { closeWalletPosition, openWalletPosition, parseWalletUsd, recordWalletCash, removeWalletPosition, summarizeWallet } from '../wallet.js';
 import '../styles/journal.css';
@@ -54,6 +56,7 @@ function emptyForm() {
     tickerSymbol: null,
     setup: '',
     notes: '',
+    screenshot: null,
     positionUsd: '',
     side: 'long',
     type: 'spot',
@@ -227,7 +230,9 @@ function JournalFeedback({ feedback, section }) {
   );
 }
 
-function TradeTable({ trades, closed = false, manualCurrency, runningValues, ready, readError, disabled, activeAction, onClose, onRemove }) {
+function TradeTable({
+  trades, closed = false, manualCurrency, runningValues, ready, readError, disabled, activeAction, onClose, onRemove, onViewScreenshot,
+}) {
   if (trades.length === 0) {
     return (
       <p className="journal-empty" role="status">
@@ -303,7 +308,7 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
                     disabled={disabled}
                     title="Hapus posisi"
                     aria-label={`Hapus posisi ${trade.pair}`}
-                    onClick={() => onRemove(trade.id)}
+                    onClick={() => onRemove(trade)}
                   >
                     {activeAction === `remove:${trade.id}` ? '…' : '×'}
                   </button>
@@ -337,6 +342,12 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
                   {trade.setup || '–'}
                   {trade.riskPct != null && <small className="journal-trade-note">Risiko {trade.riskPct}%</small>}
                   {trade.notes && <small className="journal-trade-note journal-position-notes">{trade.notes}</small>}
+                  {trade.chartScreenshot && (
+                    <button type="button" className="text-button journal-screenshot-button"
+                      aria-label={`Lihat screenshot chart ${trade.pair}`} onClick={() => onViewScreenshot(trade)}>
+                      Lihat screenshot
+                    </button>
+                  )}
                 </td>
                 <td><time dateTime={trade.date}>{trade.date}</time></td>
                 <td className="num">{formatJournalPrice(trade.entryPrice, currency, entryPrecision)}</td>
@@ -364,12 +375,13 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
   );
 }
 
-export default function JournalPage({ account }) {
+export default function JournalPage({ account, uid }) {
   const { journal, currency, capital, ready, readError } = account;
   const [form, setForm] = useState(emptyForm);
   const [capitalDraft, setCapitalDraft] = useState(null);
   const [activeAction, setActiveAction] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const [viewingScreenshot, setViewingScreenshot] = useState(null);
   const running = useRef(false);
   const disabled = !account.ready || account.pending || activeAction !== null;
   const { side, type, stopLossPct, rewardMultiple } = form;
@@ -466,7 +478,7 @@ export default function JournalPage({ account }) {
       const input = form.ticker.trim().toUpperCase();
       const symbol = form.tickerSymbol ?? normalizeTicker(input);
       const fallback = symbol !== input && /^[A-Z0-9]+$/.test(input) ? input : null;
-      const { setup, notes } = form;
+      const { setup, notes, screenshot } = form;
       if (!symbol || !setupOptions.includes(setup)) throw new Error('Isi kode ticker dan pilih setup posisi.');
 
       const positionCents = parseWalletUsd(form.positionUsd);
@@ -512,6 +524,7 @@ export default function JournalPage({ account }) {
         ...(futures && { entryTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
         setup,
         notes,
+        chartScreenshot: Boolean(screenshot),
         positionUsd,
         status: 'open',
         entryPrice,
@@ -521,7 +534,20 @@ export default function JournalPage({ account }) {
         quoteCurrency: reference.currency,
       });
       const at = Date.now();
-      const saved = await account.update((current) => openWalletPosition(current, trade, at));
+      let saved;
+      try {
+        if (screenshot) await uploadJournalScreenshot(uid, trade.id, screenshot);
+        saved = await account.update((current) => openWalletPosition(current, trade, at));
+      } catch (error) {
+        if (screenshot) await deleteJournalScreenshot(uid, trade.id);
+        throw error;
+      }
+      if (!saved && screenshot) {
+        // Pastikan hasil di server sebelum menghapus file ketika Firestore gagal mengonfirmasi simpan.
+        const recorded = await account.hasJournalTrade(trade.id).catch(() => null);
+        if (recorded === false) await deleteJournalScreenshot(uid, trade.id);
+        saved = recorded === true;
+      }
       if (!saved) throw new Error('Posisi gagal disimpan. Coba lagi.');
       setForm(emptyForm());
       return `Posisi ${trade.pair} tersimpan.`;
@@ -538,14 +564,18 @@ export default function JournalPage({ account }) {
     });
   }
 
-  function handleRemove(id, section) {
+  function handleRemove({ id, chartScreenshot }, section) {
     return runAction(`remove:${id}`, section, async () => {
       const at = Date.now();
       const saved = await account.update((current) => removeWalletPosition(current, id, at));
       if (!saved) throw new Error('Posisi gagal dihapus. Coba lagi.');
-      return section === 'open' && wallet.positions.has(id)
+      const message = section === 'open' && wallet.positions.has(id)
         ? 'Posisi dibatalkan dan dana dikembalikan ke wallet.'
         : 'Posisi dihapus dari jurnal.';
+      if (chartScreenshot && !await deleteJournalScreenshot(uid, id)) {
+        throw new Error(`${message} Screenshot chart gagal dihapus.`);
+      }
+      return message;
     });
   }
 
@@ -701,6 +731,10 @@ export default function JournalPage({ account }) {
                 Stop loss otomatis dihitung dari harga masuk. Pilih rasio untuk menghitung take profit.
                 Gunakan mata uang ticker. Tulis desimal dengan titik atau koma tanpa pemisah ribuan.
               </p>
+              <JournalScreenshotField file={form.screenshot} disabled={disabled} onChange={(file) => {
+                setField('screenshot', file);
+                setFeedback((current) => current?.section === 'entry' ? null : current);
+              }} />
             </fieldset>
           </div>
           <div className="journal-actions">
@@ -749,7 +783,8 @@ export default function JournalPage({ account }) {
           disabled={disabled}
           activeAction={activeAction}
           onClose={handleClose}
-          onRemove={(id) => handleRemove(id, 'open')}
+          onRemove={(trade) => handleRemove(trade, 'open')}
+          onViewScreenshot={setViewingScreenshot}
         />
       </section>
 
@@ -835,9 +870,13 @@ export default function JournalPage({ account }) {
           readError={readError}
           disabled={disabled}
           activeAction={activeAction}
-          onRemove={(id) => handleRemove(id, 'closed')}
+          onRemove={(trade) => handleRemove(trade, 'closed')}
+          onViewScreenshot={setViewingScreenshot}
         />
       </section>
+      {viewingScreenshot && (
+        <JournalScreenshotDialog uid={uid} trade={viewingScreenshot} onClose={() => setViewingScreenshot(null)} />
+      )}
     </div>
   );
 }

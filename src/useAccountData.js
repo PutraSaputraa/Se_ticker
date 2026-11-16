@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { connectFirestoreEmulator, doc, getFirestore, onSnapshot } from 'firebase/firestore';
+import { connectFirestoreEmulator, doc, getDocFromServer, getFirestore, onSnapshot } from 'firebase/firestore';
 import { app, auth, useEmulators } from './firebase.js';
 import { AccountChangeError, normalizeAccountData, updateAccountData } from './accountData.js';
 
@@ -57,6 +57,11 @@ export default function useAccountData(uid) {
     }
   }
 
+  async function hasJournalTrade(id) {
+    const snapshot = await getDocFromServer(doc(db, 'users', uid));
+    return normalizeAccountData(snapshot.data()).journal.some((trade) => trade.id === id);
+  }
+
   return {
     ...data,
     ready,
@@ -65,5 +70,6 @@ export default function useAccountData(uid) {
     readError,
     retry: () => setAttempt((value) => value + 1),
     update,
+    hasJournalTrade,
   };
 }
