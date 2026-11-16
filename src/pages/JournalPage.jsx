@@ -704,7 +704,9 @@ export default function JournalPage({ account, uid }) {
                   <select value={stopLossPct} onChange={(event) => setField('stopLossPct', event.target.value)} aria-describedby="journal-level-note" disabled={disabled}>
                     <option value="">Isi sendiri</option>
                     <option value="5">5% otomatis</option>
+                    <option value="6">6% otomatis</option>
                     <option value="7">7% otomatis</option>
+                    <option value="8">8% otomatis</option>
                   </select>
                 </label>
                 <PriceField
