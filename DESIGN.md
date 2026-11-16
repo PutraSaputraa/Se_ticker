@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: Cek Saham
-description: Workspace riset untuk mencari kandidat, membandingkan saham, membaca level trading, dan menguji strategi.
+description: Workspace riset untuk mencari kandidat, membandingkan saham, membaca level trading, menguji strategi, dan mencatat posisi.
 colors:
   canvas: "#f3f6f8"
   surface: "#ffffff"
@@ -87,7 +87,7 @@ components:
 
 # Cek Saham
 
-Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, dan garis pemisah tipis dari analisis desain Coinbase. Detail saham, Pantauan saham, Rekomendasi, dan Uji strategi memakai sistem ini. Gunakan nama dan simbol instrumen, tanggal sesi, grafik, dan angka untuk membangun hierarki halaman.
+Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, dan garis pemisah tipis dari analisis desain Coinbase. Detail saham, Pantauan saham, Rekomendasi, Uji strategi, dan Jurnal memakai sistem ini. Gunakan nama dan simbol instrumen, tanggal sesi, grafik, dan angka untuk membangun hierarki halaman.
 
 ## Warna dan tipografi
 
@@ -123,6 +123,13 @@ Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, 
 2. Mulai ringkasan dari return simulasi dan drawdown maksimum, diikuti win rate, jumlah transaksi, dan expectancy. Letakkan asumsi eksekusi dalam bagian tersendiri di bawah metrik. Jika sampel kosong, tampilkan pesan yang membantu pengguna memilih sampel lain.
 3. Letakkan ringkasan dan kurva ekuitas berdampingan jika ruang cukup. Di HP, susun ringkasan sebelum kurva dan gunakan dua kolom untuk metrik. Tandai basis 100 pada grafik agar perubahan ekuitas mudah dibandingkan.
 4. Tampilkan saham dan return di awal tabel performa dan transaksi. Pertahankan kolom ticker saat tabel digeser di HP. Gunakan tanggal ringkas dengan tahun untuk transaksi lintas tahun.
+
+## Jurnal
+
+1. Sediakan tautan ke Wallet, Catat posisi, Posisi terbuka, dan Posisi ditutup di dekat judul. Utamakan saldo tersedia di Wallet dan tempatkan aksi tambah dan tarik saldo dekat input jumlah.
+2. Susun **Rincian posisi** dan **Rencana keluar** berdampingan saat ruang cukup. Letakkan **Type** di samping **Posisi**. Tempatkan **Notes** di samping **Setup** pada desktop dan di bawah **Setup** pada HP. Tampilkan umpan balik di dekat tombol buka posisi.
+3. Letakkan PnL berjalan di atas tabel posisi terbuka. Tempatkan ringkasan posisi ditutup dan grafik jurnal berdampingan jika ruang cukup dan susun vertikal di HP. Pakai biru untuk garis saldo dan warna status untuk membedakan batang untung dan rugi.
+4. Pertahankan ticker saat tabel posisi digeser dan tampilkan petunjuk saat tabel melampaui panel. Gunakan tinggi minimal `44px` untuk kontrol form, pemilih grafik, dan tombol aksi baris.
 
 ## Desktop dan HP
 

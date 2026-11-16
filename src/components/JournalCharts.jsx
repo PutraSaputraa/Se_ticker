@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { formatCompactNumber, formatDate, formatPnl, formatPrice, priceDecimals } from '../format.js';
 import { walletMovementLabels } from '../wallet.js';
+import TableScroll from './TableScroll.jsx';
 
 const sources = {
   daily: { label: 'PnL harian', detail: 'PnL per tanggal keluar. Catatan manual mengikuti tanggal yang dicatat.' },
@@ -120,6 +121,7 @@ export default function JournalCharts({ series, preferredCurrency, walletHistory
     ?? series[0];
   const currency = isWallet ? 'USD' : selected?.currency;
   const points = chartPoints(selected?.daily ?? [], walletHistory, source, currency, isWallet);
+  const detailsLabel = `Rincian ${sources[source].label.toLowerCase()} ${currency}`;
 
   return (
     <section id="journal-charts" className="journal-section journal-charts" aria-labelledby="journal-chart-title">
@@ -154,20 +156,22 @@ export default function JournalCharts({ series, preferredCurrency, walletHistory
           <ChartPlot points={points} currency={currency} source={source} type={type} isWallet={isWallet} />
           <details className="journal-pnl-days">
             <summary>{isWallet ? 'Lihat nilai per aktivitas' : 'Lihat nilai per tanggal'}</summary>
-            <table className="fund-table" aria-label={`Rincian ${sources[source].label.toLowerCase()} ${currency}`}>
-              <thead>
-                <tr><th scope="col">{isWallet ? 'Waktu' : 'Tanggal'}</th><th scope="col">{isWallet ? 'Aktivitas' : 'Posisi'}</th><th scope="col" className="num">{sources[source].label}</th></tr>
-              </thead>
-              <tbody>
-                {[...points].reverse().map(({ key, date, label, activity, value }) => (
-                  <tr key={key}>
-                    <th scope="row"><time dateTime={date}>{label}</time></th>
-                    <td>{activity}</td>
-                    <td className="num">{isWallet ? formatPrice(value, currency) : formatPnl(value, currency)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <TableScroll className="journal-table-wrap" label={detailsLabel}>
+              <table className="fund-table" aria-label={detailsLabel}>
+                <thead>
+                  <tr><th scope="col">{isWallet ? 'Waktu' : 'Tanggal'}</th><th scope="col">{isWallet ? 'Aktivitas' : 'Posisi'}</th><th scope="col" className="num">{sources[source].label}</th></tr>
+                </thead>
+                <tbody>
+                  {[...points].reverse().map(({ key, date, label, activity, value }) => (
+                    <tr key={key}>
+                      <th scope="row"><time dateTime={date}>{label}</time></th>
+                      <td>{activity}</td>
+                      <td className="num">{isWallet ? formatPrice(value, currency) : formatPnl(value, currency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroll>
           </details>
         </>
       ) : <p className="journal-help">{isWallet ? 'Belum ada aktivitas wallet.' : 'Belum ada PnL bertanggal untuk ditampilkan.'}</p>}

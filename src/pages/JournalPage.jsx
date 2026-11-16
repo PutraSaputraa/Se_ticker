@@ -241,7 +241,7 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
   }
 
   return (
-    <TableScroll className="journal-table-wrap" label={closed ? 'Tabel posisi ditutup' : 'Tabel posisi terbuka'}>
+    <TableScroll className="journal-table-wrap journal-trades-scroll" label={closed ? 'Tabel posisi ditutup' : 'Tabel posisi terbuka'}>
       <table className="fund-table journal-table">
         <thead>
           <tr>
@@ -551,10 +551,10 @@ export default function JournalPage({ account }) {
 
   return (
     <div className="journal-page">
-      <header className="intro journal-page-header">
+      <header className="journal-page-header">
         <div>
           <h1>Jurnal trading</h1>
-          <p>Catat rencana posisi dan evaluasi hasil setelah ditutup.</p>
+          <p className="journal-help">Catat posisi dan evaluasi hasil trading.</p>
         </div>
         <nav className="journal-jump-links" aria-label="Bagian jurnal">
           <a href="#journal-wallet">Wallet</a>
@@ -753,7 +753,7 @@ export default function JournalPage({ account }) {
         />
       </section>
 
-      <section id="journal-closed" className="journal-section" aria-labelledby="journal-closed-title">
+      <section id="journal-closed" className="journal-section journal-closed" aria-labelledby="journal-closed-title">
         <div className="journal-section-header">
           <div>
             <h2 id="journal-closed-title">Posisi ditutup</h2>

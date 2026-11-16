@@ -48,7 +48,7 @@ export default function JournalWallet({ wallet, ready, readError, disabled, savi
           {wallet.history.length > 0 && (
             <details className="journal-pnl-days">
               <summary>Riwayat wallet</summary>
-              <TableScroll label="Riwayat wallet USD">
+              <TableScroll className="journal-table-wrap" label="Riwayat wallet USD">
                 <table className="fund-table journal-wallet-history">
                   <thead>
                     <tr><th scope="col">Waktu</th><th scope="col">Aktivitas</th><th scope="col" className="num">Perubahan saldo</th><th scope="col" className="num">Saldo tersedia</th></tr>
