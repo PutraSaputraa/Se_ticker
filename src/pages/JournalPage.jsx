@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import JournalCharts from '../components/JournalCharts.jsx';
-import { ExitPlanFields, PriceField } from '../components/JournalOrderFields.jsx';
+import { ExitPlanFields, LeverageFields, PriceField } from '../components/JournalOrderFields.jsx';
 import { JournalScreenshotDialog, JournalScreenshotField } from '../components/JournalScreenshot.jsx';
 import JournalTradeSetups from '../components/JournalTradeSetups.jsx';
 import TickerField from '../components/TickerField.jsx';
@@ -16,6 +16,7 @@ import {
   journalStatuses,
   journalTypes,
   normalizeTrade,
+  parseJournalLeverage,
   positionPnlUsd,
   realizedTradePnl,
   summarizeJournal,
@@ -44,6 +45,7 @@ function emptyForm() {
     notes: '',
     screenshot: null,
     positionUsd: '',
+    leverage: '1',
     side: 'long',
     type: 'spot',
     entryPrice: '',
@@ -291,7 +293,12 @@ function TradeTable({
                 <td className="num">{formatJournalPrice(trade.stopLoss, currency, levelPrecision)}</td>
                 <td className="num">{trade.rewardMultiple == null ? '–' : `1:${trade.rewardMultiple}`}</td>
                 <td className="num">{formatJournalPrice(trade.takeProfit, currency, levelPrecision)}</td>
-                <td className="num">{formatJournalPrice(trade.positionUsd, 'USD')}</td>
+                <td className="num">
+                  {formatJournalPrice(trade.positionUsd * (trade.leverage ?? 1), 'USD')}
+                  {trade.leverage > 1 && (
+                    <small className="journal-trade-note">Margin {formatPrice(trade.positionUsd, 'USD')} · {trade.leverage}×</small>
+                  )}
+                </td>
                 {closed && (
                   <>
                     <td>{trade.exitDate ? <time dateTime={trade.exitDate}>{trade.exitDate}</time> : '–'}</td>
@@ -352,6 +359,9 @@ export default function JournalPage({ account, uid }) {
 
   function setField(field, value) {
     setForm((previous) => ({ ...previous, [field]: value }));
+    if (field === 'leverage' || field === 'positionUsd') {
+      setFeedback((current) => current?.section === 'entry' && current.type === 'error' ? null : current);
+    }
   }
 
   function setTicker(ticker, tickerSymbol = null) {
@@ -428,6 +438,8 @@ export default function JournalPage({ account, uid }) {
       const { entryPrice, stopLoss, takeProfit } = validateLevels(levels, form);
 
       const futures = type === 'futures';
+      const leverage = futures ? parseJournalLeverage(form.leverage, positionCents) : 1;
+      if (leverage == null) throw new Error('Gunakan leverage minimal 1× dengan nilai posisi yang valid.');
       if (futures && form.date > new Date().toLocaleDateString('sv-SE')) {
         throw new Error('Tanggal masuk belum tiba di zona waktu perangkat.');
       }
@@ -444,6 +456,7 @@ export default function JournalPage({ account, uid }) {
         notes,
         chartScreenshot: Boolean(screenshot),
         positionUsd,
+        leverage,
         status: 'open',
         entryPrice,
         stopLoss,
@@ -624,6 +637,7 @@ export default function JournalPage({ account, uid }) {
               <div className="journal-form-grid">
                 <ExitPlanFields form={form} levels={levels} setField={setField} disabled={disabled} describedBy="journal-level-note" />
               </div>
+              {type === 'futures' && <LeverageFields form={form} setField={setField} disabled={disabled} />}
               <p className="journal-help" id="journal-level-note">
                 Stop loss otomatis dihitung dari harga masuk. Pilih rasio untuk menghitung take profit.
                 Gunakan mata uang ticker. Tulis desimal dengan titik atau koma tanpa pemisah ribuan.

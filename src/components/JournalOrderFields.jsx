@@ -1,5 +1,7 @@
-import { journalRewardMultiples } from '../journal.js';
+import { formatPrice } from '../format.js';
+import { journalRewardMultiples, parseJournalLeverage } from '../journal.js';
 import { journalStopLossPercentages } from '../journalLevels.js';
+import { parseWalletUsd } from '../wallet.js';
 
 export function PriceField({ label, value, onChange, describedBy, disabled, readOnly = false }) {
   return (
@@ -43,5 +45,26 @@ export function ExitPlanFields({ form, levels, setField, disabled, describedBy }
       <PriceField label="Take Profit (TP)" value={rewardMultiple ? levels.takeProfit : form.takeProfit}
         onChange={(value) => setField('takeProfit', value)} describedBy={describedBy} disabled={disabled} readOnly={Boolean(rewardMultiple)} />
     </>
+  );
+}
+
+export function LeverageFields({ form, setField, disabled }) {
+  const marginCents = parseWalletUsd(form.positionUsd);
+  const leverage = parseJournalLeverage(form.leverage, marginCents);
+  const positionValue = leverage == null ? '' : formatPrice(marginCents * leverage / 100, 'USD');
+
+  return (
+    <div className="journal-leverage-fields">
+      <label>
+        Leverage (×)
+        <input type="text" inputMode="decimal" value={form.leverage}
+          onChange={(event) => setField('leverage', event.target.value)} disabled={disabled} required />
+      </label>
+      <label>
+        Nilai posisi setelah leverage (USD)
+        <input type="text" value={positionValue} placeholder="–" disabled={disabled} readOnly />
+      </label>
+      <p className="journal-help">Nilai posisi awal menjadi margin wallet. PnL memakai nilai posisi setelah leverage.</p>
+    </div>
   );
 }

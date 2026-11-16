@@ -29,7 +29,7 @@ npx firebase-tools deploy --only firestore:rules --project seticker
 
 Dokumen `users/{uid}` menyimpan `watchlist`, `history`, dan waktu pembaruan `updatedAt`. Aturan membatasi akses dokumen ke akun dengan UID yang sama. Password dikelola Firebase Authentication. Konfigurasi Web App merupakan konfigurasi publik yang disertakan dalam bundle frontend. Hak akses data ditegakkan oleh Firestore Rules. [Dokumentasi Firebase](https://firebase.google.com/docs/firestore/security/rules-conditions)
 
-Wallet jurnal mencatat saldo USD dan mutasinya pada akun. Saat membuka posisi, nilai posisi dipindahkan dari saldo tersedia ke dana di posisi. Penutupan mengembalikan dana tersebut beserta PnL terealisasi, sedangkan pembatalan posisi mengembalikan dana awal. Publikasikan versi terbaru `firestore.rules` sebelum merilis frontend yang memakai field `wallet`.
+Wallet jurnal mencatat saldo USD dan mutasinya pada akun. Saat membuka posisi, nilai posisi awal dipindahkan dari saldo tersedia ke dana di posisi. Pada FUTURES, dana awal menjadi margin. Nilai posisi untuk menghitung PnL adalah margin × leverage, dan PnL persen dihitung terhadap margin awal. Penutupan menambahkan dana awal dan PnL terealisasi ke saldo tersedia. Pembatalan posisi mengembalikan dana awal. Publikasikan versi terbaru `firestore.rules` sebelum merilis frontend yang memakai field `wallet` atau leverage di Trade Setup.
 
 Watchlist dan lima pencarian terakhir disinkronkan antarperangkat melalui listener Firestore. Pembaruan menggunakan transaksi agar perubahan bersamaan tetap tergabung. Penyimpanan membutuhkan koneksi internet. Aplikasi menampilkan kegagalan baca atau simpan dan mengembalikan input harga jika penyimpanan ditolak.
 

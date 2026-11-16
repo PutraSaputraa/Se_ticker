@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { AccountChangeError, normalizeAccountData } from '../src/accountData.js';
-import { realizedTradePnl } from '../src/journal.js';
+import { calculateTradePnl, parseJournalLeverage, positionPnlUsd, realizedTradePnl } from '../src/journal.js';
 import { closeWalletPosition, openWalletPosition, parseWalletUsd, recordWalletCash, removeWalletPosition, summarizeWallet } from '../src/wallet.js';
 
 const at = Date.parse('2026-02-03T03:00:00Z');
@@ -82,4 +82,43 @@ test('posisi futures memakai tanggal kuotasi di zona saat dicatat dan menyimpan 
   assert.equal(closed.journal[0].type, 'futures');
   assert.equal(closed.journal[0].exitDate, '2026-11-16');
   assert.equal(closed.journal[0].notes, 'Cek volume\nPantau sesi berikutnya');
+});
+
+test('input leverage mendukung desimal dan membatasi nilai posisi pada rentang yang dapat dicatat', () => {
+  assert.equal(parseJournalLeverage('10×', 10_000), 10);
+  assert.equal(parseJournalLeverage('2,5', 10_000), 2.5);
+  for (const invalid of ['', '0', '0.5', '-1', '1e2', '1.000,5', '999999999999999']) {
+    assert.equal(parseJournalLeverage(invalid, 10_000), null);
+  }
+});
+
+test('futures menahan margin dan memakai leverage untuk PnL berjalan serta PnL terealisasi', () => {
+  const funded = deposit(normalizeAccountData(), 10_000);
+  for (const [side, exitPrice, expectedPnl] of [
+    ['long', 105, 50],
+    ['long', 95, -50],
+    ['short', 95, 50],
+    ['short', 105, -50],
+  ]) {
+    const opened = normalizeAccountData(openWalletPosition(funded, {
+      ...trade, side, type: 'futures', leverage: 10, positionUsd: 100,
+    }, at));
+    assert.deepEqual(balances(opened), [0, 10_000, 10_000]);
+    const [position] = opened.journal;
+    assert.equal(position.leverage, 10);
+    const running = calculateTradePnl(position, exitPrice);
+    assert.equal(running.pnlPct, expectedPnl);
+    assert.equal(positionPnlUsd(position, running.pnlPct), expectedPnl);
+
+    const exit = { ...quote, price: exitPrice };
+    const closed = normalizeAccountData(closeWalletPosition(opened, position.id, exit, at));
+    assert.deepEqual(balances(closed), [10_000 + expectedPnl * 100, 0, 10_000 + expectedPnl * 100]);
+    assert.equal(closed.journal[0].pnlPct, expectedPnl);
+    assert.equal(realizedTradePnl(closed.journal[0], 'USD').amount, expectedPnl);
+    assert.equal(closeWalletPosition(closed, position.id, exit, at), closed);
+  }
+
+  const spot = openWalletPosition(funded, { ...trade, type: 'spot', positionUsd: 100, leverage: 10 }, at);
+  assert.equal(spot.journal[0].leverage, undefined);
+  assert.equal(calculateTradePnl(spot.journal[0], 105).pnlPct, 5);
 });

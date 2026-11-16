@@ -37,7 +37,7 @@ service cloud.firestore {
         let data = request.resource.data;
         return data.keys().hasOnly(['uid', 'pair', 'market', 'date', 'side', 'type',
             'timeframe', 'setup', 'thesis', 'positionCents', 'limitPrice', 'stopLoss', 'takeProfit',
-            'rewardMultiple', 'quoteCurrency', 'triggerAbove', 'entryTimeZone', 'createdAt'])
+            'rewardMultiple', 'quoteCurrency', 'triggerAbove', 'entryTimeZone', 'createdAt', 'leverage'])
           && data.pair is string && data.pair.size() <= 32
           && data.pair.matches('^[A-Z0-9^][A-Z0-9.=-]*$')
           && data.market in ['us', 'hk', 'jp', 'ks', 'kq', 'tw', 'two', 'crypto', 'id', 'ss', 'sz']
@@ -48,6 +48,8 @@ service cloud.firestore {
           && data.setup is string && data.setup.size() > 0 && data.setup.size() <= 40
           && data.thesis is string && data.thesis.size() <= 2000
           && data.positionCents is int && data.positionCents > 0 && data.positionCents <= 999999999999900
+          && (!('leverage' in data) || (data.type == 'futures' && data.leverage is number
+            && data.leverage >= 1 && data.positionCents * data.leverage <= 9007199254740991))
           && data.limitPrice is number && data.limitPrice > 0
           && data.stopLoss is number && data.stopLoss > 0
           && data.takeProfit is number && data.takeProfit > 0

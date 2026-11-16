@@ -38,6 +38,7 @@ export function tradeFromTriggeredSetup(setup, quote) {
     setup: setup.setup,
     notes: setup.thesis,
     positionUsd: setup.positionCents / 100,
+    leverage: setup.leverage,
     entryPrice: quote.price,
     entryTimestamp: quote.timestamp,
     entryTimeZone: setup.entryTimeZone,

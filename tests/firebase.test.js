@@ -219,6 +219,7 @@ test('pemantau membuka pending setup satu kali dan mempertahankan setup tanpa sa
   const id = crypto.randomUUID();
   const pending = doc(owner.db, journalSetupsCollection, id);
   const unfunded = doc(owner.db, journalSetupsCollection, `${id}-unfunded`);
+  const invalid = doc(owner.db, journalSetupsCollection, `${id}-invalid`);
   const reference = doc(owner.db, 'users', uid);
   const setup = {
     uid,
@@ -226,7 +227,7 @@ test('pemantau membuka pending setup satu kali dan mempertahankan setup tanpa sa
     market: 'crypto',
     date: '2026-11-16',
     side: 'long',
-    type: 'spot',
+    type: 'futures',
     timeframe: '4H',
     setup: 'Support',
     thesis: 'Uji pergerakan harga BTC.',
@@ -243,7 +244,10 @@ test('pemantau membuka pending setup satu kali dan mempertahankan setup tanpa sa
   const before = (await getDocFromServer(reference)).data();
   const available = summarizeWallet(before.wallet).availableCents;
   try {
-    await setDoc(pending, setup);
+    for (const changes of [{ type: 'spot', leverage: 10 }, { leverage: 0.5 }, { leverage: '10' }]) {
+      await assert.rejects(setDoc(invalid, { ...setup, ...changes }), { code: 'permission-denied' });
+    }
+    await setDoc(pending, { ...setup, leverage: 10 });
     await setDoc(unfunded, { ...setup, positionCents: available + 1 });
     const owned = query(collection(secondDevice.db, journalSetupsCollection), where('uid', '==', uid));
     assert.equal((await getDocsFromServer(owned)).size, 2);
@@ -269,16 +273,22 @@ test('pemantau membuka pending setup satu kali dan mempertahankan setup tanpa sa
 
     const after = (await getDocFromServer(reference)).data();
     const trade = after.journal.find((item) => item.id === id);
-    assert.deepEqual([trade.status, trade.entryPrice, trade.notes], ['open', 121, setup.thesis]);
+    assert.deepEqual([trade.status, trade.entryPrice, trade.notes, trade.leverage], ['open', 121, setup.thesis, 10]);
     assert.equal(after.wallet.filter(({ id: movementId }) => movementId === `open:${id}`).length, 1);
     assert.equal(summarizeWallet(after.wallet).availableCents, available - setup.positionCents);
     assert.equal((await admin.doc(pending.path).get()).exists, false);
     assert.equal((await getDocFromServer(unfunded)).exists(), true);
 
+    const exit = { ...quote, price: 133.1, timestamp: quote.timestamp + 60 };
+    await updateAccountData(owner.db, uid, (current) => closeWalletPosition(current, id, exit, Date.now()));
+    const settled = (await getDocFromServer(reference)).data();
+    assert.equal(settled.journal.find((item) => item.id === id).walletPnlCents, 10_000);
+    assert.equal(summarizeWallet(settled.wallet).availableCents, available + 10_000);
+
     await deleteDoc(unfunded);
     assert.equal((await monitorJournalSetups(admin, async () => quote)).opened, 0);
   } finally {
-    await admin.getAll(admin.doc(pending.path), admin.doc(unfunded.path)).then((snapshots) =>
+    await admin.getAll(admin.doc(pending.path), admin.doc(unfunded.path), admin.doc(invalid.path)).then((snapshots) =>
       Promise.all(snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => snapshot.ref.delete())),
     );
     await admin.terminate();

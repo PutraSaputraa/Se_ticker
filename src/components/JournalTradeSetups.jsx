@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react';
 import { formatDate, formatPrice } from '../format.js';
-import { journalSetupOptions, journalSides, journalTypes } from '../journal.js';
+import { journalSetupOptions, journalSides, journalTypes, parseJournalLeverage } from '../journal.js';
 import { calculateLevels, levelPrecision, validateLevels } from '../journalLevels.js';
 import { journalSetupMarkets, journalSetupTimeframes } from '../journalSetups.js';
 import { normalizeTicker } from '../tickers.js';
 import { fetchJournalQuote } from '../useJournalQuotes.js';
 import useJournalSetups from '../useJournalSetups.js';
 import { parseWalletUsd } from '../wallet.js';
-import { ExitPlanFields, PriceField } from './JournalOrderFields.jsx';
+import { ExitPlanFields, LeverageFields, PriceField } from './JournalOrderFields.jsx';
 import TickerField from './TickerField.jsx';
 
 function emptySetup() {
@@ -21,6 +21,7 @@ function emptySetup() {
     setup: '',
     thesis: '',
     positionUsd: '',
+    leverage: '1',
     entryPrice: '',
     stopLossPct: '',
     stopLoss: '',
@@ -31,7 +32,8 @@ function emptySetup() {
 
 function PendingSetup({ item, availableCents, disabled, onCancel }) {
   const { pair, market, date, side, type, timeframe, setup, thesis, positionCents, quoteCurrency, triggerAbove,
-    limitPrice, stopLoss, takeProfit } = item;
+    limitPrice, stopLoss, takeProfit, leverage = 1 } = item;
+  const marginUsd = positionCents / 100;
   const waitingForBalance = availableCents != null && positionCents > availableCents;
   const formatLevel = (value) => formatPrice(value, quoteCurrency, levelPrecision);
   return (
@@ -49,7 +51,11 @@ function PendingSetup({ item, availableCents, disabled, onCancel }) {
         <div><dt>Limit Price</dt><dd>{triggerAbove ? '≥ ' : '≤ '}{formatLevel(limitPrice)}</dd></div>
         <div><dt>Stop Loss</dt><dd>{formatLevel(stopLoss)}</dd></div>
         <div><dt>Take Profit</dt><dd>{formatLevel(takeProfit)}</dd></div>
-        <div><dt>Nilai posisi</dt><dd>{formatPrice(positionCents / 100, 'USD')}</dd></div>
+        <div>
+          <dt>Nilai posisi</dt>
+          <dd>{formatPrice(marginUsd * leverage, 'USD')}</dd>
+          {leverage > 1 && <small className="journal-trade-note">Margin {formatPrice(marginUsd, 'USD')} · {leverage}×</small>}
+        </div>
       </dl>
       <div className="journal-section-header">
         <div>
@@ -77,6 +83,9 @@ export default function JournalTradeSetups({ uid, knownTickers, availableCents, 
 
   function setField(field, value) {
     setDraft((previous) => ({ ...previous, [field]: value }));
+    if (field === 'leverage' || field === 'positionUsd' || field === 'type') {
+      setFeedback((current) => current?.error ? null : current);
+    }
   }
 
   async function run(operation) {
@@ -104,6 +113,8 @@ export default function JournalTradeSetups({ uid, knownTickers, availableCents, 
         throw new Error('Pilih market, kode ticker, dan identitas setup.');
       }
       if (positionCents == null) throw new Error('Isi nilai posisi USD lebih dari 0, misalnya 500 atau 125,50.');
+      const leverage = type === 'futures' ? parseJournalLeverage(draft.leverage, positionCents) : 1;
+      if (leverage == null) throw new Error('Gunakan leverage minimal 1× dengan nilai posisi yang valid.');
       const { entryPrice: limitPrice, stopLoss, takeProfit } = validateLevels(levels, draft, 'Limit Price');
       const quote = await fetchJournalQuote(symbol);
 
@@ -118,6 +129,7 @@ export default function JournalTradeSetups({ uid, knownTickers, availableCents, 
           setup,
           thesis: thesis.trim(),
           positionCents,
+          ...(leverage > 1 && { leverage }),
           limitPrice,
           stopLoss,
           takeProfit,
@@ -227,6 +239,7 @@ export default function JournalTradeSetups({ uid, knownTickers, availableCents, 
                 </div>
                 <ExitPlanFields form={draft} levels={levels} setField={setField} disabled={locked} describedBy="journal-setup-level-note" />
               </div>
+              {draft.type === 'futures' && <LeverageFields form={draft} setField={setField} disabled={locked} />}
               <p id="journal-setup-level-note" className="journal-help">
                 Limit Price menjadi batas harga turun atau naik, tergantung kuotasi saat setup disimpan.
                 SL otomatis memakai Limit Price sebagai dasar. Semua level memakai mata uang ticker.

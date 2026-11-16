@@ -208,6 +208,15 @@
 
 .journal-form-group > .journal-help { margin-top: 0.65rem; }
 
+.journal-leverage-fields {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 20rem;
+  margin-top: 0.75rem;
+}
+
+.journal-leverage-fields .journal-help { margin: 0; }
+
 .journal-form label,
 .journal-chart-controls label {
   display: grid;

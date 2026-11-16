@@ -17,6 +17,7 @@ export const journalTypes = { spot: 'SPOT', futures: 'FUTURES' };
 export const journalCurrencies = ['USD', 'IDR', 'USDT'];
 export const journalRewardMultiples = [2, 3, 4];
 export const journalSetupOptions = [
+  'Breakout',
   'Consolidation',
   'Cup & Handle',
   'Earning Report',
@@ -39,6 +40,21 @@ function makeId() {
   return `${Date.now().toString(36)}-${counter.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function validLeverage(leverage, marginCents) {
+  return Number.isFinite(leverage) && leverage >= 1 && marginCents > 0
+    && marginCents * leverage <= Number.MAX_SAFE_INTEGER;
+}
+
+export function parseJournalLeverage(input, marginCents) {
+  const match = /^(\d+(?:[.,]\d+)?)(?:\s*[x×])?$/i.exec(input.trim());
+  const leverage = match ? Number(match[1].replace(',', '.')) : NaN;
+  return validLeverage(leverage, marginCents) ? leverage : null;
+}
+
+function positionLeverage({ type, leverage, positionUsd }) {
+  return type === 'futures' && validLeverage(leverage, Math.round(positionUsd * 100)) ? leverage : 1;
+}
+
 export function normalizeTrade(entry) {
   if (!entry || typeof entry !== 'object') return null;
   const pair = typeof entry.pair === 'string' ? entry.pair.trim().toUpperCase() : '';
@@ -57,6 +73,7 @@ export function normalizeTrade(entry) {
   const rewardMultiple = num(entry.rewardMultiple);
   const takeProfit = num(entry.takeProfit);
   const positionUsd = num(entry.positionUsd);
+  const leverage = positionLeverage({ type, leverage: entry.leverage, positionUsd });
   const quoteCurrency = typeof entry.quoteCurrency === 'string' ? entry.quoteCurrency.trim() : '';
   const hasPrice = entryPrice > 0 && Boolean(quoteCurrency);
   const validStatus = Object.hasOwn(journalStatuses, entry.status) && (entry.status !== 'open' || hasPrice);
@@ -97,6 +114,7 @@ export function normalizeTrade(entry) {
       exitPrice: num(entry.exitPrice),
       exitDate: typeof entry.exitDate === 'string' ? entry.exitDate : null,
       ...(positionUsd > 0 && { positionUsd }),
+      ...(leverage > 1 && { leverage }),
       ...(Number.isSafeInteger(entry.walletPnlCents) && { walletPnlCents: entry.walletPnlCents }),
     }),
   };
@@ -146,7 +164,8 @@ export function tradeQuoteError(trade, quote) {
 
 export function calculateTradePnl(trade, price) {
   const pnl = trade.side === 'short' ? trade.entryPrice - price : price - trade.entryPrice;
-  return { pnl, pnlPct: (pnl / trade.entryPrice) * 100 };
+  // pnl stays per unit. pnlPct measures the return on the original margin.
+  return { pnl, pnlPct: (pnl / trade.entryPrice) * 100 * positionLeverage(trade) };
 }
 
 export function closeTrade(journal, id, quote) {
