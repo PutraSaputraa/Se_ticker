@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: Cek Saham
-description: Workspace untuk mencari kandidat di Rekomendasi, membandingkan saham di Pantauan, serta membaca level trading dan grafik di Detail saham.
+description: Workspace riset untuk mencari kandidat, membandingkan saham, membaca level trading, dan menguji strategi.
 colors:
   canvas: "#f3f6f8"
   surface: "#ffffff"
@@ -87,7 +87,7 @@ components:
 
 # Cek Saham
 
-Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, dan garis pemisah tipis dari analisis desain Coinbase. Detail saham, Pantauan saham, dan Rekomendasi memakai sistem ini. Gunakan nama dan simbol instrumen, tanggal sesi, grafik, dan angka untuk membangun hierarki halaman.
+Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, dan garis pemisah tipis dari analisis desain Coinbase. Detail saham, Pantauan saham, Rekomendasi, dan Uji strategi memakai sistem ini. Gunakan nama dan simbol instrumen, tanggal sesi, grafik, dan angka untuk membangun hierarki halaman.
 
 ## Warna dan tipografi
 
@@ -116,6 +116,13 @@ Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, 
 2. Mulai tabel scan dari simbol, harga tutup, dan perubahan. Sematkan kolom saham saat tabel digeser di HP. Tampilkan resistance dan rasio volume dengan angka tabular. Catatan AI pada satu saham bisa dibuka dari baris saham tersebut.
 3. Tampilkan hasil riset AI sebagai kartu kandidat. Letakkan identitas saham dan aksi **Pantau** di bagian atas, lalu susun analisis teknikal, level pantauan, dan katalis sesuai data yang tersedia. Susun rincian dalam satu kolom jika ruang sempit.
 4. Tampilkan jumlah hasil dan sesi acuan atau tanggal riset di atas hasil. Gunakan tombol sekunder untuk **Pantau**, serta label **Dipantau** untuk saham yang sudah tersimpan.
+
+## Uji strategi
+
+1. Satukan pilihan **Per bursa** dan **Saham pilihan**, kolom sampel, serta aksi **Jalankan backtest** dalam satu panel. Tampilkan petunjuk input ticker dekat kolom tersebut dan letakkan status proses atau gagal di panel yang sama.
+2. Mulai ringkasan dari return simulasi dan drawdown maksimum, diikuti win rate, jumlah transaksi, dan expectancy. Letakkan asumsi eksekusi dalam bagian tersendiri di bawah metrik. Jika sampel kosong, tampilkan pesan yang membantu pengguna memilih sampel lain.
+3. Letakkan ringkasan dan kurva ekuitas berdampingan jika ruang cukup. Di HP, susun ringkasan sebelum kurva dan gunakan dua kolom untuk metrik. Tandai basis 100 pada grafik agar perubahan ekuitas mudah dibandingkan.
+4. Tampilkan saham dan return di awal tabel performa dan transaksi. Pertahankan kolom ticker saat tabel digeser di HP. Gunakan tanggal ringkas dengan tahun untuk transaksi lintas tahun.
 
 ## Desktop dan HP
 

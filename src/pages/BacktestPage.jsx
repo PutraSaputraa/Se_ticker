@@ -22,9 +22,14 @@ const exitLabels = {
 };
 
 const formatIndex = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
-const formatExitDate = new Intl.DateTimeFormat('id-ID', {
+const tradeDateFormat = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC',
 });
+
+function formatTradeDate(date) {
+  const timestamp = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(timestamp) ? tradeDateFormat.format(timestamp) : date;
+}
 
 function Stat({ label, value, tone }) {
   return (
@@ -32,6 +37,48 @@ function Stat({ label, value, tone }) {
       <dt>{label}</dt>
       <dd className={tone}>{value}</dd>
     </div>
+  );
+}
+
+function BacktestSummary({ data }) {
+  const { label, symbolsTested, params, stats } = data;
+  const returnTone = stats.totalReturn > 0 ? 'trend--up' : stats.totalReturn < 0 ? 'trend--down' : undefined;
+
+  return (
+    <section className="research-panel backtest-panel" aria-labelledby="backtest-results-title">
+      <div className="research-panel-heading">
+        <div>
+          <h2 id="backtest-results-title">Ringkasan simulasi</h2>
+          <p>{label} · {symbolsTested} saham menghasilkan transaksi</p>
+        </div>
+      </div>
+      {stats.totalTrades > 0 ? (
+        <dl className="research-metrics" aria-label="Metrik simulasi">
+          <Stat label="Return simulasi" value={formatPct(stats.totalReturn)} tone={returnTone} />
+          <Stat label="Drawdown maksimum" value={`${formatIndex.format(Math.abs(stats.maxDrawdown))}%`} tone={Math.abs(stats.maxDrawdown) > 0 ? 'trend--down' : undefined} />
+          <Stat label="Win rate" value={formatPct(stats.winRate).replace(/^\+/, '')} />
+          <Stat label="Transaksi" value={stats.totalTrades} />
+          <Stat label="Rata-rata untung" value={formatPct(stats.avgWin)} />
+          <Stat label="Rata-rata rugi" value={formatPct(-Math.abs(stats.avgLoss))} />
+          <Stat label="Rasio expectancy" value={stats.expectancyRatio == null ? '–' : `${formatIndex.format(stats.expectancyRatio)}×`} />
+          <Stat label="Expectancy per transaksi" value={stats.netExpectancy == null ? '–' : formatPct(stats.netExpectancy)} />
+        </dl>
+      ) : (
+        <div className="research-empty">
+          <h3>Belum ada transaksi dalam sampel ini</h3>
+          <p>Performa belum dapat dinilai. Uji bursa atau daftar ticker lain.</p>
+        </div>
+      )}
+      <div className="backtest-assumptions">
+        <h3 id="backtest-assumptions-title">Asumsi eksekusi</h3>
+        <dl className="research-assumptions" aria-labelledby="backtest-assumptions-title">
+          <div><dt>Stop loss</dt><dd>{params.stopPct}%</dd></div>
+          <div><dt>Target</dt><dd>{params.targetR}R</dd></div>
+          {params.maxHoldDays != null && <div><dt>Masa posisi</dt><dd>{params.maxHoldDays} sesi</dd></div>}
+          {params.riskPerTrade != null && <div><dt>Risiko per posisi</dt><dd>{formatIndex.format(params.riskPerTrade)}% ekuitas</dd></div>}
+        </dl>
+      </div>
+    </section>
   );
 }
 
@@ -52,7 +99,7 @@ function EquityCurve({ curve }) {
   const points = curve.map(({ equity }, index) => `${x(index)},${y(equity)}`).join(' ');
   const ticks = [top, (top + bottom) / 2, bottom];
   const xLabels = dateAxis
-    ? [0, 0.5, 1].map((offset) => formatExitDate.format(first + duration * offset))
+    ? [0, 0.5, 1].map((offset) => tradeDateFormat.format(first + duration * offset))
     : [1, curve.length > 2 ? Math.ceil(curve.length / 2) : null, curve.length];
 
   return (
@@ -108,22 +155,14 @@ export default function BacktestPage() {
   const loading = state.status === 'loading';
   const data = state.status === 'success' ? state.data : null;
   const stats = data?.stats;
-  const hasTrades = stats?.totalTrades > 0;
 
   return (
     <div className="research-workspace backtest-page">
-      <header className="page-heading">
-        <h1>Uji strategi</h1>
-        <p>Simulasikan aturan breakout Minervini pada dua tahun data historis untuk menilai performa pada sampel tersebut.</p>
-      </header>
-
-      <section className="research-panel" aria-labelledby="backtest-controls-title">
-        <div className="research-panel-heading">
-          <div>
-            <h2 id="backtest-controls-title">Sampel pengujian</h2>
-            <p>Trend Template, VCP, dan pivot menentukan sinyal long. Posisi dibuka pada harga pembukaan sesi berikutnya.</p>
-          </div>
-        </div>
+      <section className="research-panel backtest-panel" aria-labelledby="backtest-controls-title">
+        <header className="page-heading backtest-heading">
+          <h1 id="backtest-controls-title">Uji strategi</h1>
+          <p>Simulasikan aturan breakout Minervini pada dua tahun data historis.</p>
+        </header>
         <form className="research-controls" onSubmit={run}>
           <fieldset className="research-mode">
             <legend>Sumber saham</legend>
@@ -153,7 +192,7 @@ export default function BacktestPage() {
               </select>
             </label>
           ) : (
-            <label className="research-field research-field--tickers">
+            <label className="research-field">
               Kode ticker
               <input
                 type="text"
@@ -166,88 +205,61 @@ export default function BacktestPage() {
             </label>
           )}
           <button type="submit" className="scan-button" disabled={loading}>
-            {loading ? 'Menguji…' : 'Jalankan backtest'}
+            {loading ? 'Menguji…' : state.status === 'error' ? 'Coba lagi' : 'Jalankan backtest'}
           </button>
           {mode === 'custom' && <p className="research-form-help" id="backtest-ticker-help">Pisahkan kode dengan koma. Kolom kosong memakai sampel bursa terakhir.</p>}
         </form>
+        <p className="research-form-help backtest-execution-note">Trend Template, VCP, dan pivot menentukan sinyal long. Posisi dibuka pada harga pembukaan sesi berikutnya.</p>
+
+        {loading && (
+          <div className="status-card" role="status">
+            <span className="spinner" aria-hidden="true" />
+            <div>
+              <p className="status-title">Menguji strategi…</p>
+              <p>Menjalankan aturan pada data historis tiap saham dan menghitung statistik.</p>
+            </div>
+          </div>
+        )}
+
+        {state.status === 'error' && (
+          <div className="status-card status-card--error" role="alert">
+            <span className="status-mark" aria-hidden="true">!</span>
+            <div>
+              <p className="status-title">Uji strategi gagal</p>
+              <p>{state.message}</p>
+            </div>
+          </div>
+        )}
       </section>
-
-      {loading && (
-        <div className="status-card" role="status">
-          <span className="spinner" aria-hidden="true" />
-          <div>
-            <p className="status-title">Menguji strategi…</p>
-            <p>Menjalankan aturan pada data historis tiap saham dan menghitung statistik.</p>
-          </div>
-        </div>
-      )}
-
-      {state.status === 'error' && (
-        <div className="status-card status-card--error" role="alert">
-          <span className="status-mark" aria-hidden="true">!</span>
-          <div>
-            <p className="status-title">Uji strategi gagal</p>
-            <p>{state.message}</p>
-          </div>
-        </div>
-      )}
 
       {data && (
         <>
-          <section className="research-panel" aria-labelledby="backtest-results-title">
-            <div className="research-panel-heading">
-              <div>
-                <h2 id="backtest-results-title">Ringkasan simulasi</h2>
-                <p>{data.label} · {data.symbolsTested} saham menghasilkan transaksi</p>
-              </div>
-            </div>
-            <dl className="research-assumptions" aria-label="Asumsi eksekusi">
-              <div><dt>Stop loss</dt><dd>{data.params.stopPct}%</dd></div>
-              <div><dt>Target</dt><dd>{data.params.targetR}R</dd></div>
-              {data.params.maxHoldDays != null && <div><dt>Masa posisi</dt><dd>{data.params.maxHoldDays} sesi</dd></div>}
-              {data.params.riskPerTrade != null && <div><dt>Risiko per posisi</dt><dd>{formatIndex.format(data.params.riskPerTrade)}% ekuitas</dd></div>}
-            </dl>
-            <dl className="research-metrics">
-              <Stat label="Transaksi" value={stats.totalTrades} />
-              <Stat label="Win rate" value={hasTrades ? formatPct(stats.winRate).replace(/^\+/, '') : '–'} />
-              <Stat label="Return simulasi" value={hasTrades ? formatPct(stats.totalReturn) : '–'} tone={stats.totalReturn > 0 ? 'trend--up' : stats.totalReturn < 0 ? 'trend--down' : undefined} />
-              <Stat label="Drawdown maksimum" value={hasTrades ? `${formatIndex.format(Math.abs(stats.maxDrawdown))}%` : '–'} />
-              <Stat label="Rata-rata untung" value={hasTrades ? formatPct(stats.avgWin) : '–'} />
-              <Stat label="Rata-rata rugi" value={hasTrades ? formatPct(-Math.abs(stats.avgLoss)) : '–'} />
-              <Stat label="Rasio expectancy" value={stats.expectancyRatio == null ? '–' : `${formatIndex.format(stats.expectancyRatio)}×`} />
-              <Stat label="Expectancy per transaksi" value={stats.netExpectancy == null ? '–' : formatPct(stats.netExpectancy)} />
-            </dl>
-            {!hasTrades && (
-              <div className="research-empty">
-                <h3>Belum ada transaksi dalam sampel ini</h3>
-                <p>Performa belum dapat dinilai. Uji bursa atau daftar ticker lain.</p>
-              </div>
-            )}
-          </section>
-
-          {data.curve?.length > 1 && (
-            <section className="research-panel" aria-labelledby="equity-title">
-              <div className="research-panel-heading">
-                <div>
-                  <h2 id="equity-title">Kurva ekuitas</h2>
-                  <p>Ekuitas simulasi dihitung ulang setiap kali posisi ditutup.</p>
+          <div className="backtest-overview">
+            <BacktestSummary data={data} />
+            {data.curve?.length > 1 && (
+              <section className="research-panel backtest-panel" aria-labelledby="equity-title">
+                <div className="research-panel-heading">
+                  <div>
+                    <h2 id="equity-title">Kurva ekuitas</h2>
+                    <p>Ekuitas simulasi dihitung ulang setiap kali posisi ditutup.</p>
+                  </div>
                 </div>
-              </div>
-              <EquityCurve curve={data.curve} />
-            </section>
-          )}
+                <EquityCurve curve={data.curve} />
+              </section>
+            )}
+          </div>
 
           {data.perSymbol?.length > 0 && (
-            <section className="research-panel" aria-labelledby="backtest-by-symbol">
+            <section className="research-panel backtest-panel" aria-labelledby="backtest-by-symbol">
               <div className="research-panel-heading"><h2 id="backtest-by-symbol">Performa per saham</h2></div>
               <TableScroll className="research-table-scroll" label="Tabel performa per saham">
-                <table className="fund-table research-table">
+                <table className="fund-table research-table backtest-table">
                   <thead>
                     <tr>
                       <th scope="col">Saham</th>
-                      <th scope="col" className="num">Transaksi</th>
-                      <th scope="col" className="num">Win rate</th>
                       <th scope="col" className="num">Return</th>
+                      <th scope="col" className="num">Win rate</th>
+                      <th scope="col" className="num">Transaksi</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -255,11 +267,11 @@ export default function BacktestPage() {
                       <tr key={row.symbol}>
                         <th scope="row" className="research-instrument">
                           <TickerLink symbol={row.symbol} />
-                          {row.name && <span className="research-cell-note">{row.name}</span>}
+                          {row.name && row.name !== row.symbol && <span className="research-cell-note research-table-company">{row.name}</span>}
                         </th>
-                        <td className="num">{row.trades}</td>
-                        <td className="num">{formatPct(row.winRate).replace(/^\+/, '')}</td>
                         <td className={`num ${row.totalReturn > 0 ? 'trend--up' : row.totalReturn < 0 ? 'trend--down' : ''}`}>{formatPct(row.totalReturn)}</td>
+                        <td className="num">{formatPct(row.winRate).replace(/^\+/, '')}</td>
+                        <td className="num">{row.trades}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -269,7 +281,7 @@ export default function BacktestPage() {
           )}
 
           {data.trades?.length > 0 && (
-            <section className="research-panel" aria-labelledby="backtest-trades">
+            <section className="research-panel backtest-panel" aria-labelledby="backtest-trades">
               <div className="research-panel-heading">
                 <div>
                   <h2 id="backtest-trades">Transaksi terakhir</h2>
@@ -277,24 +289,24 @@ export default function BacktestPage() {
                 </div>
               </div>
               <TableScroll className="research-table-scroll" label="Tabel transaksi terakhir">
-                <table className="fund-table research-table">
+                <table className="fund-table research-table backtest-table">
                   <thead>
                     <tr>
                       <th scope="col">Saham</th>
-                      <th scope="col">Tanggal masuk</th>
-                      <th scope="col">Tanggal keluar</th>
                       <th scope="col" className="num">Return</th>
-                      <th scope="col" className="num">Kelipatan risiko</th>
+                      <th scope="col">Tanggal keluar</th>
+                      <th scope="col">Tanggal masuk</th>
+                      <th scope="col" className="num backtest-risk-heading">Kelipatan risiko</th>
                       <th scope="col">Alasan keluar</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[...data.trades].reverse().map((trade, index) => (
                       <tr key={`${trade.symbol}-${trade.entryDate}-${index}`}>
-                        <th scope="row"><TickerLink symbol={trade.symbol} /></th>
-                        <td><time dateTime={trade.entryDate}>{trade.entryDate}</time></td>
-                        <td><time dateTime={trade.exitDate}>{trade.exitDate}</time></td>
+                        <th scope="row" className="research-instrument"><TickerLink symbol={trade.symbol} /></th>
                         <td className={`num ${trade.returnPct > 0 ? 'trend--up' : trade.returnPct < 0 ? 'trend--down' : ''}`}>{formatPct(trade.returnPct)}</td>
+                        <td><time dateTime={trade.exitDate}>{formatTradeDate(trade.exitDate)}</time></td>
+                        <td><time dateTime={trade.entryDate}>{formatTradeDate(trade.entryDate)}</time></td>
                         <td className="num">{formatIndex.format(trade.rMultiple)}R</td>
                         <td>{exitLabels[trade.exitReason] ?? trade.exitReason}</td>
                       </tr>
