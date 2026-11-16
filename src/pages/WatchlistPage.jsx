@@ -18,7 +18,7 @@ export default function WatchlistPage({ account }) {
 
   return (
     <div className="research-workspace watchlist-page">
-      <header className="page-heading research-heading">
+      <header className="page-heading research-heading watchlist-heading">
         <div>
           <h1>Pantauan saham</h1>
           <p>Bandingkan harga penutupan, volume, dan kriteria Stage 2.</p>
@@ -26,12 +26,14 @@ export default function WatchlistPage({ account }) {
         <Link className="scan-button" to="/">Cari saham</Link>
       </header>
 
-      <section className="research-panel" aria-labelledby="watchlist-title">
-        <div className="research-panel-heading">
-          <div>
-            <h2 id="watchlist-title">Daftar pantauan</h2>
-            {watchlist.length > 0 && <p>{watchlist.length} saham · Breakout diurutkan pertama</p>}
-          </div>
+      <section className="research-panel watchlist-panel" aria-label="Daftar pantauan">
+        <div className="research-panel-heading watchlist-toolbar">
+          {watchlist.length > 0 && (
+            <div>
+              <strong>{watchlist.length} saham</strong>
+              <p>Breakout di urutan atas</p>
+            </div>
+          )}
           <span className="research-sync" data-state={sync} role="status">{syncLabel}</span>
         </div>
         {watchlist.length > 0 ? (
@@ -49,7 +51,7 @@ export default function WatchlistPage({ account }) {
           />
         ) : account.ready ? (
           <div className="research-empty">
-            <h3>Belum ada saham dipantau</h3>
+            <h2>Belum ada saham dipantau</h2>
             <p>Cari ticker, buka detail saham, lalu pilih Pantau.</p>
           </div>
         ) : (

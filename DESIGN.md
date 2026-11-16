@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: Cek Saham
-description: Workspace riset saham dengan harga penutupan, level trading, dan grafik sebagai fokus Detail saham.
+description: Workspace riset saham untuk membandingkan harga dan status di Pantauan serta membaca level trading dan grafik di Detail saham.
 colors:
   canvas: "#f3f6f8"
   surface: "#ffffff"
@@ -87,11 +87,11 @@ components:
 
 # Cek Saham
 
-Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, dan garis pemisah tipis dari analisis desain Coinbase. Detail saham menjadi penerapan pertama. Gunakan nama dan simbol instrumen, tanggal sesi, grafik, dan angka untuk membangun hierarki halaman.
+Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, dan garis pemisah tipis dari analisis desain Coinbase. Detail saham dan Pantauan saham memakai sistem ini. Gunakan nama dan simbol instrumen, tanggal sesi, grafik, dan angka untuk membangun hierarki halaman.
 
 ## Warna dan tipografi
 
-- Gunakan token tema bersama di `src/App.css` untuk kanvas, permukaan, teks, garis, dan status. Palet aksen `--stock-action*` berada di `src/styles/stock.css` selama penerapan awal di Detail saham.
+- Gunakan token tema bersama di `src/App.css` untuk kanvas, permukaan, teks, garis, dan status. Token `--workspace-*` menetapkan aksen biru, skala judul, dan ukuran panel untuk Detail saham dan Pantauan saham.
 - Aksi utama memakai biru solid. Gunakan biru lembut dan garis biru untuk pilihan aktif, seperti rentang grafik atau tombol **Dipantau**. Gunakan label, tanda, atau pola garis untuk membedakan arah harga, risiko, dan status breakout.
 - Gunakan IBM Plex Sans yang sudah tersedia di aplikasi. Harga, persentase, volume, dan data tabel memakai angka tabular. Ratakan kolom numerik ke kanan dan tampilkan mata uang atau satuannya bila diperlukan untuk membaca nilai.
 - Pisahkan panel data dengan garis 1 px. Area di dalam panel, seperti sel level dan bingkai grafik, memakai permukaan netral yang sedikit berbeda dari kartu.
@@ -102,6 +102,13 @@ Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, 
 2. Letakkan **Buy Trigger** dan **Sell Trigger / Stop loss** di awal Rencana trading, diikuti Target dan Resistance 50 hari. Pasangkan status breakout dengan teks yang menjelaskan statusnya.
 3. Tampilkan pilihan rentang di dekat judul grafik. Letakkan legenda dan data candle yang dipilih langsung di bawah grafik. Bedakan garis Buy Trigger, Sell Trigger, dan volume rata-rata dengan pola garis dan label.
 4. Tempatkan rincian sesi acuan di sebelah grafik saat ruangnya cukup. Lanjutkan dengan analisis Minervini, tabel OHLCV, dan fundamental.
+
+## Pantauan saham
+
+1. Tempatkan **Cari saham** sebagai aksi utama. Di atas tabel, tampilkan jumlah saham, urutan breakout, dan status sinkronisasi akun.
+2. Mulai dari simbol, harga tutup, dan status agar data utama mudah dibandingkan. Ikuti dengan harga pantauan, Stage 2, volume, rata-rata volume 50 sesi, dan aksi baris. Gunakan panah atau tanda sama dengan untuk menunjukkan arah harga tutup terhadap harga buka.
+3. Di HP, pertahankan struktur tabel dan sematkan kolom saham di sisi kiri. Tempatkan gulir horizontal di dalam panel tabel dan tampilkan petunjuk geser saat kolom melampaui panel. Beri tinggi minimal `44px` untuk kontrol harga pantauan dan aksi baris.
+4. Tampilkan keadaan harga yang sedang dimuat atau gagal di baris saham terkait. Tampilkan pesan daftar kosong beserta cara menambahkan saham setelah sinkronisasi selesai.
 
 ## Desktop dan HP
 

@@ -52,8 +52,10 @@ export function formatPnl(value, currency, precision) {
   return `${sign}${formatPrice(Math.abs(value), currency, precision)}`;
 }
 
-export function formatVolume(volume) {
-  return volume == null ? 'Tidak tersedia' : `${volumeFormat.format(volume)} lembar`;
+export function formatVolume(volume, { includeUnit = true } = {}) {
+  if (volume == null) return 'Tidak tersedia';
+  const formatted = volumeFormat.format(volume);
+  return includeUnit ? `${formatted} lembar` : formatted;
 }
 
 export function formatCompactNumber(value) {

@@ -30,6 +30,16 @@
   --accent-hover: #114a63;
   --accent-soft: #e1eef3;
   --accent-soft-hover: #d4e6ee;
+  --workspace-action: #0052ff;
+  --workspace-action-hover: #0048e0;
+  --workspace-action-active: #003ecc;
+  --workspace-action-soft: #eaf1ff;
+  --workspace-on-action: #ffffff;
+  --workspace-title-size: clamp(1.75rem, 3.2cqi, 2.25rem);
+  --workspace-card-radius: 1rem;
+  --workspace-card-padding: clamp(0.875rem, 1.65vw, 1.375rem);
+  --workspace-card-gap: clamp(0.75rem, 1.5vw, 1rem);
+  --workspace-content-width: 76rem;
   --focus: #147da2;
   --positive: #176449;
   --positive-soft: #e6f2eb;
@@ -68,6 +78,11 @@
   --accent-hover: #456da5;
   --accent-soft: #252e3a;
   --accent-soft-hover: #2c3747;
+  --workspace-action: #a9c4ff;
+  --workspace-action-hover: #bfd3ff;
+  --workspace-action-active: #95b3f5;
+  --workspace-action-soft: #273650;
+  --workspace-on-action: #101c3a;
   --focus: #a4c0ec;
   --positive: #85cca8;
   --positive-soft: #234539;

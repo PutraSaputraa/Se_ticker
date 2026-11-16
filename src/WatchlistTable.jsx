@@ -194,10 +194,16 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled 
         event.stopPropagation();
         if (event.key === 'Enter') event.currentTarget.blur();
       }}
-      aria-label={`Price to watch untuk ${symbol}`}
+      aria-label={`Harga pantauan untuk ${symbol}`}
     />
   );
 }
+
+const priceDirections = {
+  1: { icon: '↑', label: 'Naik dibanding harga buka', className: 'trend--up' },
+  0: { icon: '=', label: 'Sama dengan harga buka', className: '' },
+  '-1': { icon: '↓', label: 'Turun dibanding harga buka', className: 'trend--down' },
+};
 
 function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, disabled, trendScore }) {
   const { symbol, priceToWatch } = entry;
@@ -215,20 +221,24 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
   );
 
   if (row?.status !== 'success') {
+    const error = row?.status === 'error';
     return (
       <tr>
-        <th scope="row"><TickerLink symbol={symbol} /></th>
-        <td><TrendScoreBadge score={trendScore} /></td>
-        <td colSpan={5} className={row?.status === 'error' ? 'research-quote-error' : 'research-cell-note'}>
-          {row?.status === 'error' ? row.message : 'Memuat harga dan volume…'}
+        <th scope="row" className="research-instrument"><TickerLink symbol={symbol} /></th>
+        <td colSpan={3} className="watchlist-quote-state">
+          <span className={error ? 'research-quote-error' : 'research-cell-note'}>
+            {error ? row.message : 'Memuat harga dan volume…'}
+          </span>
         </td>
+        <td className="watchlist-stage"><TrendScoreBadge score={trendScore} /></td>
+        <td colSpan={2} />
         <td className="num">{removeButton}</td>
       </tr>
     );
   }
 
   const { quote } = row;
-  const up = quote.close >= quote.open;
+  const direction = priceDirections[Math.sign(quote.close - quote.open)];
   const volumePass = quote.buyTrigger?.volumeChecks?.[0]?.meetsThreshold ?? null;
   const decimals = quote.currency === 'JPY' || quote.currency === 'IDR' ? 0 : 2;
   const breakout = breakoutStatus(quote, priceToWatch);
@@ -239,13 +249,16 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
     }}>
       <th scope="row" className="research-instrument">
         <TickerLink symbol={symbol} />
-        {quote.name && quote.name !== symbol && <span className="research-cell-note">{quote.name}</span>}
+        {quote.name && quote.name !== symbol && <span className="research-cell-note watchlist-company">{quote.name}</span>}
       </th>
-      <td><TrendScoreBadge score={trendScore} /></td>
-      <td className={`num ${up ? 'trend--up' : 'trend--down'}`}>
-        {formatPrice(quote.close, quote.currency)}
+      <td className="num">
+        <span className={`watchlist-close ${direction?.className ?? ''}`}>
+          {direction && <span role="img" aria-label={direction.label} title={direction.label}>{direction.icon}</span>}
+          {formatPrice(quote.close, quote.currency)}
+        </span>
         {quote.date && <time className="research-cell-note" dateTime={quote.date}>{formatDateCompact(quote.date)}</time>}
       </td>
+      <td><BreakoutBadge state={breakout.state} /></td>
       <td className="num">
         <PriceToWatchInput
           symbol={symbol}
@@ -255,12 +268,12 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
           disabled={disabled}
         />
       </td>
+      <td className="watchlist-stage"><TrendScoreBadge score={trendScore} /></td>
       <td className="num">
         {Number.isFinite(quote.volume) ? quote.volume.toLocaleString('id-ID') : 'Belum tersedia'}
         <CheckBadgeMini passed={volumePass} />
       </td>
-      <td className="num">{formatVolume(quote.buyTrigger?.averageVolume)}</td>
-      <td><BreakoutBadge state={breakout.state} /></td>
+      <td className="num">{formatVolume(quote.buyTrigger?.averageVolume, { includeUnit: false })}</td>
       <td className="num">{removeButton}</td>
     </tr>
   );
@@ -287,14 +300,14 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
         <thead>
           <tr>
             <th scope="col">Saham</th>
-            <th scope="col" title="Jumlah kriteria Trend Template Minervini yang lolos">Stage 2</th>
             <th scope="col" className="num">Harga tutup</th>
+            <th scope="col">Status</th>
             <th scope="col" className="num">Harga pantauan</th>
+            <th scope="col" className="watchlist-stage" title="Jumlah kriteria Trend Template Minervini yang lolos">Stage 2</th>
             <th scope="col" className="num">Volume (lembar)</th>
             <th scope="col" className="num" title="Rata-rata volume yang dipakai untuk menghitung ambang breakout">
-              Rata-rata volume 50 sesi
+              Rata-rata volume <span className="watchlist-header-note">50 sesi (lembar)</span>
             </th>
-            <th scope="col">Status</th>
             <th scope="col" className="num">Aksi</th>
           </tr>
         </thead>
