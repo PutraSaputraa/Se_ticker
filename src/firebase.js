@@ -2,7 +2,6 @@ import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth } from 'firebase/auth';
 
 export const useEmulators = import.meta.env.DEV && import.meta.env.VITE_FIREBASE_USE_EMULATORS === 'true';
-const storageBucket = useEmulators ? 'demo-seticker.appspot.com' : import.meta.env.VITE_FIREBASE_STORAGE_BUCKET?.trim();
 const config = useEmulators ? {
   apiKey: 'demo-api-key',
   authDomain: 'demo-seticker.firebaseapp.com',
@@ -25,7 +24,7 @@ const configured = Object.values(config).every((value) =>
 
 if (configured) {
   try {
-    app = initializeApp({ ...config, ...(storageBucket && { storageBucket }) });
+    app = initializeApp(config);
     auth = getAuth(app);
     if (useEmulators) {
       connectAuthEmulator(auth, 'http://127.0.0.1:9099');

@@ -535,11 +535,15 @@ export default function JournalPage({ account, uid }) {
       });
       const at = Date.now();
       let saved;
+      let uploaded = false;
       try {
-        if (screenshot) await uploadJournalScreenshot(uid, trade.id, screenshot);
+        if (screenshot) {
+          await uploadJournalScreenshot(uid, trade.id, screenshot);
+          uploaded = true;
+        }
         saved = await account.update((current) => openWalletPosition(current, trade, at));
       } catch (error) {
-        if (screenshot) await deleteJournalScreenshot(uid, trade.id);
+        if (uploaded) await deleteJournalScreenshot(uid, trade.id);
         throw error;
       }
       if (!saved && screenshot) {

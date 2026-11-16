@@ -1,11 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import {
-  downloadJournalScreenshot,
-  maxScreenshotBytes,
-  screenshotContentTypes,
-  screenshotStorageReady,
-  screenshotStorageUnavailable,
-} from '../journalScreenshot.js';
+import { downloadJournalScreenshot } from '../journalScreenshot.js';
+import { maxScreenshotBytes, screenshotContentTypes } from '../journalScreenshotFile.js';
+
+const maxSizeLabel = `${maxScreenshotBytes / 1_000_000} MB`;
 
 export function JournalScreenshotField({ file, onChange, disabled }) {
   const input = useRef(null);
@@ -33,7 +30,7 @@ export function JournalScreenshotField({ file, onChange, disabled }) {
     if (selected && !screenshotContentTypes.includes(selected.type)) {
       message = 'Pilih gambar dalam format PNG, JPG, atau WebP.';
     } else if (selected && (selected.size === 0 || selected.size > maxScreenshotBytes)) {
-      message = 'Pilih gambar dengan ukuran di atas 0 hingga 5 MB.';
+      message = `Pilih gambar dengan ukuran di atas 0 hingga ${maxSizeLabel}.`;
     }
     if (message) event.currentTarget.value = '';
     setError(message);
@@ -54,11 +51,11 @@ export function JournalScreenshotField({ file, onChange, disabled }) {
           aria-describedby={error ? `${hintId} ${errorId}` : hintId}
           aria-invalid={Boolean(error)}
           onChange={selectFile}
-          disabled={disabled || !screenshotStorageReady}
+          disabled={disabled}
         />
       </div>
       <p className="journal-help" id={hintId}>
-        {screenshotStorageReady ? 'PNG, JPG, atau WebP hingga 5 MB.' : screenshotStorageUnavailable}
+        PNG, JPG, atau WebP hingga {maxSizeLabel}.
       </p>
       {error && <p className="journal-feedback journal-feedback--error" id={errorId} role="alert">{error}</p>}
       {file && preview && (
@@ -97,12 +94,9 @@ export function JournalScreenshotDialog({ uid, trade, onClose }) {
         if (!active) return;
         url = URL.createObjectURL(file);
         setResult({ url });
-      } catch {
+      } catch (error) {
         if (!active) return;
-        const message = screenshotStorageReady
-          ? 'Screenshot chart gagal dibuka.'
-          : screenshotStorageUnavailable;
-        setResult({ message });
+        setResult({ message: error.message });
       }
     }
 
@@ -124,14 +118,12 @@ export function JournalScreenshotDialog({ uid, trade, onClose }) {
       {result?.message && (
         <div className="journal-feedback journal-feedback--error">
           <p role="alert">{result.message}</p>
-          {screenshotStorageReady && (
-            <button className="text-button journal-screenshot-button" type="button" onClick={() => {
-              setResult(null);
-              setAttempt((value) => value + 1);
-            }}>
-              Coba lagi
-            </button>
-          )}
+          <button className="text-button journal-screenshot-button" type="button" onClick={() => {
+            setResult(null);
+            setAttempt((value) => value + 1);
+          }}>
+            Coba lagi
+          </button>
         </div>
       )}
     </dialog>

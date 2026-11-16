@@ -9,7 +9,6 @@ import {
   collection, connectFirestoreEmulator, deleteDoc, doc, getDocFromServer,
   getDocsFromServer, getFirestore, serverTimestamp, setDoc, terminate,
 } from 'firebase/firestore';
-import { connectStorageEmulator, deleteObject, getBytes, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { mergeLegacyData, normalizeAccountData, updateAccountData } from '../src/accountData.js';
 import { addTrade, closeTrade, positionPnlUsd } from '../src/journal.js';
 import { closeWalletPosition, openWalletPosition, recordWalletCash, summarizeWallet } from '../src/wallet.js';
@@ -20,7 +19,6 @@ if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_
 }
 
 const clients = [];
-const storageHost = process.env.FIREBASE_STORAGE_EMULATOR_HOST;
 const password = 'Local-test-8675309!';
 const email = `ticker-${crypto.randomUUID()}@example.test`;
 let owner;
@@ -211,35 +209,4 @@ test('dua perangkat memakai saldo wallet yang sama dan penutupan hanya mengembal
   delete olderVersion.wallet;
   await assert.rejects(setDoc(reference, { ...olderVersion, updatedAt: serverTimestamp() }), { code: 'permission-denied' });
   await assert.rejects(setDoc(doc(outsider.db, 'users', uid), { ...settled, updatedAt: serverTimestamp() }), { code: 'permission-denied' });
-});
-
-test('screenshot posisi membatasi ukuran, format, dan akses ke pemilik akun', { skip: !storageHost }, async () => {
-  const [host, port] = storageHost.split(':');
-  const path = `users/${uid}/journal/screenshot-test/chart`;
-  function screenshotReference(client) {
-    const storage = getStorage(client.app, 'gs://demo-seticker.appspot.com');
-    connectStorageEmulator(storage, host, Number(port));
-    return ref(storage, path);
-  }
-
-  const file = screenshotReference(owner);
-  const otherFile = screenshotReference(outsider);
-  const guestFile = screenshotReference(guest);
-  const png = Uint8Array.from(Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X0xQAAAAASUVORK5CYII=',
-    'base64',
-  ));
-  const image = { contentType: 'image/png' };
-  const denied = { code: 'storage/unauthorized' };
-
-  await assert.rejects(uploadBytes(file, png, { contentType: 'image/svg+xml' }), denied);
-  await assert.rejects(uploadBytes(file, new Uint8Array(5_000_001), image), denied);
-  await assert.rejects(uploadBytes(otherFile, png, image), denied);
-  await uploadBytes(file, png, image);
-  assert.deepEqual(new Uint8Array(await getBytes(file)), png);
-  await assert.rejects(getBytes(guestFile), denied);
-  await assert.rejects(getBytes(otherFile), denied);
-  await assert.rejects(deleteObject(otherFile), denied);
-  await deleteObject(file);
-  await assert.rejects(getBytes(file), { code: 'storage/object-not-found' });
 });
