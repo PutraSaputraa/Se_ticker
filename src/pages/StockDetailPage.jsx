@@ -298,7 +298,7 @@ function StockDetail({ symbol, account }) {
       )}
 
       {quote && (
-        <article className="stock-detail-card">
+        <article className="stock-detail-content">
           <header className="stock-identity">
             <div className="stock-identity-info">
               <div className="stock-instrument">
@@ -337,10 +337,10 @@ function StockDetail({ symbol, account }) {
               <StatusBadge status={analysis.status} />
             </div>
             <dl className="stock-levels">
-              <TradingLevel label="Buy trigger" value={formatPrice(buyTrigger.level, currency)} />
+              <TradingLevel label="Buy Trigger" value={formatPrice(buyTrigger.level, currency)} />
               <TradingLevel
-                label="Stop loss"
-                value={formatPrice(analysis.stop, currency)}
+                label="Sell Trigger / Stop loss"
+                value={formatPrice(buyTrigger.sellLevel ?? analysis.stop, currency)}
                 hint={analysis.riskPct != null ? `Risiko ${formatPct(-Math.abs(analysis.riskPct))}` : undefined}
                 tone="risk"
               />
@@ -358,35 +358,37 @@ function StockDetail({ symbol, account }) {
             </dl>
           </section>
 
-          <CandlestickChart
-            sessions={chartSnapshot?.priceHistory ?? quote.priceHistory ?? []}
-            referenceDate={quote.date}
-            buyLevel={buyTrigger.level}
-            sellLevel={buyTrigger.sellLevel}
-            averageVolume={buyTrigger.averageVolume}
-            formatPrice={(price) => formatPrice(price, currency)}
-            formatDate={formatDate}
-            formatVolume={formatVolume}
-            timeframe={chartSnapshot?.range ?? quote.range ?? defaultRange}
-            selectedRange={range}
-            onTimeframeChange={setRange}
-            ranges={chartSnapshot?.availableRanges ?? quote.availableRanges}
-            loading={range !== defaultRange && chartData.status === 'loading'}
-            error={range !== defaultRange && chartData.status === 'error' ? chartData.message : null}
-            onRetry={() => setChartAttempt((attempt) => attempt + 1)}
-          />
+          <div className="stock-market-grid">
+            <CandlestickChart
+              sessions={chartSnapshot?.priceHistory ?? quote.priceHistory ?? []}
+              referenceDate={quote.date}
+              buyLevel={buyTrigger.level}
+              sellLevel={buyTrigger.sellLevel}
+              averageVolume={buyTrigger.averageVolume}
+              formatPrice={(price) => formatPrice(price, currency)}
+              formatDate={formatDate}
+              formatVolume={formatVolume}
+              timeframe={chartSnapshot?.range ?? quote.range ?? defaultRange}
+              selectedRange={range}
+              onTimeframeChange={setRange}
+              ranges={chartSnapshot?.availableRanges ?? quote.availableRanges}
+              loading={range !== defaultRange && chartData.status === 'loading'}
+              error={range !== defaultRange && chartData.status === 'error' ? chartData.message : null}
+              onRetry={() => setChartAttempt((attempt) => attempt + 1)}
+            />
 
-          <section className="stock-data-section stock-session" aria-labelledby="stock-session-title">
-            <h2 id="stock-session-title">Rincian sesi acuan</h2>
-            <dl className="stock-session-values" aria-label="Harga dan volume saham">
-              <div><dt>Buka</dt><dd>{formatPrice(quote.open, currency)}</dd></div>
-              <div><dt>Tertinggi</dt><dd>{formatPrice(quote.high, currency)}</dd></div>
-              <div><dt>Terendah</dt><dd>{formatPrice(quote.low, currency)}</dd></div>
-              <div><dt>Tutup</dt><dd>{formatPrice(quote.close, currency)}</dd></div>
-              <div><dt>Volume</dt><dd>{formatVolume(quote.volume)}</dd></div>
-              <div><dt>Rata-rata volume 50 sesi</dt><dd>{formatVolume(buyTrigger.averageVolume)}</dd></div>
-            </dl>
-          </section>
+            <section className="stock-data-section stock-session" aria-labelledby="stock-session-title">
+              <h2 id="stock-session-title">Rincian sesi acuan</h2>
+              <dl className="stock-session-values" aria-label="Harga dan volume saham">
+                <div><dt>Buka</dt><dd>{formatPrice(quote.open, currency)}</dd></div>
+                <div><dt>Tertinggi</dt><dd>{formatPrice(quote.high, currency)}</dd></div>
+                <div><dt>Terendah</dt><dd>{formatPrice(quote.low, currency)}</dd></div>
+                <div><dt>Tutup</dt><dd>{formatPrice(quote.close, currency)}</dd></div>
+                <div><dt>Volume</dt><dd>{formatVolume(quote.volume)}</dd></div>
+                <div><dt>Rata-rata volume 50 sesi</dt><dd>{formatVolume(buyTrigger.averageVolume)}</dd></div>
+              </dl>
+            </section>
+          </div>
 
           {minervini.status === 'success' && (
             <MinerviniPanel

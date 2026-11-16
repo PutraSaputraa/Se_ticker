@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { formatCompactNumber } from './format.js';
+import { formatCompactNumber, formatDateCompact } from './format.js';
 
 const axisDateFormat = new Intl.DateTimeFormat('id-ID', {
   timeZone: 'UTC',
@@ -30,7 +30,7 @@ function CandleReadout({ session, active, isReference, formatDate, formatPrice, 
   );
 }
 
-function ChartHeader({ count, timeframe, selectedRange, ranges, onTimeframeChange, latestDate, formatDate, loading, error, onRetry }) {
+function ChartHeader({ count, timeframe, selectedRange, ranges, onTimeframeChange, latestDate, loading, error, onRetry }) {
   const isWeekly = ['1wk', '1y', '2y'].includes(timeframe);
   const loadedRange = ranges.find(({ value }) => value === timeframe)?.label;
   const requestedRange = ranges.find(({ value }) => value === selectedRange)?.label;
@@ -41,7 +41,8 @@ function ChartHeader({ count, timeframe, selectedRange, ranges, onTimeframeChang
           <h2 id="candle-title">Grafik harga</h2>
           {latestDate && (
             <p className="stock-muted">
-              {loadedRange && `${loadedRange} · `}Interval {isWeekly ? 'mingguan' : 'harian'} · {count} candle hingga {formatDate(latestDate)}
+              {loadedRange && `${loadedRange} · `}{count} candle {isWeekly ? 'mingguan' : 'harian'} hingga{' '}
+              <time dateTime={latestDate}>{formatDateCompact(latestDate)}</time>
             </p>
           )}
         </div>
@@ -104,7 +105,6 @@ export default function CandlestickChart({
       ranges={ranges?.length ? ranges : defaultRanges}
       onTimeframeChange={onTimeframeChange}
       latestDate={latest?.date}
-      formatDate={formatDate}
       loading={loading}
       error={error}
       onRetry={onRetry}
@@ -131,8 +131,8 @@ export default function CandlestickChart({
   const candleCenter = (index) => (index + 0.5) * step;
   const dateTicks = new Set([0, Math.floor((sessions.length - 1) / 2), sessions.length - 1]);
   const triggers = [
-    { label: 'Buy trigger', type: 'buy', level: buyLevel },
-    { label: 'Sell trigger', type: 'sell', level: sellLevel },
+    { label: 'Buy Trigger', type: 'buy', level: buyLevel },
+    { label: 'Sell Trigger', type: 'sell', level: sellLevel },
   ].filter(({ level }) => Number.isFinite(level));
   const isOnScale = (level) => level >= floor && level <= ceiling;
   const hasAverage = Number.isFinite(averageVolume);
@@ -165,14 +165,6 @@ export default function CandlestickChart({
   return (
     <section className="candle-chart" aria-labelledby="candle-title">
       {header}
-      <CandleReadout
-        session={inspected}
-        active={tooltipOpen}
-        isReference={inspected.date === referenceDate}
-        formatPrice={formatPrice}
-        formatDate={formatDate}
-        formatVolume={formatVolume}
-      />
       <div className="candle-grid" aria-busy={loading}>
         <div className="candle-axis-y" aria-hidden="true">
           {[ceiling, (ceiling + floor) / 2, floor].map((price) => (
@@ -295,6 +287,14 @@ export default function CandlestickChart({
           {hasAverage && <li className="candle-legend--average">Volume rata-rata 50 sesi</li>}
         </ul>
       )}
+      <CandleReadout
+        session={inspected}
+        active={tooltipOpen}
+        isReference={inspected.date === referenceDate}
+        formatPrice={formatPrice}
+        formatDate={formatDate}
+        formatVolume={formatVolume}
+      />
     </section>
   );
 }
