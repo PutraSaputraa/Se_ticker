@@ -1,6 +1,10 @@
 const storageKey = 'cek-saham:watchlist';
 
-// Setiap entri: { symbol, priceToWatch }. priceToWatch null berarti belum diisi.
+function normalizeRating(rating) {
+  return Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : null;
+}
+
+// Rating disimpan pada entri yang sudah diberi bintang.
 function normalizeEntry(entry) {
   if (typeof entry === 'string') {
     // Format lama: daftar pantauan hanya berupa daftar simbol.
@@ -11,7 +15,8 @@ function normalizeEntry(entry) {
     const symbol = entry.symbol.trim();
     if (!symbol) return null;
     const priceToWatch = Number.isFinite(entry.priceToWatch) ? entry.priceToWatch : null;
-    return { symbol, priceToWatch };
+    const rating = normalizeRating(entry.rating);
+    return { symbol, priceToWatch, ...(rating !== null && { rating }) };
   }
   return null;
 }
@@ -60,5 +65,13 @@ export function removeSymbol(list, symbol) {
 export function setPriceToWatch(list, symbol, priceToWatch) {
   return list.map((entry) =>
     entry.symbol === symbol ? { ...entry, priceToWatch } : entry,
+  );
+}
+
+export function setWatchlistRating(list, symbol, value) {
+  const rating = normalizeRating(value);
+  if (rating === null) return list;
+  return list.map((entry) =>
+    entry.symbol === symbol ? { ...entry, rating } : entry,
   );
 }

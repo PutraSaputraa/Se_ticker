@@ -105,9 +105,9 @@ Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, 
 
 ## Pantauan saham
 
-1. Tempatkan **Cari saham** sebagai aksi utama. Di atas tabel, tampilkan jumlah saham, urutan breakout, dan status sinkronisasi akun.
+1. Tempatkan **Cari saham** sebagai aksi utama. Di atas tabel, tampilkan jumlah saham, petunjuk urutan bintang, dan status sinkronisasi akun. Urutkan bintang tertinggi ke atas dan gunakan status breakout saat jumlah bintangnya sama.
 2. Mulai dari simbol, harga tutup, dan status agar data utama mudah dibandingkan. Ikuti dengan harga pantauan, Stage 2, volume, rata-rata volume 50 sesi, dan aksi baris. Gunakan panah atau tanda sama dengan untuk menunjukkan arah harga tutup terhadap harga buka.
-3. Di HP, pertahankan struktur tabel dan sematkan kolom saham di sisi kiri. Tempatkan gulir horizontal di dalam panel tabel dan tampilkan petunjuk geser saat kolom melampaui panel. Beri tinggi minimal `44px` untuk kontrol harga pantauan dan aksi baris.
+3. Di HP, pertahankan struktur tabel dan sematkan kolom saham di sisi kiri. Tempatkan pilihan 1–5 bintang di kolom saham agar mudah dijangkau saat tabel digeser. Tampilkan petunjuk geser saat kolom melampaui panel. Beri tinggi minimal `44px` untuk kontrol bintang, harga pantauan, dan aksi baris.
 4. Tampilkan keadaan harga yang sedang dimuat atau gagal di baris saham terkait. Tampilkan pesan daftar kosong beserta cara menambahkan saham setelah sinkronisasi selesai.
 
 ## Rekomendasi

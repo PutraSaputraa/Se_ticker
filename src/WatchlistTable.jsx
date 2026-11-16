@@ -205,8 +205,40 @@ const priceDirections = {
   '-1': { icon: '↓', label: 'Turun dibanding harga buka', className: 'trend--down' },
 };
 
-function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, disabled, trendScore }) {
-  const { symbol, priceToWatch } = entry;
+const starValues = [1, 2, 3, 4, 5];
+
+function WatchlistRating({ symbol, rating, onSetRating, disabled }) {
+  return (
+    <div className="watchlist-rating" role="group" aria-label={`Beri bintang untuk ${symbol}`}>
+      {starValues.map((value) => (
+        <button
+          key={value}
+          type="button"
+          aria-label={`${value} bintang`}
+          aria-pressed={value === rating}
+          aria-disabled={disabled}
+          title={`Beri ${value} bintang`}
+          onClick={() => { if (!disabled && value !== rating) onSetRating(symbol, value); }}
+        >
+          <span aria-hidden="true" className={value <= rating ? 'watchlist-star-filled' : undefined}>
+            {value <= rating ? '★' : '☆'}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, onSetRating, disabled, trendScore }) {
+  const { symbol, priceToWatch, rating } = entry;
+  const quote = row?.quote;
+  const instrument = (
+    <th scope="row" className="research-instrument">
+      <TickerLink symbol={symbol} />
+      {quote?.name && quote.name !== symbol && <span className="research-cell-note research-table-company">{quote.name}</span>}
+      <WatchlistRating symbol={symbol} rating={rating} onSetRating={onSetRating} disabled={disabled} />
+    </th>
+  );
   const removeButton = (
     <button
       type="button"
@@ -224,7 +256,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
     const error = row?.status === 'error';
     return (
       <tr>
-        <th scope="row" className="research-instrument"><TickerLink symbol={symbol} /></th>
+        {instrument}
         <td colSpan={3} className="watchlist-quote-state">
           <span className={error ? 'research-quote-error' : 'research-cell-note'}>
             {error ? row.message : 'Memuat harga dan volume…'}
@@ -237,7 +269,6 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
     );
   }
 
-  const { quote } = row;
   const direction = priceDirections[Math.sign(quote.close - quote.open)];
   const volumePass = quote.buyTrigger?.volumeChecks?.[0]?.meetsThreshold ?? null;
   const decimals = quote.currency === 'JPY' || quote.currency === 'IDR' ? 0 : 2;
@@ -247,10 +278,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
     <tr className="watchlist-row" onClick={(event) => {
       if (!event.target.closest('a, button, input')) onOpen(symbol);
     }}>
-      <th scope="row" className="research-instrument">
-        <TickerLink symbol={symbol} />
-        {quote.name && quote.name !== symbol && <span className="research-cell-note research-table-company">{quote.name}</span>}
-      </th>
+      {instrument}
       <td className="num">
         <span className={`watchlist-close ${direction?.className ?? ''}`}>
           {direction && <span role="img" aria-label={direction.label} title={direction.label}>{direction.icon}</span>}
@@ -281,12 +309,14 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
 
 const stateRank = { breakout: 0, near: 1, none: 2 };
 
-export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove, onSetWatchPrice, disabled }) {
+export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove, onSetWatchPrice, onSetRating, disabled }) {
   const symbolsKey = entries.map((entry) => entry.symbol).join('\n');
   const rows = useWatchlistData(symbolsKey);
   const trendScores = useTrendScores(symbolsKey);
 
   const ordered = [...entries].sort((a, b) => {
+    const byRating = (b.rating ?? 0) - (a.rating ?? 0);
+    if (byRating !== 0) return byRating;
     const rowA = rows[a.symbol];
     const rowB = rows[b.symbol];
     const rankA = rowA?.status === 'success' ? stateRank[breakoutStatus(rowA.quote, a.priceToWatch).state] : 3;
@@ -321,6 +351,7 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
               onOpen={onOpen}
               onRemove={onRemove}
               onSetWatchPrice={onSetWatchPrice}
+              onSetRating={onSetRating}
               disabled={disabled}
               trendScore={trendScores[entry.symbol]}
             />

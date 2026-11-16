@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import WatchlistTable from '../WatchlistTable.jsx';
 import { formatPrice } from '../format.js';
-import { removeSymbol, setPriceToWatch } from '../watchlist.js';
+import { removeSymbol, setPriceToWatch, setWatchlistRating } from '../watchlist.js';
 import '../styles/research.css';
 
 export default function WatchlistPage({ account }) {
@@ -31,7 +31,7 @@ export default function WatchlistPage({ account }) {
           {watchlist.length > 0 && (
             <div>
               <strong>{watchlist.length} saham</strong>
-              <p>Breakout di urutan atas</p>
+              <p>Bintang tertinggi di atas</p>
             </div>
           )}
           <span className="research-sync" data-state={sync} role="status">{syncLabel}</span>
@@ -47,6 +47,9 @@ export default function WatchlistPage({ account }) {
             }
             onSetWatchPrice={(symbol, price) =>
               account.update((current) => ({ ...current, watchlist: setPriceToWatch(current.watchlist, symbol, price) }))
+            }
+            onSetRating={(symbol, rating) =>
+              account.update((current) => ({ ...current, watchlist: setWatchlistRating(current.watchlist, symbol, rating) }))
             }
           />
         ) : account.ready ? (

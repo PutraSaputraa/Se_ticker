@@ -76,6 +76,8 @@
   border-radius: var(--workspace-card-radius);
 }
 
+.research-panel.watchlist-panel { --research-symbol-width: clamp(8.75rem, 17cqi, 14rem); }
+
 .research-panel-heading {
   align-items: center;
   padding: 1rem clamp(0.875rem, 2vw, 1.375rem);
@@ -303,6 +305,31 @@
 .watchlist-table .watchlist-stage .research-cell-note { min-width: 3.75rem; white-space: normal; }
 .watchlist-header-note { display: block; font-weight: 400; }
 
+.watchlist-rating {
+  display: flex;
+  width: max-content;
+  margin-top: 0.2rem;
+}
+
+.watchlist-rating button {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.watchlist-rating button:hover:not([aria-disabled="true"]) { background: var(--workspace-action-soft); }
+.watchlist-rating button[aria-disabled="true"] { cursor: not-allowed; opacity: 0.64; }
+.watchlist-rating button:focus-visible { outline-offset: -2px; }
+.watchlist-star-filled { color: var(--warning); }
+
 .watchlist-close {
   display: inline-flex;
   align-items: center;
@@ -360,6 +387,7 @@
 
 @media (pointer: coarse) {
   .watchlist-table .ptw-input { font-size: 1rem; }
+  .watchlist-rating button { height: 2.75rem; }
 }
 
 .research-watch {
