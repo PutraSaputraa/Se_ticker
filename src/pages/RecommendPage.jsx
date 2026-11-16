@@ -9,10 +9,6 @@ export default function RecommendPage({ account }) {
 
   return (
     <div className="research-workspace recommend-page">
-      <header className="page-heading">
-        <h1>Rekomendasi</h1>
-        <p>Temukan saham dari pemindaian teknikal atau telusuri kandidat melalui riset AI.</p>
-      </header>
       <BreakoutScanner
         watchlist={watchlist}
         disabled={watchlistDisabled}

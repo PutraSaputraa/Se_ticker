@@ -37,11 +37,11 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice }) {
         <thead>
           <tr>
             <th scope="col">Saham</th>
-            <th scope="col">Sesi</th>
             <th scope="col" className="num">Harga tutup</th>
             <th scope="col" className="num">Perubahan</th>
             <th scope="col" className="num">Resistance</th>
-            <th scope="col" className="num">Rasio volume</th>
+            <th scope="col" className="num scan-volume">Rasio volume</th>
+            <th scope="col">Sesi</th>
             <th scope="col" className="num">Aksi</th>
           </tr>
         </thead>
@@ -50,12 +50,16 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice }) {
             <tr key={pick.symbol}>
               <th scope="row" className="research-instrument">
                 <TickerLink symbol={pick.symbol} />
-                {pick.name && <span className="research-cell-note">{pick.name}</span>}
+                {pick.name && <span className="research-cell-note research-table-company">{pick.name}</span>}
                 {pick.universe && <span className="research-cell-note">{pick.universe}</span>}
-                {pick.aiNote && <p className="research-scan-note">{pick.aiNote}</p>}
+                {pick.aiNote && (
+                  <details className="research-scan-details">
+                    <summary>Catatan AI</summary>
+                    <p className="research-scan-note">{pick.aiNote}</p>
+                  </details>
+                )}
               </th>
-              <td>{pick.date ? <time dateTime={pick.date}>{formatDateCompact(pick.date)}</time> : 'Tidak tersedia'}</td>
-              <td className="num">{formatPrice(pick.close, pick.currency)}</td>
+              <td className="num"><strong>{formatPrice(pick.close, pick.currency)}</strong></td>
               <td className={`num ${pick.changePct > 0 ? 'trend--up' : pick.changePct < 0 ? 'trend--down' : ''}`}>
                 {formatPct(pick.changePct)}
               </td>
@@ -63,11 +67,12 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice }) {
                 {formatPrice(pick.resistance, pick.currency)}
                 {Number.isFinite(pick.breakoutPct) && <span className="research-cell-note">{formatPct(pick.breakoutPct)} di atas level</span>}
               </td>
-              <td className="num">
+              <td className="num scan-volume">
                 {Number.isFinite(pick.volumeRatio)
                   ? `${pick.volumeRatio.toLocaleString('id-ID', { maximumFractionDigits: 1 })}×`
                   : 'Tidak tersedia'}
               </td>
+              <td>{pick.date ? <time dateTime={pick.date}>{formatDateCompact(pick.date)}</time> : 'Tidak tersedia'}</td>
               <td className="num"><WatchAction symbol={pick.symbol} inWatchlist={watched.has(pick.symbol)} disabled={disabled} onAdd={onAdd} /></td>
             </tr>
           ))}
@@ -80,16 +85,18 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice }) {
 function ResearchBrief({ pick, inWatchlist, disabled, onAdd }) {
   return (
     <li className="research-brief">
-      <div>
-        <TickerLink symbol={pick.symbol} />
-        {pick.name && <p className="research-company">{pick.name}</p>}
+      <div className="research-brief-heading">
+        <div>
+          <TickerLink symbol={pick.symbol} />
+          {pick.name && <p className="research-company">{pick.name}</p>}
+        </div>
+        <WatchAction symbol={pick.symbol} inWatchlist={inWatchlist} disabled={disabled} onAdd={onAdd} />
       </div>
       <dl className="research-brief-details">
         {pick.note && <div><dt>Analisis teknikal</dt><dd>{pick.note}</dd></div>}
         {pick.level && <div><dt>Level pantauan</dt><dd>{pick.level}</dd></div>}
         {pick.catalyst && <div><dt>Katalis</dt><dd>{pick.catalyst}</dd></div>}
       </dl>
-      <WatchAction symbol={pick.symbol} inWatchlist={inWatchlist} disabled={disabled} onAdd={onAdd} />
     </li>
   );
 }
@@ -185,13 +192,11 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
 
   return (
     <>
-      <section className="research-panel" aria-labelledby="breakout-scanner-title">
-        <div className="research-panel-heading">
-          <div>
-            <h2 id="breakout-scanner-title">Pencarian kandidat</h2>
-            <p>{description}</p>
-          </div>
-        </div>
+      <section className="research-panel recommend-panel" aria-labelledby="breakout-scanner-title">
+        <header className="page-heading recommend-heading">
+          <h1 id="breakout-scanner-title">Rekomendasi</h1>
+          <p>{description}</p>
+        </header>
         <form className="research-controls" onSubmit={(event) => { event.preventDefault(); if (!loading) run(); }}>
           <fieldset className="research-mode">
             <legend>Metode</legend>
@@ -221,30 +226,30 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           </label>
           <button type="submit" className="scan-button" disabled={loading}>{action}</button>
         </form>
+
+        {loading && (
+          <div className="status-card" role="status">
+            <span className="spinner" aria-hidden="true" />
+            <div>
+              <p className="status-title">{isResearch ? 'Menelusuri kandidat…' : 'Memindai data harga…'}</p>
+              <p>{isResearch ? 'Kenari mencari dan menilai sumber web.' : 'Memeriksa resistance, konsolidasi, dan volume tiap saham.'}</p>
+            </div>
+          </div>
+        )}
+
+        {state.status === 'error' && (
+          <div className="status-card status-card--error" role="alert">
+            <span className="status-mark" aria-hidden="true">!</span>
+            <div>
+              <p className="status-title">{isResearch ? 'Riset gagal' : 'Pemindaian gagal'}</p>
+              <p>{state.message}</p>
+            </div>
+          </div>
+        )}
       </section>
 
-      {loading && (
-        <div className="status-card" role="status">
-          <span className="spinner" aria-hidden="true" />
-          <div>
-            <p className="status-title">{isResearch ? 'Menelusuri kandidat…' : 'Memindai data harga…'}</p>
-            <p>{isResearch ? 'Kenari mencari dan menilai sumber web.' : 'Memeriksa resistance, konsolidasi, dan volume tiap saham.'}</p>
-          </div>
-        </div>
-      )}
-
-      {state.status === 'error' && (
-        <div className="status-card status-card--error" role="alert">
-          <span className="status-mark" aria-hidden="true">!</span>
-          <div>
-            <p className="status-title">{isResearch ? 'Riset gagal' : 'Pemindaian gagal'}</p>
-            <p>{state.message}</p>
-          </div>
-        </div>
-      )}
-
       {result && (
-        <section className="research-panel" aria-labelledby="research-results-title">
+        <section className="research-panel recommend-panel" aria-labelledby="research-results-title">
           <div className="research-panel-heading">
             <div>
               <h2 id="research-results-title">{isResearch ? 'Kandidat riset AI' : 'Hasil scan matematis'}</h2>

@@ -249,7 +249,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
     }}>
       <th scope="row" className="research-instrument">
         <TickerLink symbol={symbol} />
-        {quote.name && quote.name !== symbol && <span className="research-cell-note watchlist-company">{quote.name}</span>}
+        {quote.name && quote.name !== symbol && <span className="research-cell-note research-table-company">{quote.name}</span>}
       </th>
       <td className="num">
         <span className={`watchlist-close ${direction?.className ?? ''}`}>

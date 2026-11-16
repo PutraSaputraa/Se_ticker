@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: Cek Saham
-description: Workspace riset saham untuk membandingkan harga dan status di Pantauan serta membaca level trading dan grafik di Detail saham.
+description: Workspace untuk mencari kandidat di Rekomendasi, membandingkan saham di Pantauan, serta membaca level trading dan grafik di Detail saham.
 colors:
   canvas: "#f3f6f8"
   surface: "#ffffff"
@@ -87,11 +87,11 @@ components:
 
 # Cek Saham
 
-Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, dan garis pemisah tipis dari analisis desain Coinbase. Detail saham dan Pantauan saham memakai sistem ini. Gunakan nama dan simbol instrumen, tanggal sesi, grafik, dan angka untuk membangun hierarki halaman.
+Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, dan garis pemisah tipis dari analisis desain Coinbase. Detail saham, Pantauan saham, dan Rekomendasi memakai sistem ini. Gunakan nama dan simbol instrumen, tanggal sesi, grafik, dan angka untuk membangun hierarki halaman.
 
 ## Warna dan tipografi
 
-- Gunakan token tema bersama di `src/App.css` untuk kanvas, permukaan, teks, garis, dan status. Token `--workspace-*` menetapkan aksen biru, skala judul, dan ukuran panel untuk Detail saham dan Pantauan saham.
+- Gunakan token tema bersama di `src/App.css` untuk kanvas, permukaan, teks, garis, dan status. Token `--workspace-*` menetapkan aksen biru, skala judul, dan ukuran panel.
 - Aksi utama memakai biru solid. Gunakan biru lembut dan garis biru untuk pilihan aktif, seperti rentang grafik atau tombol **Dipantau**. Gunakan label, tanda, atau pola garis untuk membedakan arah harga, risiko, dan status breakout.
 - Gunakan IBM Plex Sans yang sudah tersedia di aplikasi. Harga, persentase, volume, dan data tabel memakai angka tabular. Ratakan kolom numerik ke kanan dan tampilkan mata uang atau satuannya bila diperlukan untuk membaca nilai.
 - Pisahkan panel data dengan garis 1 px. Area di dalam panel, seperti sel level dan bingkai grafik, memakai permukaan netral yang sedikit berbeda dari kartu.
@@ -109,6 +109,13 @@ Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, 
 2. Mulai dari simbol, harga tutup, dan status agar data utama mudah dibandingkan. Ikuti dengan harga pantauan, Stage 2, volume, rata-rata volume 50 sesi, dan aksi baris. Gunakan panah atau tanda sama dengan untuk menunjukkan arah harga tutup terhadap harga buka.
 3. Di HP, pertahankan struktur tabel dan sematkan kolom saham di sisi kiri. Tempatkan gulir horizontal di dalam panel tabel dan tampilkan petunjuk geser saat kolom melampaui panel. Beri tinggi minimal `44px` untuk kontrol harga pantauan dan aksi baris.
 4. Tampilkan keadaan harga yang sedang dimuat atau gagal di baris saham terkait. Tampilkan pesan daftar kosong beserta cara menambahkan saham setelah sinkronisasi selesai.
+
+## Rekomendasi
+
+1. Satukan pilihan **Scan matematis** atau **Riset AI**, pemilih bursa, dan tombol mulai dalam satu panel. Tampilkan status proses dan pesan gagal di dekat kontrol, serta tampilkan aksi **Coba lagi** untuk mengulang permintaan.
+2. Mulai tabel scan dari simbol, harga tutup, dan perubahan. Sematkan kolom saham saat tabel digeser di HP. Tampilkan resistance dan rasio volume dengan angka tabular. Catatan AI pada satu saham bisa dibuka dari baris saham tersebut.
+3. Tampilkan hasil riset AI sebagai kartu kandidat. Letakkan identitas saham dan aksi **Pantau** di bagian atas, lalu susun analisis teknikal, level pantauan, dan katalis sesuai data yang tersedia. Susun rincian dalam satu kolom jika ruang sempit.
+4. Tampilkan jumlah hasil dan sesi acuan atau tanggal riset di atas hasil. Gunakan tombol sekunder untuk **Pantau**, serta label **Dipantau** untuk saham yang sudah tersimpan.
 
 ## Desktop dan HP
 
