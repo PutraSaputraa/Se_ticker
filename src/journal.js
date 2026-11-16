@@ -16,6 +16,22 @@ export const journalSides = {
 export const journalTypes = { spot: 'SPOT', futures: 'FUTURES' };
 export const journalCurrencies = ['USD', 'IDR', 'USDT'];
 export const journalRewardMultiples = [2, 3, 4];
+export const journalSetupOptions = [
+  'Consolidation',
+  'Cup & Handle',
+  'Earning Report',
+  'Falling Wedge',
+  'Fundamental Long Term',
+  'HH-HL',
+  'HNS',
+  'Inverse HNS',
+  'LL-LH',
+  'News',
+  'Resistence',
+  'Retrace Fibo 0.618',
+  'Retrace Fibo 0.786',
+  'Support',
+];
 
 let counter = 0;
 function makeId() {
@@ -45,6 +61,8 @@ export function normalizeTrade(entry) {
   const hasPrice = entryPrice > 0 && Boolean(quoteCurrency);
   const validStatus = Object.hasOwn(journalStatuses, entry.status) && (entry.status !== 'open' || hasPrice);
   const status = validStatus ? entry.status : null;
+  const plan = entry.setupPlan;
+  const limitPrice = num(plan?.limitPrice);
 
   return {
     id: typeof entry.id === 'string' && entry.id ? entry.id : makeId(),
@@ -59,6 +77,14 @@ export function normalizeTrade(entry) {
     status,
     notes: typeof entry.notes === 'string' ? entry.notes.trim() : '',
     ...(entry.chartScreenshot === true && { chartScreenshot: true }),
+    ...(limitPrice > 0 && {
+      setupPlan: {
+        limitPrice,
+        date: typeof plan.date === 'string' ? plan.date : '',
+        market: typeof plan.market === 'string' ? plan.market : '',
+        timeframe: typeof plan.timeframe === 'string' ? plan.timeframe : '',
+      },
+    }),
     ...(hasPrice && {
       entryPrice,
       ...(stopLoss > 0 && { stopLoss }),
@@ -97,7 +123,7 @@ export function addTrade(journal, trade) {
   return [normalized, ...journal];
 }
 
-function quoteDateForTrade(trade, quote) {
+export function quoteDateForTrade(trade, quote) {
   if (trade.type === 'futures' && trade.entryTimeZone && Number.isSafeInteger(quote.timestamp)) {
     try {
       return new Intl.DateTimeFormat('sv-SE', { timeZone: trade.entryTimeZone }).format(quote.timestamp * 1000);

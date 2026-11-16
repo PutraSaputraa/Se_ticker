@@ -13,6 +13,12 @@ export const markets = {
   sz: { label: 'China (Shenzhen)', suffix: '.SZ', digits: 6 },
 };
 
+const tickerMarkets = {
+  ...markets,
+  tw: { label: 'Taiwan (TWSE)', suffix: '.TW' },
+  two: { label: 'Taiwan (TPEx)', suffix: '.TWO' },
+};
+
 const catalog = new Map();
 for (const [market, { symbols }] of Object.entries(universes)) {
   for (const symbol of symbols) catalog.set(symbol, market === 'auto' ? 'id' : market);
@@ -26,7 +32,7 @@ for (const symbol of ['BTC-USD', 'ETH-USD', 'SOL-USD']) catalog.set(symbol, 'cry
 const symbolPattern = /^\^?[A-Z0-9]+(?:[.=-][A-Z0-9]+)*$/;
 const cryptoPattern = /-(?:USD|USDT|USDC|EUR|GBP|JPY|IDR|BTC|ETH)$/;
 const marketPrefix = /^(US|CRYPTO):\s*/;
-const marketsBySuffix = new Map(Object.entries(markets)
+const marketsBySuffix = new Map(Object.entries(tickerMarkets)
   .filter(([, { suffix }]) => suffix)
   .map(([market, { suffix }]) => [suffix, market]));
 
@@ -46,7 +52,7 @@ export function normalizeTicker(ticker, market = 'auto') {
   if (selectedMarket === 'crypto') {
     return /^[A-Z0-9]+$/.test(symbol) ? `${symbol}-USD` : symbol.replace(/\s*\/\s*/, '-');
   }
-  const { suffix, digits } = markets[selectedMarket] ?? {};
+  const { suffix, digits } = tickerMarkets[selectedMarket] ?? {};
   if (suffix) {
     const code = /^\d+$/.test(symbol) ? symbol.padStart(digits ?? 0, '0') : symbol;
     return `${code}${suffix}`;
@@ -67,7 +73,7 @@ export function suggestTickers(input, knownSymbols = [], market = 'auto') {
   if (!query) return [];
 
   const selectedMarket = prefix ? prefix[1].toLowerCase() : market;
-  const { digits } = markets[selectedMarket] ?? {};
+  const { digits } = tickerMarkets[selectedMarket] ?? {};
   const matchWithoutLeadingZeros = digits && /^[1-9]\d*$/.test(query);
   const exact = selectedMarket === 'auto' ? query : normalizeTicker(query, selectedMarket);
   const known = knownSymbols.map((symbol) => symbol.trim().toUpperCase());
@@ -78,7 +84,7 @@ export function suggestTickers(input, knownSymbols = [], market = 'auto') {
     if (!matchesQuery || symbol.length > 32 || !symbolPattern.test(symbol)) continue;
     const region = tickerMarket(symbol);
     if (selectedMarket !== 'auto' && region !== selectedMarket) continue;
-    matches.push({ symbol, market: markets[region]?.label ?? '' });
+    matches.push({ symbol, market: tickerMarkets[region]?.label ?? '' });
   }
 
   return matches
@@ -88,16 +94,16 @@ export function suggestTickers(input, knownSymbols = [], market = 'auto') {
 
 export function suggestTickerAlternatives(symbol) {
   const market = tickerMarket(symbol);
-  const suffix = markets[market]?.suffix;
+  const suffix = tickerMarkets[market]?.suffix;
   const code = suffix ? symbol.slice(0, -suffix.length) : symbol;
   const sameCode = [];
   const nearCode = [];
 
   for (const [candidate, region] of catalog) {
     if (candidate === symbol) continue;
-    const candidateSuffix = markets[region].suffix;
+    const candidateSuffix = tickerMarkets[region].suffix;
     const candidateCode = candidateSuffix ? candidate.slice(0, -candidateSuffix.length) : candidate;
-    const option = { symbol: candidate, market: markets[region].label };
+    const option = { symbol: candidate, market: tickerMarkets[region].label };
     if (candidateCode === code) {
       sameCode.push(option);
     } else if (market === region && code.length >= 4 && candidateCode.length === code.length

@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
-import { connectFirestoreEmulator, doc, getDocFromServer, getFirestore, onSnapshot } from 'firebase/firestore';
-import { app, auth, useEmulators } from './firebase.js';
+import { doc, getDocFromServer, onSnapshot } from 'firebase/firestore';
+import { auth } from './firebase.js';
+import { db } from './firestore.js';
 import { AccountChangeError, normalizeAccountData, updateAccountData } from './accountData.js';
-
-const db = getFirestore(app);
-if (useEmulators) connectFirestoreEmulator(db, '127.0.0.1', 8080);
 
 function dataError(error) {
   if (error.code === 'permission-denied') {

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
+import { Firestore } from '@google-cloud/firestore';
 import { deleteApp, initializeApp } from 'firebase/app';
 import {
   connectAuthEmulator, createUserWithEmailAndPassword, deleteUser,
@@ -7,10 +8,12 @@ import {
 } from 'firebase/auth';
 import {
   collection, connectFirestoreEmulator, deleteDoc, doc, getDocFromServer,
-  getDocsFromServer, getFirestore, serverTimestamp, setDoc, terminate,
+  getDocsFromServer, getFirestore, query, serverTimestamp, setDoc, terminate, updateDoc, where,
 } from 'firebase/firestore';
+import { monitorJournalSetups } from '../netlify/functions/journal-setup-monitor.js';
 import { mergeLegacyData, normalizeAccountData, updateAccountData } from '../src/accountData.js';
 import { addTrade, closeTrade, positionPnlUsd } from '../src/journal.js';
+import { journalSetupsCollection } from '../src/journalSetups.js';
 import { closeWalletPosition, openWalletPosition, recordWalletCash, summarizeWallet } from '../src/wallet.js';
 import { addSymbol, removeSymbol, setPriceToWatch } from '../src/watchlist.js';
 
@@ -209,4 +212,75 @@ test('dua perangkat memakai saldo wallet yang sama dan penutupan hanya mengembal
   delete olderVersion.wallet;
   await assert.rejects(setDoc(reference, { ...olderVersion, updatedAt: serverTimestamp() }), { code: 'permission-denied' });
   await assert.rejects(setDoc(doc(outsider.db, 'users', uid), { ...settled, updatedAt: serverTimestamp() }), { code: 'permission-denied' });
+});
+
+test('pemantau membuka pending setup satu kali dan mempertahankan setup tanpa saldo cukup', { timeout: 45_000 }, async () => {
+  const admin = new Firestore({ projectId: 'demo-seticker' });
+  const id = crypto.randomUUID();
+  const pending = doc(owner.db, journalSetupsCollection, id);
+  const unfunded = doc(owner.db, journalSetupsCollection, `${id}-unfunded`);
+  const reference = doc(owner.db, 'users', uid);
+  const setup = {
+    uid,
+    pair: 'BTC-USD',
+    market: 'crypto',
+    date: '2026-11-16',
+    side: 'long',
+    type: 'spot',
+    timeframe: '4H',
+    setup: 'Support',
+    thesis: 'Uji pergerakan harga BTC.',
+    positionCents: 10_000,
+    limitPrice: 120,
+    stopLoss: 114,
+    takeProfit: 138,
+    rewardMultiple: 3,
+    quoteCurrency: 'USD',
+    triggerAbove: true,
+    entryTimeZone: 'Asia/Jakarta',
+    createdAt: serverTimestamp(),
+  };
+  const before = (await getDocFromServer(reference)).data();
+  const available = summarizeWallet(before.wallet).availableCents;
+  try {
+    await setDoc(pending, setup);
+    await setDoc(unfunded, { ...setup, positionCents: available + 1 });
+    const owned = query(collection(secondDevice.db, journalSetupsCollection), where('uid', '==', uid));
+    assert.equal((await getDocsFromServer(owned)).size, 2);
+    const outsiderRef = doc(outsider.db, journalSetupsCollection, id);
+    await assert.rejects(getDocFromServer(outsiderRef), { code: 'permission-denied' });
+    await assert.rejects(deleteDoc(outsiderRef), { code: 'permission-denied' });
+    const foreignSetups = query(collection(outsider.db, journalSetupsCollection), where('uid', '==', uid));
+    await assert.rejects(getDocsFromServer(foreignSetups), { code: 'permission-denied' });
+    await assert.rejects(setDoc(doc(outsider.db, journalSetupsCollection, `${id}-spoof`), setup), { code: 'permission-denied' });
+    await assert.rejects(updateDoc(pending, { positionCents: 1 }), { code: 'permission-denied' });
+
+    const quote = {
+      symbol: 'BTC-USD', date: '2026-11-16', currency: 'USD',
+      timestamp: Math.ceil(Date.now() / 1000), price: 121,
+    };
+    const results = await Promise.all([
+      monitorJournalSetups(admin, async () => quote),
+      monitorJournalSetups(admin, async () => quote),
+    ]);
+    assert.equal(results.reduce((total, result) => total + result.opened, 0), 1, JSON.stringify(results));
+    assert.ok(results.some(({ blocked }) => blocked === 1), JSON.stringify(results));
+    assert.ok(results.every(({ failed }) => failed === 0), JSON.stringify(results));
+
+    const after = (await getDocFromServer(reference)).data();
+    const trade = after.journal.find((item) => item.id === id);
+    assert.deepEqual([trade.status, trade.entryPrice, trade.notes], ['open', 121, setup.thesis]);
+    assert.equal(after.wallet.filter(({ id: movementId }) => movementId === `open:${id}`).length, 1);
+    assert.equal(summarizeWallet(after.wallet).availableCents, available - setup.positionCents);
+    assert.equal((await admin.doc(pending.path).get()).exists, false);
+    assert.equal((await getDocFromServer(unfunded)).exists(), true);
+
+    await deleteDoc(unfunded);
+    assert.equal((await monitorJournalSetups(admin, async () => quote)).opened, 0);
+  } finally {
+    await admin.getAll(admin.doc(pending.path), admin.doc(unfunded.path)).then((snapshots) =>
+      Promise.all(snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => snapshot.ref.delete())),
+    );
+    await admin.terminate();
+  }
 });

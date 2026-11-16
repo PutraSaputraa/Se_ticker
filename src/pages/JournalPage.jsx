@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import JournalCharts from '../components/JournalCharts.jsx';
+import { ExitPlanFields, PriceField } from '../components/JournalOrderFields.jsx';
 import { JournalScreenshotDialog, JournalScreenshotField } from '../components/JournalScreenshot.jsx';
+import JournalTradeSetups from '../components/JournalTradeSetups.jsx';
 import TickerField from '../components/TickerField.jsx';
 import JournalWallet from '../components/JournalWallet.jsx';
 import TableScroll from '../components/TableScroll.jsx';
@@ -9,7 +11,7 @@ import {
   calculateTradePnl,
   interpretProfitFactor,
   journalCurrencies,
-  journalRewardMultiples,
+  journalSetupOptions,
   journalSides,
   journalStatuses,
   journalTypes,
@@ -20,30 +22,14 @@ import {
   summarizeRealizedPnl,
   tradeQuoteError,
 } from '../journal.js';
-import { formatPct, formatPnl, formatPrice, priceDecimals } from '../format.js';
+import { formatDate, formatPct, formatPnl, formatPrice, priceDecimals } from '../format.js';
+import { calculateLevels, levelPrecision, validateLevels } from '../journalLevels.js';
+import { journalSetupMarkets } from '../journalSetups.js';
 import { deleteJournalScreenshot, uploadJournalScreenshot } from '../journalScreenshot.js';
 import useJournalQuotes, { fetchJournalInstrument, fetchJournalQuote } from '../useJournalQuotes.js';
 import { closeWalletPosition, openWalletPosition, parseWalletUsd, recordWalletCash, removeWalletPosition, summarizeWallet } from '../wallet.js';
 import '../styles/journal.css';
 
-const levelPrecision = 16;
-const levelPattern = new RegExp(`^\\d*(?:[.,]\\d{1,${levelPrecision}})?$`);
-const setupOptions = [
-  'Consolidation',
-  'Cup & Handle',
-  'Earning Report',
-  'Falling Wedge',
-  'Fundamental Long Term',
-  'HH-HL',
-  'HNS',
-  'Inverse HNS',
-  'LL-LH',
-  'News',
-  'Resistence',
-  'Retrace Fibo 0.618',
-  'Retrace Fibo 0.786',
-  'Support',
-];
 const quoteTimeFormat = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric', month: 'short', year: 'numeric',
   hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
@@ -66,61 +52,6 @@ function emptyForm() {
     rewardMultiple: '',
     takeProfit: '',
   };
-}
-
-function parseLevelUnits(input) {
-  const text = input.trim();
-  if (!levelPattern.test(text)) return null;
-
-  const [whole, fraction = ''] = text.split(/[.,]/);
-  const units = BigInt(whole + fraction.padEnd(levelPrecision, '0'));
-  return units > 0n ? units : null;
-}
-
-function formatLevel(units) {
-  if (units === null || units <= 0n) return '';
-  const digits = String(units).padStart(levelPrecision + 1, '0');
-  const whole = digits.slice(0, -levelPrecision);
-  const fraction = digits.slice(-levelPrecision).replace(/0+$/, '');
-  return fraction ? `${whole}.${fraction}` : whole;
-}
-
-function calculateLevels(form) {
-  const entry = parseLevelUnits(form.entryPrice);
-  const direction = form.side === 'long' ? 1n : -1n;
-  let stop = parseLevelUnits(form.stopLoss);
-  if (form.stopLossPct) {
-    const percent = 100n - direction * BigInt(form.stopLossPct);
-    // Round to the nearest unit at the form's decimal precision.
-    stop = entry === null ? null : (entry * percent + 50n) / 100n;
-  }
-
-  let target = parseLevelUnits(form.takeProfit);
-  if (form.rewardMultiple) {
-    const risk = entry !== null && stop !== null ? (entry - stop) * direction : 0n;
-    target = risk > 0n ? entry + direction * risk * BigInt(form.rewardMultiple) : null;
-  }
-
-  return { entryPrice: formatLevel(entry), stopLoss: formatLevel(stop), takeProfit: formatLevel(target) };
-}
-
-function PriceField({ label, value, onChange, disabled, readOnly = false }) {
-  return (
-    <label>
-      {label}
-      <input
-        type="text"
-        inputMode="decimal"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        aria-describedby="journal-level-note"
-        maxLength={25}
-        disabled={disabled}
-        readOnly={readOnly}
-        required={!readOnly}
-      />
-    </label>
-  );
 }
 
 function formatJournalPrice(value, currency, precision) {
@@ -340,6 +271,12 @@ function TradeTable({
                 )}
                 <td className="journal-setup">
                   {trade.setup || '–'}
+                  {trade.setupPlan && (
+                    <small className="journal-trade-note">
+                      {journalSetupMarkets[trade.setupPlan.market]} · {trade.setupPlan.timeframe} · {formatDate(trade.setupPlan.date)}<br />
+                      Limit {formatJournalPrice(trade.setupPlan.limitPrice, currency, levelPrecision)}
+                    </small>
+                  )}
                   {trade.riskPct != null && <small className="journal-trade-note">Risiko {trade.riskPct}%</small>}
                   {trade.notes && <small className="journal-trade-note journal-position-notes">{trade.notes}</small>}
                   {trade.chartScreenshot && (
@@ -384,7 +321,7 @@ export default function JournalPage({ account, uid }) {
   const [viewingScreenshot, setViewingScreenshot] = useState(null);
   const running = useRef(false);
   const disabled = !account.ready || account.pending || activeAction !== null;
-  const { side, type, stopLossPct, rewardMultiple } = form;
+  const { side, type, rewardMultiple } = form;
   const levels = calculateLevels(form);
   const wallet = useMemo(() => summarizeWallet(account.wallet), [account.wallet]);
   const knownTickers = accountTickerSymbols(account);
@@ -479,7 +416,7 @@ export default function JournalPage({ account, uid }) {
       const symbol = form.tickerSymbol ?? normalizeTicker(input);
       const fallback = symbol !== input && /^[A-Z0-9]+$/.test(input) ? input : null;
       const { setup, notes, screenshot } = form;
-      if (!symbol || !setupOptions.includes(setup)) throw new Error('Isi kode ticker dan pilih setup posisi.');
+      if (!symbol || !journalSetupOptions.includes(setup)) throw new Error('Isi kode ticker dan pilih setup posisi.');
 
       const positionCents = parseWalletUsd(form.positionUsd);
       if (positionCents == null) {
@@ -488,26 +425,7 @@ export default function JournalPage({ account, uid }) {
       if (positionCents > wallet.availableCents) throw new Error('Saldo wallet tidak cukup untuk nilai posisi ini.');
       const positionUsd = positionCents / 100;
 
-      const entryPrice = Number(levels.entryPrice);
-      const stopLoss = Number(levels.stopLoss);
-      const takeProfit = Number(levels.takeProfit);
-      const prices = rewardMultiple ? [entryPrice, stopLoss] : [entryPrice, stopLoss, takeProfit];
-      if (!prices.every((price) => Number.isFinite(price) && price > 0)) {
-        throw new Error(`Gunakan angka positif hingga ${levelPrecision} desimal untuk harga yang diisi manual.`);
-      }
-      if (side === 'long' ? stopLoss >= entryPrice : stopLoss <= entryPrice) {
-        throw new Error(side === 'long'
-          ? 'Untuk Long, Stop Loss harus di bawah harga masuk.'
-          : 'Untuk Short, Stop Loss harus di atas harga masuk.');
-      }
-      if (rewardMultiple && (!Number.isFinite(takeProfit) || takeProfit <= 0)) {
-        throw new Error('Take Profit otomatis harus lebih dari 0. Sesuaikan Stop Loss atau Risk Reward Ratio.');
-      }
-      if (side === 'long' ? takeProfit <= entryPrice : takeProfit >= entryPrice) {
-        throw new Error(side === 'long'
-          ? 'Untuk Long, Take Profit harus di atas harga masuk.'
-          : 'Untuk Short, Take Profit harus di bawah harga masuk.');
-      }
+      const { entryPrice, stopLoss, takeProfit } = validateLevels(levels, form);
 
       const futures = type === 'futures';
       if (futures && form.date > new Date().toLocaleDateString('sv-SE')) {
@@ -592,6 +510,7 @@ export default function JournalPage({ account, uid }) {
         </div>
         <nav className="journal-jump-links" aria-label="Bagian jurnal">
           <a href="#journal-wallet">Wallet</a>
+          <a href="#journal-setups">Trade Setup</a>
           <a href="#journal-entry">Catat posisi</a>
           <a href="#journal-open">Posisi terbuka</a>
           <a href="#journal-closed">Posisi ditutup</a>
@@ -602,6 +521,9 @@ export default function JournalPage({ account, uid }) {
         saving={activeAction === 'wallet'} onMove={handleWalletMove}>
         <JournalFeedback feedback={feedback} section="wallet" />
       </JournalWallet>
+
+      <JournalTradeSetups uid={uid} knownTickers={knownTickers}
+        availableCents={ready ? wallet.availableCents : null} disabled={disabled} />
 
       <section id="journal-entry" className="journal-section journal-entry" aria-labelledby="journal-entry-title">
         <div className="journal-entry-header">
@@ -664,7 +586,8 @@ export default function JournalPage({ account, uid }) {
                     required
                   />
                 </label>
-                <PriceField label="Harga masuk" value={form.entryPrice} onChange={(value) => setField('entryPrice', value)} disabled={disabled} />
+                <PriceField label="Harga masuk" value={form.entryPrice} onChange={(value) => setField('entryPrice', value)}
+                  describedBy="journal-level-note" disabled={disabled} />
                 <label className="journal-setup-field">
                   Setup
                   <select
@@ -674,7 +597,7 @@ export default function JournalPage({ account, uid }) {
                     required
                   >
                     <option value="" disabled>Pilih setup</option>
-                    {setupOptions.map((setup) => <option key={setup} value={setup}>{setup}</option>)}
+                    {journalSetupOptions.map((setup) => <option key={setup} value={setup}>{setup}</option>)}
                   </select>
                 </label>
                 <label className="journal-notes-field">
@@ -699,39 +622,7 @@ export default function JournalPage({ account, uid }) {
             <fieldset className="journal-form-group">
               <legend>Rencana keluar</legend>
               <div className="journal-form-grid">
-                <label>
-                  Metode Stop Loss
-                  <select value={stopLossPct} onChange={(event) => setField('stopLossPct', event.target.value)} aria-describedby="journal-level-note" disabled={disabled}>
-                    <option value="">Isi sendiri</option>
-                    <option value="5">5% otomatis</option>
-                    <option value="6">6% otomatis</option>
-                    <option value="7">7% otomatis</option>
-                    <option value="8">8% otomatis</option>
-                  </select>
-                </label>
-                <PriceField
-                  label="Stop Loss"
-                  value={stopLossPct ? levels.stopLoss : form.stopLoss}
-                  onChange={(value) => setField('stopLoss', value)}
-                  disabled={disabled}
-                  readOnly={Boolean(stopLossPct)}
-                />
-                <label>
-                  Risk Reward Ratio
-                  <select value={rewardMultiple} onChange={(event) => setField('rewardMultiple', event.target.value)} disabled={disabled}>
-                    <option value="">Isi TP sendiri</option>
-                    {journalRewardMultiples.map((multiple) => (
-                      <option key={multiple} value={multiple}>1:{multiple}</option>
-                    ))}
-                  </select>
-                </label>
-                <PriceField
-                  label="Take Profit (TP)"
-                  value={rewardMultiple ? levels.takeProfit : form.takeProfit}
-                  onChange={(value) => setField('takeProfit', value)}
-                  disabled={disabled}
-                  readOnly={Boolean(rewardMultiple)}
-                />
+                <ExitPlanFields form={form} levels={levels} setField={setField} disabled={disabled} describedBy="journal-level-note" />
               </div>
               <p className="journal-help" id="journal-level-note">
                 Stop loss otomatis dihitung dari harga masuk. Pilih rasio untuk menghitung take profit.

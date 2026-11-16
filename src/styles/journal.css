@@ -688,6 +688,43 @@
 .journal-badge--long { background: var(--workspace-action-soft); color: var(--workspace-action); }
 .journal-badge--short { background: var(--surface-tint); color: var(--text); }
 
+.journal-setup-form {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.journal-setup-limit,
+.journal-setup-thesis { grid-column: 1 / -1; }
+
+.journal-pending-setups {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journal-pending-setup {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface-muted);
+  overflow-wrap: anywhere;
+}
+
+.journal-pending-setup .journal-badge { vertical-align: middle; }
+
+.journal-pending-levels {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.journal-pending-levels dt { color: var(--muted); font-size: 0.8125rem; }
+.journal-pending-levels dd { font-size: 1rem; font-weight: 600; }
+
 @container (min-width: 59rem) {
   .journal-closed {
     grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
@@ -702,8 +739,11 @@
   .journal-date-field,
   .journal-setup-field,
   .journal-notes-field { grid-column: 1 / -1; }
+  .journal-setup-form :is(.journal-ticker-field, .journal-setup-field) { grid-column: auto; }
+  .journal-setup-position { grid-column: 1 / -1; }
   .journal-running { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
   .journal-pnl-values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .journal-pending-levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @container (max-width: 27rem) {
@@ -712,6 +752,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .journal-jump-links a:last-child:nth-child(odd) { grid-column: 1 / -1; }
 
   .journal-wallet-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .journal-wallet-totals > :first-child { grid-column: 1 / -1; }

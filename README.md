@@ -41,6 +41,16 @@ Setiap posisi bisa memiliki satu screenshot dalam format PNG, JPG, atau WebP hin
 
 Untuk mengaktifkan unggahan di Netlify, sediakan `VITE_FIREBASE_API_KEY` dan `VITE_FIREBASE_PROJECT_ID` pada scope **Builds** dan **Functions**. Netlify menyediakan akses Blobs untuk Function pada situs tersebut.
 
+### Trade Setup / Pending Order Jurnal
+
+Simpan setup dengan market, ticker, tanggal, arah, timeframe, alasan masuk, nilai posisi, serta Limit Price, SL, dan TP. Jurnal menentukan arah pemicu dari kuotasi saat penyimpanan. Setup yang lebih tinggi menunggu harga mencapai atau melampaui limit, sedangkan setup yang lebih rendah menunggu harga turun ke limit atau lebih rendah.
+
+Scheduled Function `journal-setup-monitor` berjalan setiap menit pada deploy produksi, termasuk saat pengguna menutup Jurnal. Pemantau membaca kuotasi terbaru dari Yahoo Finance dan memeriksa hingga 16 setup per putaran secara bergiliran. Sentuhan harga singkat di antara kuotasi yang terbaca bisa terlewat. Harga masuk mengikuti kuotasi pemicu, sedangkan SL dan TP mengikuti level yang disimpan. Jika saldo kurang saat harga memenuhi pemicu, setup menunggu hingga saldo dan kuotasi sama-sama memenuhi syarat. Pembukaan posisi dan mutasi wallet memakai satu transaksi Firestore.
+
+Sebelum merilis frontend, publikasikan `firestore.rules` untuk koleksi `journalSetups`. Gunakan service account dari proyek Firebase yang sama dengan peran **Cloud Datastore User**. Simpan JSON kredensialnya pada variabel rahasia `JOURNAL_FIRESTORE_CREDENTIALS` di Netlify dengan scope **Functions** untuk produksi. `VITE_FIREBASE_PROJECT_ID` pada scope yang sama menentukan proyek tujuan pemantau.
+
+Untuk menguji pemantauan lokal, jalankan Firebase Emulator Suite dengan proyek `demo-seticker`. Set `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080` saat menjalankan `netlify dev --offline`, lalu panggil `/.netlify/functions/journal-setup-monitor` di Netlify Dev untuk satu kali pemeriksaan.
+
 ## Pengujian Firebase lokal
 
 Gunakan Java 21 atau lebih baru dan Firebase Emulator Suite.
