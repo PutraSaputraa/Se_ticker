@@ -74,9 +74,10 @@ export default async function price(request) {
 
   const params = new URL(request.url).searchParams;
   const symbol = params.get('symbol')?.trim().toUpperCase() ?? '';
-  const requestedDate = params.get('date');
   const journal = params.get('mode') === 'journal';
-  const alternate = journal && requestedDate ? params.get('fallback')?.trim().toUpperCase() : null;
+  const instrumentOnly = journal && params.get('lookup') === 'instrument';
+  const requestedDate = instrumentOnly ? null : params.get('date');
+  const alternate = journal && (requestedDate || instrumentOnly) ? params.get('fallback')?.trim().toUpperCase() : null;
   const fallback = alternate && alternate !== symbol && alternate.length <= 32 && symbolPattern.test(alternate)
     ? alternate
     : null;
@@ -106,7 +107,7 @@ export default async function price(request) {
 
   const notFound = requestedDate
     ? `Ticker ${fallback ?? symbol} atau data untuk tanggal yang dipilih tidak ditemukan di Yahoo Finance.`
-    : `Ticker ${symbol} tidak ditemukan di Yahoo Finance.`;
+    : `Ticker ${fallback ?? symbol} tidak ditemukan di Yahoo Finance.`;
   const noData = requestedDate
     ? `Data perdagangan untuk ${symbol} pada tanggal yang dipilih belum tersedia atau tidak lengkap.`
     : `Data sesi yang sudah tutup untuk ${symbol} belum tersedia atau tidak lengkap.`;
@@ -118,7 +119,7 @@ export default async function price(request) {
     let lookup = await fetchChart(symbol, query, signal);
     if (fallback && lookup.notFound) {
       // Tanggal libur atau sebelum IPO dapat menghasilkan 404 untuk ticker yang valid.
-      const listing = await fetchChart(symbol, 'range=1mo&interval=1d', signal);
+      const listing = requestedDate ? await fetchChart(symbol, 'range=1mo&interval=1d', signal) : lookup;
       if (listing.notFound) {
         resolvedSymbol = fallback;
         lookup = await fetchChart(resolvedSymbol, query, signal);
@@ -143,6 +144,12 @@ export default async function price(request) {
     }
 
     const meta = result.meta;
+    if (instrumentOnly) {
+      const currency = typeof meta?.currency === 'string' ? meta.currency.trim() : '';
+      if (!currency) return errorResponse('Yahoo Finance tidak memberikan mata uang untuk ticker ini.', 502);
+      return Response.json({ symbol: resolvedSymbol, currency }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
     const timeZone = meta?.exchangeTimezoneName;
     if ((requestedDate || journal) && !timeZone) {
       return errorResponse('Yahoo Finance tidak memberikan zona waktu bursa untuk ticker ini.', 502);

@@ -13,6 +13,7 @@ export const journalSides = {
   short: { label: 'Short', className: 'short' },
 };
 
+export const journalTypes = { spot: 'SPOT', futures: 'FUTURES' };
 export const journalCurrencies = ['USD', 'IDR', 'USDT'];
 export const journalRewardMultiples = [2, 3, 4];
 
@@ -28,6 +29,7 @@ export function normalizeTrade(entry) {
   if (!pair) return null;
 
   const side = entry.side === 'short' ? 'short' : 'long';
+  const type = entry.type === 'futures' ? 'futures' : 'spot';
   const num = (value) => {
     const text = String(value ?? '').trim();
     if (!text) return null;
@@ -49,6 +51,7 @@ export function normalizeTrade(entry) {
     date: typeof entry.date === 'string' && entry.date ? entry.date : new Date().toISOString().slice(0, 10),
     pair,
     side,
+    type,
     setup: typeof entry.setup === 'string' ? entry.setup.trim() : '',
     riskPct: num(entry.riskPct),
     pnl: status === 'open' ? null : num(entry.pnl),
@@ -61,6 +64,8 @@ export function normalizeTrade(entry) {
       ...(journalRewardMultiples.includes(rewardMultiple) && { rewardMultiple }),
       ...(takeProfit > 0 && { takeProfit }),
       entryTimestamp: Number.isSafeInteger(entry.entryTimestamp) ? entry.entryTimestamp : null,
+      ...(type === 'futures' && typeof entry.entryTimeZone === 'string' && entry.entryTimeZone
+        && { entryTimeZone: entry.entryTimeZone }),
       quoteCurrency,
       exitPrice: num(entry.exitPrice),
       exitDate: typeof entry.exitDate === 'string' ? entry.exitDate : null,
@@ -91,11 +96,22 @@ export function addTrade(journal, trade) {
   return [normalized, ...journal];
 }
 
+function quoteDateForTrade(trade, quote) {
+  if (trade.type === 'futures' && trade.entryTimeZone && Number.isSafeInteger(quote.timestamp)) {
+    try {
+      return new Intl.DateTimeFormat('sv-SE', { timeZone: trade.entryTimeZone }).format(quote.timestamp * 1000);
+    } catch {
+      return quote.date;
+    }
+  }
+  return quote.date;
+}
+
 export function tradeQuoteError(trade, quote) {
   if (quote.currency !== trade.quoteCurrency) {
     return 'Mata uang harga terakhir berbeda dari harga masuk.';
   }
-  if (quote.date < trade.date || (trade.entryTimestamp != null && quote.timestamp < trade.entryTimestamp)) {
+  if (quoteDateForTrade(trade, quote) < trade.date || (trade.entryTimestamp != null && quote.timestamp < trade.entryTimestamp)) {
     return 'Harga terakhir mendahului harga masuk. Coba lagi setelah kuotasi diperbarui.';
   }
   return '';
@@ -113,7 +129,7 @@ export function closeTrade(journal, id, quote) {
     return {
       ...trade,
       exitPrice: quote.price,
-      exitDate: quote.date,
+      exitDate: quoteDateForTrade(trade, quote),
       ...result,
       status: result.pnl > 0 ? 'win' : result.pnl < 0 ? 'loss' : 'be',
     };

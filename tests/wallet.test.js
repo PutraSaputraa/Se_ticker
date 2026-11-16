@@ -62,3 +62,24 @@ test('kerugian short yang melampaui dana tetap bisa dicatat sebagai defisit', ()
   assert.throws(() => openWalletPosition(closed, { ...trade, id: 'new' }, at), AccountChangeError);
   assert.deepEqual(balances(deposit(closed, 15_000, 'recovery')), [5000, 0, 5000]);
 });
+
+test('posisi futures memakai tanggal kuotasi di zona saat dicatat dan menyimpan notes setelah ditutup', () => {
+  const funded = deposit(normalizeAccountData(), 50_000);
+  const opened = openWalletPosition(funded, {
+    ...trade,
+    date: '2026-11-16',
+    type: 'futures',
+    entryTimeZone: 'Asia/Jakarta',
+    notes: 'Cek volume\nPantau sesi berikutnya',
+  }, at);
+  const updatedQuote = { ...quote, date: '2026-11-15', timestamp: Date.parse('2026-11-15T18:00:00Z') / 1000 };
+  const staleQuote = { ...updatedQuote, timestamp: Date.parse('2026-11-15T16:00:00Z') / 1000 };
+
+  assert.throws(() => closeWalletPosition(opened, trade.id, staleQuote, at), /Harga terakhir mendahului harga masuk/);
+  const reloaded = normalizeAccountData(opened);
+  const closed = normalizeAccountData(closeWalletPosition(reloaded, trade.id, updatedQuote, at));
+  assert.deepEqual(balances(closed), [52_469, 0, 52_469]);
+  assert.equal(closed.journal[0].type, 'futures');
+  assert.equal(closed.journal[0].exitDate, '2026-11-16');
+  assert.equal(closed.journal[0].notes, 'Cek volume\nPantau sesi berikutnya');
+});

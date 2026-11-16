@@ -2,17 +2,29 @@ import { useEffect, useState } from 'react';
 
 const refreshInterval = 60_000;
 const concurrency = 4;
+const unavailable = 'Harga dari Yahoo Finance belum tersedia. Coba lagi.';
 
-export async function fetchJournalQuote(symbol, { date, fallback, signal } = {}) {
+async function fetchJournalData(symbol, { date, fallback, signal, lookup } = {}) {
   const params = new URLSearchParams({ symbol, mode: 'journal' });
   if (date) params.set('date', date);
   if (fallback) params.set('fallback', fallback);
+  if (lookup) params.set('lookup', lookup);
   const timeout = AbortSignal.timeout(15_000);
   const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const response = await fetch(`/.netlify/functions/price?${params}`, { cache: 'no-store', signal: requestSignal }).catch(() => null);
-  const quote = await response?.json().catch(() => null);
-  if (!response?.ok || !Number.isFinite(quote?.price) || quote.price <= 0 || !quote.date || !quote.currency) {
-    throw new Error(quote?.error ?? 'Harga dari Yahoo Finance belum tersedia. Coba lagi.');
+  const data = await response?.json().catch(() => null);
+  if (!response?.ok || !data?.currency) throw new Error(data?.error ?? unavailable);
+  return data;
+}
+
+export function fetchJournalInstrument(symbol, fallback) {
+  return fetchJournalData(symbol, { fallback, lookup: 'instrument' });
+}
+
+export async function fetchJournalQuote(symbol, options) {
+  const quote = await fetchJournalData(symbol, options);
+  if (!Number.isFinite(quote.price) || quote.price <= 0 || !quote.date) {
+    throw new Error(quote.error ?? unavailable);
   }
   return quote;
 }

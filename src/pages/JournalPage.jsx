@@ -11,6 +11,7 @@ import {
   journalRewardMultiples,
   journalSides,
   journalStatuses,
+  journalTypes,
   normalizeTrade,
   positionPnlUsd,
   realizedTradePnl,
@@ -19,7 +20,7 @@ import {
   tradeQuoteError,
 } from '../journal.js';
 import { formatPct, formatPnl, formatPrice, priceDecimals } from '../format.js';
-import useJournalQuotes, { fetchJournalQuote } from '../useJournalQuotes.js';
+import useJournalQuotes, { fetchJournalInstrument, fetchJournalQuote } from '../useJournalQuotes.js';
 import { closeWalletPosition, openWalletPosition, parseWalletUsd, recordWalletCash, removeWalletPosition, summarizeWallet } from '../wallet.js';
 import '../styles/journal.css';
 
@@ -52,8 +53,10 @@ function emptyForm() {
     ticker: '',
     tickerSymbol: null,
     setup: '',
+    notes: '',
     positionUsd: '',
     side: 'long',
+    type: 'spot',
     entryPrice: '',
     stopLossPct: '',
     stopLoss: '',
@@ -311,7 +314,10 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
             return (
               <tr key={trade.id}>
                 <th scope="row" className="journal-ticker">{trade.pair}</th>
-                <td><Badge meta={side} /></td>
+                <td>
+                  <Badge meta={side} />
+                  <small className="journal-trade-note">{journalTypes[trade.type]}</small>
+                </td>
                 {closed ? (
                   <>
                     <td className={`num ${pnlTone(realized?.amount)}`}>
@@ -330,7 +336,7 @@ function TradeTable({ trades, closed = false, manualCurrency, runningValues, rea
                 <td className="journal-setup">
                   {trade.setup || '–'}
                   {trade.riskPct != null && <small className="journal-trade-note">Risiko {trade.riskPct}%</small>}
-                  {trade.notes && <small className="journal-trade-note">{trade.notes}</small>}
+                  {trade.notes && <small className="journal-trade-note journal-position-notes">{trade.notes}</small>}
                 </td>
                 <td><time dateTime={trade.date}>{trade.date}</time></td>
                 <td className="num">{formatJournalPrice(trade.entryPrice, currency, entryPrecision)}</td>
@@ -366,7 +372,7 @@ export default function JournalPage({ account }) {
   const [feedback, setFeedback] = useState(null);
   const running = useRef(false);
   const disabled = !account.ready || account.pending || activeAction !== null;
-  const { side, stopLossPct, rewardMultiple } = form;
+  const { side, type, stopLossPct, rewardMultiple } = form;
   const levels = calculateLevels(form);
   const wallet = useMemo(() => summarizeWallet(account.wallet), [account.wallet]);
   const knownTickers = accountTickerSymbols(account);
@@ -460,7 +466,7 @@ export default function JournalPage({ account }) {
       const input = form.ticker.trim().toUpperCase();
       const symbol = form.tickerSymbol ?? normalizeTicker(input);
       const fallback = symbol !== input && /^[A-Z0-9]+$/.test(input) ? input : null;
-      const { setup } = form;
+      const { setup, notes } = form;
       if (!symbol || !setupOptions.includes(setup)) throw new Error('Isi kode ticker dan pilih setup posisi.');
 
       const positionCents = parseWalletUsd(form.positionUsd);
@@ -491,19 +497,28 @@ export default function JournalPage({ account }) {
           : 'Untuk Short, Take Profit harus di bawah harga masuk.');
       }
 
-      const quote = await fetchJournalQuote(symbol, { date: form.date, fallback });
+      const futures = type === 'futures';
+      if (futures && form.date > new Date().toLocaleDateString('sv-SE')) {
+        throw new Error('Tanggal masuk belum tiba di zona waktu perangkat.');
+      }
+      const reference = futures
+        ? await fetchJournalInstrument(symbol, fallback)
+        : await fetchJournalQuote(symbol, { date: form.date, fallback });
       const trade = normalizeTrade({
-        date: quote.date,
-        pair: quote.symbol ?? symbol,
+        date: futures ? form.date : reference.date,
+        pair: reference.symbol ?? symbol,
         side,
+        type,
+        ...(futures && { entryTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
         setup,
+        notes,
         positionUsd,
         status: 'open',
         entryPrice,
         stopLoss,
         rewardMultiple,
         takeProfit,
-        quoteCurrency: quote.currency,
+        quoteCurrency: reference.currency,
       });
       const at = Date.now();
       const saved = await account.update((current) => openWalletPosition(current, trade, at));
@@ -580,7 +595,7 @@ export default function JournalPage({ account }) {
                   maxLength={39}
                   disabled={disabled}
                 />
-                <label>
+                <label className="journal-date-field">
                   Tanggal masuk
                   <input type="date" value={form.date} onChange={(event) => setField('date', event.target.value)} disabled={disabled} required />
                 </label>
@@ -590,6 +605,15 @@ export default function JournalPage({ account }) {
                     {Object.entries(journalSides).map(([value, { label }]) => (
                       <option key={value} value={value}>{label}</option>
                     ))}
+                  </select>
+                </label>
+                <label>
+                  Type
+                  <select value={type} onChange={(event) => {
+                    setField('type', event.target.value);
+                    setFeedback((current) => current?.section === 'entry' ? null : current);
+                  }} disabled={disabled}>
+                    {Object.entries(journalTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </label>
                 <label>
@@ -619,11 +643,23 @@ export default function JournalPage({ account }) {
                     {setupOptions.map((setup) => <option key={setup} value={setup}>{setup}</option>)}
                   </select>
                 </label>
+                <label className="journal-notes-field">
+                  Notes (opsional)
+                  <textarea
+                    rows={2}
+                    value={form.notes}
+                    onChange={(event) => setField('notes', event.target.value)}
+                    placeholder="Mis. alasan membuka posisi"
+                    disabled={disabled}
+                  />
+                </label>
               </div>
               <p className="journal-help" id="journal-wallet-note">Nilai posisi diambil dari <a href="#journal-wallet">saldo wallet USD</a>.</p>
               <p className="journal-help" id="journal-ticker-note">
-                Untuk kripto, gunakan <code>BTC-USD</code> atau <code>CRYPTO:BTC</code>. Awali dengan <code>US:</code> untuk memilih ticker AS jika kodenya sama.
-                Tanggal masuk mengikuti zona waktu bursa.
+                Untuk kripto, gunakan <code>BTC-USD</code> atau <code>CRYPTO:BTC</code>. Awali dengan <code>US:</code> untuk memilih ticker AS jika kodenya sama.{' '}
+                {type === 'futures'
+                  ? 'Tanggal masuk mengikuti zona waktu perangkat. Gunakan kode kontrak untuk kuotasi futures.'
+                  : 'Tanggal masuk mengikuti zona waktu bursa.'}
               </p>
             </fieldset>
             <fieldset className="journal-form-group">

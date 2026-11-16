@@ -55,3 +55,23 @@ test('jurnal tidak berpindah bursa jika ticker terdaftar tetapi tanggalnya tidak
   assert.equal(response.status, 404);
   assert.equal(lookup.mock.callCount(), 2);
 });
+
+test('entri futures bisa membaca mata uang ketika tanggal perangkat mendahului bursa', async (t) => {
+  t.mock.method(Date, 'now', () => Date.parse('2026-11-16T01:00:00Z'));
+  const lookup = t.mock.method(globalThis, 'fetch', async (input) => {
+    const url = new URL(input);
+    if (url.pathname.endsWith('/MSFT.JK')) return new Response(null, { status: 404 });
+    return Response.json({ chart: { result: [{
+      meta: { currency: 'USD', exchangeTimezoneName: 'America/New_York' },
+    }] } });
+  });
+
+  const spot = await price(new Request('http://localhost/price?mode=journal&symbol=MSFT&date=2026-11-16'));
+  assert.equal(spot.status, 400);
+  assert.match((await spot.json()).error, /Tanggal masuk belum tiba di zona waktu bursa/);
+
+  const futures = await price(new Request('http://localhost/price?mode=journal&lookup=instrument&symbol=MSFT.JK&fallback=MSFT'));
+  assert.equal(futures.status, 200);
+  assert.deepEqual(await futures.json(), { symbol: 'MSFT', currency: 'USD' });
+  assert.equal(lookup.mock.callCount(), 3);
+});
