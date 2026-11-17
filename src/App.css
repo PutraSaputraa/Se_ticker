@@ -384,6 +384,11 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   color: var(--muted);
 }
 
+.section-accent {
+  padding-inline-start: 0.85rem;
+  border-inline-start: 3px solid var(--support);
+}
+
 .page-heading--identity {
   padding: var(--workspace-card-padding);
   border: 1px solid var(--border);

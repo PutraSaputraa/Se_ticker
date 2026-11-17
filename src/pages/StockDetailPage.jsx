@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import CandlestickChart from '../CandlestickChart.jsx';
 import MinerviniPanel from '../components/MinerviniPanel.jsx';
 import TableScroll from '../components/TableScroll.jsx';
+import UpdatedValue from '../components/UpdatedValue.jsx';
 import {
   formatCompactNumber,
   formatDate,
@@ -24,23 +25,38 @@ const breakoutStatusMeta = {
   menunggu: { label: 'Menunggu breakout', className: 'status--wait' },
 };
 
-const trends = {
-  1: { label: 'Naik', className: 'up' },
-  0: { label: 'Tetap', className: 'flat' },
-  '-1': { label: 'Turun', className: 'down' },
-};
-
 function StatusBadge({ status }) {
-  const meta = breakoutStatusMeta[status] ?? breakoutStatusMeta.menunggu;
-  return <span className={`detail-status ${meta.className}`}>{meta.label}</span>;
+  const meta = breakoutStatusMeta[status];
+  return meta ? <span className={`detail-status ${meta.className}`}>{meta.label}</span> : null;
 }
 
-function TradingLevel({ label, value, hint, tone }) {
+function percentFromReference(value, reference) {
+  return Number.isFinite(value) && Number.isFinite(reference) && reference > 0
+    ? ((value - reference) / reference) * 100
+    : null;
+}
+
+function entryContext(distance) {
+  if (distance == null) return null;
+  if (distance === 0) return 'Entry setara harga penutupan.';
+  const gap = Math.abs(distance) < 0.01 ? 'kurang dari 0,01%' : formatPct(Math.abs(distance)).slice(1);
+  return `Entry ${gap} di ${distance > 0 ? 'atas' : 'bawah'} harga penutupan.`;
+}
+
+function TradingLevel({ label, level, distance, currency, tone }) {
+  let hint;
+  if (distance === 0) hint = '0%';
+  else if (distance != null) {
+    hint = Math.abs(distance) < 0.01
+      ? `<0,01% di ${distance > 0 ? 'atas' : 'bawah'}`
+      : formatPct(distance);
+  }
+
   return (
-    <div className={`stock-level${tone ? ` stock-level--${tone}` : ''}`}>
+    <div className={`stock-level stock-level--${tone}`}>
       <dt>{label}</dt>
       <dd>
-        <strong>{value}</strong>
+        {Number.isFinite(level) ? <strong>{formatPrice(level, currency)}</strong> : <small>Tidak tersedia</small>}
         {hint && <small>{hint}</small>}
       </dd>
     </div>
@@ -246,10 +262,13 @@ function StockDetail({ symbol, account }) {
   }, [quote, symbol]);
 
   const currency = quote?.currency;
-  const trend = quote ? trends[Math.sign(quote.close - quote.open)] : null;
-  const changeFromOpen = quote?.open > 0 ? (quote.close / quote.open - 1) * 100 : null;
+  const changeFromOpen = percentFromReference(quote?.close, quote?.open);
+  const changeTone = changeFromOpen > 0 ? 'trend--up' : changeFromOpen < 0 ? 'trend--down' : '';
   const analysis = quote?.analysis ?? {};
   const buyTrigger = quote?.buyTrigger ?? {};
+  const entryDistance = percentFromReference(buyTrigger.level, quote?.close);
+  const stopLevel = buyTrigger.sellLevel ?? analysis.stop;
+  const quoteContext = entryContext(entryDistance);
   const chartSnapshot = range === defaultRange ? null : chartData.snapshot;
   const alternatives = result.notFound ? suggestTickerAlternatives(symbol) : [];
   const searchUrl = result.status === 'error' ? `/?${new URLSearchParams({ ticker: symbol })}` : '/';
@@ -303,23 +322,14 @@ function StockDetail({ symbol, account }) {
         <article className="stock-detail-content">
           <header className="stock-identity motion-enter">
             <div className="stock-identity-info">
-              <div className="stock-instrument">
-                <span className="symbol-badge">{quote.symbol}</span>
-                {quote.exchange && <span>{quote.exchange}</span>}
-                <span>{currency}</span>
-              </div>
-              <h1>{quote.name}</h1>
-              <p className="stock-muted">Sesi acuan · <time dateTime={quote.date}>{formatDate(quote.date)}</time></p>
-            </div>
-            <div className="stock-quote-actions">
-              <div className="stock-quote-price">
-                <span>Harga penutupan</span>
-                <strong>{formatPrice(quote.close, currency)}</strong>
-                {changeFromOpen != null && trend && (
-                  <span className={`trend--${trend.className}`}>
-                    {trend.label} {formatPct(changeFromOpen)} vs buka
-                  </span>
-                )}
+              <div className="section-accent">
+                <div className="stock-instrument">
+                  <span className="symbol-badge">{quote.symbol}</span>
+                  {quote.exchange && <span>{quote.exchange}</span>}
+                  <span>{currency}</span>
+                </div>
+                <h1>{quote.name}</h1>
+                <p className="stock-muted">Sesi acuan · <time dateTime={quote.date}>{formatDate(quote.date)}</time></p>
               </div>
               <button
                 type="button"
@@ -330,6 +340,22 @@ function StockDetail({ symbol, account }) {
               >
                 {inWatchlist ? '✓ Dipantau' : '+ Pantau'}
               </button>
+            </div>
+            <div className="stock-quote">
+              <div className="stock-quote-heading">
+                <span>Harga penutupan</span>
+                <StatusBadge status={analysis.status} />
+              </div>
+              <div className="stock-quote-readout">
+                <UpdatedValue as="strong" value={quote.close} format={(value) => formatPrice(value, currency)} />
+                {changeFromOpen != null && (
+                  <span className={`stock-quote-change ${changeTone}`}>
+                    <UpdatedValue as="strong" value={changeFromOpen} format={formatPct} />
+                    {' '}<small>vs buka</small>
+                  </span>
+                )}
+              </div>
+              {quoteContext && <p className="stock-quote-context">{quoteContext}</p>}
             </div>
           </header>
 
@@ -354,29 +380,36 @@ function StockDetail({ symbol, account }) {
 
             <div className="stock-market-aside">
               <section className="stock-plan motion-enter motion-enter--after" aria-labelledby="stock-plan-title">
-                <div className="stock-section-heading">
-                  <h2 id="stock-plan-title">Rencana trading</h2>
-                  <StatusBadge status={analysis.status} />
-                </div>
-                <dl className="stock-levels">
-                  <TradingLevel label="Buy Trigger" value={formatPrice(buyTrigger.level, currency)} tone="entry" />
+                <h2 id="stock-plan-title">Rencana trading</h2>
+                <p className="stock-muted" id="stock-plan-reference">Jarak level dari harga penutupan</p>
+                <dl className="stock-levels" aria-describedby="stock-plan-reference">
+                  <TradingLevel label="Entry" level={buyTrigger.level} distance={entryDistance} currency={currency} tone="entry" />
                   <TradingLevel
-                    label="Sell Trigger / Stop loss"
-                    value={formatPrice(buyTrigger.sellLevel ?? analysis.stop, currency)}
-                    hint={analysis.riskPct != null ? `Risiko ${formatPct(-Math.abs(analysis.riskPct))}` : undefined}
+                    label="Stop loss"
+                    level={stopLevel}
+                    distance={percentFromReference(stopLevel, quote.close)}
+                    currency={currency}
                     tone="risk"
                   />
                   <TradingLevel
                     label="Target"
-                    value={formatPrice(analysis.target, currency)}
-                    hint={analysis.potentialPct != null ? `Potensi ${formatPct(analysis.potentialPct)}` : undefined}
+                    level={analysis.target}
+                    distance={percentFromReference(analysis.target, quote.close)}
+                    currency={currency}
                     tone="gain"
                   />
-                  <TradingLevel
-                    label="Resistance 50 hari"
-                    value={formatPrice(analysis.resistance50, currency)}
-                    hint={analysis.baseTightPct != null ? `Konsolidasi ${analysis.baseTightPct.toLocaleString('id-ID')}%` : undefined}
-                  />
+                </dl>
+                <dl className="stock-plan-context">
+                  <div>
+                    <dt>Resistance 50 sesi</dt>
+                    <dd>{formatPrice(analysis.resistance50, currency)}</dd>
+                  </div>
+                  {Number.isFinite(analysis.baseTightPct) && (
+                    <div>
+                      <dt>Konsolidasi</dt>
+                      <dd>{analysis.baseTightPct.toLocaleString('id-ID')}%</dd>
+                    </div>
+                  )}
                 </dl>
               </section>
               <section className="stock-data-section stock-session motion-enter motion-enter--last" aria-labelledby="stock-session-title">

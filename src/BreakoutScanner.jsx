@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { defaultBreakoutParams } from '../netlify/functions/shared/breakoutLogic.js';
 import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
 import ResearchRequestStatus, { ResearchProgress } from './components/ResearchRequestStatus.jsx';
@@ -6,6 +7,9 @@ import UpdatedValue from './components/UpdatedValue.jsx';
 import { formatDateCompact, formatPct } from './format.js';
 
 const scanErrorMessage = 'Pemindaian breakout gagal. Coba lagi nanti.';
+const { volumeMinRatio, volumeLookback } = defaultBreakoutParams;
+const ratioFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
+const countFormat = new Intl.NumberFormat('id-ID');
 
 const regions = [
   { value: 'auto', label: 'Semua bursa' },
@@ -47,7 +51,38 @@ function WatchAction({ symbol, inWatchlist, disabled, onAdd }) {
   );
 }
 
-function ScanTable({ results, watched, disabled, onAdd, formatPrice }) {
+function ScanVolume({ ratio, scale }) {
+  if (!Number.isFinite(ratio) || ratio < 0) return <span className="scan-volume-empty">Tidak tersedia</span>;
+
+  return (
+    <span className="scan-volume-reading">
+      <strong>{ratioFormat.format(ratio)}×</strong>
+      <span className="scan-volume-track" aria-hidden="true" style={{
+        '--scan-volume-fill': `${ratio / scale * 100}%`,
+        '--scan-volume-marker': `${volumeMinRatio / scale * 100}%`,
+      }} />
+    </span>
+  );
+}
+
+function ScanChange({ value }) {
+  return (
+    <span className={value > 0 ? 'trend--up' : value < 0 ? 'trend--down' : undefined}>
+      <UpdatedValue value={value} format={formatPct} />
+    </span>
+  );
+}
+
+function ScanResistance({ pick, formatPrice }) {
+  return (
+    <>
+      {formatPrice(pick.resistance, pick.currency)}
+      {Number.isFinite(pick.breakoutPct) && <span className="research-cell-note">{formatPct(pick.breakoutPct)} di atas level</span>}
+    </>
+  );
+}
+
+function ScanTable({ results, watched, disabled, onAdd, formatPrice, volumeScale }) {
   return (
     <TableScroll className="research-table-scroll" label="Tabel hasil scan matematis">
       <table className="fund-table research-table scan-table">
@@ -79,17 +114,10 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice }) {
               <td className="num">
                 <UpdatedValue as="strong" value={pick.close} format={(price) => formatPrice(price, pick.currency)} />
               </td>
-              <td className={`num ${pick.changePct > 0 ? 'trend--up' : pick.changePct < 0 ? 'trend--down' : ''}`}>
-                <UpdatedValue value={pick.changePct} format={formatPct} />
-              </td>
-              <td className="num">
-                {formatPrice(pick.resistance, pick.currency)}
-                {Number.isFinite(pick.breakoutPct) && <span className="research-cell-note">{formatPct(pick.breakoutPct)} di atas level</span>}
-              </td>
+              <td className="num"><ScanChange value={pick.changePct} /></td>
+              <td className="num"><ScanResistance pick={pick} formatPrice={formatPrice} /></td>
               <td className="num scan-volume">
-                {Number.isFinite(pick.volumeRatio)
-                  ? `${pick.volumeRatio.toLocaleString('id-ID', { maximumFractionDigits: 1 })}×`
-                  : 'Tidak tersedia'}
+                <ScanVolume ratio={pick.volumeRatio} scale={volumeScale} />
               </td>
               <td>{pick.date ? <time dateTime={pick.date}>{formatDateCompact(pick.date)}</time> : 'Tidak tersedia'}</td>
               <td className="num"><WatchAction symbol={pick.symbol} inWatchlist={watched.has(pick.symbol)} disabled={disabled} onAdd={onAdd} /></td>
@@ -98,6 +126,115 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice }) {
         </tbody>
       </table>
     </TableScroll>
+  );
+}
+
+function ScanListItem({ pick, inWatchlist, disabled, onAdd, formatPrice, formatDate, volumeScale }) {
+  return (
+    <li className="scan-list-item">
+      <div className="scan-item-heading">
+        <div>
+          <TickerLink symbol={pick.symbol} />
+          {pick.name && <p className="research-company">{pick.name}</p>}
+        </div>
+        <div className="scan-item-price">
+          <span>Harga tutup</span>
+          <UpdatedValue as="strong" value={pick.close} format={(price) => formatPrice(price, pick.currency)} />
+        </div>
+      </div>
+      <dl className="scan-item-metrics">
+        <div>
+          <dt>Perubahan</dt>
+          <dd><ScanChange value={pick.changePct} /></dd>
+        </div>
+        <div>
+          <dt>Rasio volume</dt>
+          <dd><ScanVolume ratio={pick.volumeRatio} scale={volumeScale} /></dd>
+        </div>
+      </dl>
+      <details className="scan-item-details">
+        <summary>Rincian<span className="visually-hidden"> {pick.symbol}</span></summary>
+        <dl className="scan-item-levels">
+          <div>
+            <dt>Resistance</dt>
+            <dd><ScanResistance pick={pick} formatPrice={formatPrice} /></dd>
+          </div>
+          <div>
+            <dt>Sesi</dt>
+            <dd>{pick.date ? <time dateTime={pick.date}>{formatDate(pick.date)}</time> : 'Tidak tersedia'}</dd>
+          </div>
+          {pick.universe && <div><dt>Cakupan</dt><dd>{pick.universe}</dd></div>}
+        </dl>
+        {pick.aiNote && <p className="research-scan-note"><strong>Catatan AI</strong><br />{pick.aiNote}</p>}
+        <WatchAction symbol={pick.symbol} inWatchlist={inWatchlist} disabled={disabled} onAdd={onAdd} />
+      </details>
+    </li>
+  );
+}
+
+function ScanResults({ results, watched, disabled, onAdd, formatPrice, formatDate }) {
+  const volumeScale = results.reduce((max, { volumeRatio }) => (
+    Number.isFinite(volumeRatio) ? Math.max(max, volumeRatio) : max
+  ), volumeMinRatio * 2);
+
+  return (
+    <>
+      <p className="scan-volume-legend">
+        <span aria-hidden="true" />
+        <span>Ambang volume <strong>{ratioFormat.format(volumeMinRatio)}×</strong> rata-rata {volumeLookback} sesi</span>
+      </p>
+      <div className="scan-table-layout">
+        <ScanTable
+          results={results}
+          watched={watched}
+          disabled={disabled}
+          onAdd={onAdd}
+          formatPrice={formatPrice}
+          volumeScale={volumeScale}
+        />
+      </div>
+      <ul className="scan-list" role="list" aria-label="Hasil scan matematis">
+        {results.map((pick) => (
+          <ScanListItem
+            key={pick.symbol}
+            pick={pick}
+            inWatchlist={watched.has(pick.symbol)}
+            disabled={disabled}
+            onAdd={onAdd}
+            formatPrice={formatPrice}
+            formatDate={formatDate}
+            volumeScale={volumeScale}
+          />
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function ScanResultHeading({ title, results, scope, formatDate }) {
+  const sessions = new Set(results.map(({ date }) => date || null));
+  const singleSession = sessions.size === 1 ? sessions.values().next().value : null;
+
+  return (
+    <div className="research-panel-heading scan-results-heading motion-enter motion-enter--after">
+      <div className="section-accent">
+        <h2 id="research-results-title">{title}</h2>
+        {scope && <p>{scope}</p>}
+      </div>
+      <dl className="scan-overview">
+        <div className="scan-overview-count">
+          <dt>Kandidat ditampilkan</dt>
+          <dd><UpdatedValue value={results.length} format={countFormat.format} /></dd>
+        </div>
+        <div>
+          <dt>Sesi acuan</dt>
+          <dd>
+            {singleSession ? <time dateTime={singleSession}>{formatDate(singleSession)}</time>
+              : sessions.size > 1 ? 'Lihat sesi per saham' : 'Tidak tersedia'}
+          </dd>
+        </div>
+      </dl>
+    </div>
   );
 }
 
@@ -219,9 +356,12 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   const ai = result?.ai;
   const isResearch = mode === 'research';
   const resultIsResearch = lastResult?.mode === 'research';
+  const scanScope = [result?.universe,
+    Number.isFinite(result?.scanned) && `${countFormat.format(result.scanned)} saham dalam cakupan`,
+  ].filter(Boolean).join(' · ');
   const resultSummary = result && (resultIsResearch
     ? `${result.universe} · ${results.length} kandidat`
-    : `${result.scanned} saham dipindai · ${result.universe} · ${results.length} memenuhi kriteria`);
+    : `${scanScope ? `${scanScope} · ` : ''}${results.length} kandidat ditampilkan`);
   const finished = request.status === 'success';
   const resultTitle = resultIsResearch
     ? (finished ? 'Kandidat riset AI' : 'Hasil riset sebelumnya')
@@ -245,7 +385,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   return (
     <>
       <section className="research-panel recommend-panel research-config motion-enter" aria-labelledby="breakout-scanner-title">
-        <header className="page-heading recommend-heading">
+        <header className="page-heading recommend-heading section-accent">
           <h1 id="breakout-scanner-title">Rekomendasi</h1>
           <p>{description}</p>
         </header>
@@ -290,18 +430,21 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
 
       {result && (
         <section className="research-panel recommend-panel" aria-labelledby="research-results-title">
-          <div className="research-panel-heading motion-enter motion-enter--after">
-            <div>
-              <h2 id="research-results-title">{resultTitle}</h2>
-              <p><span className="motion-status" key={resultSummary}>{resultSummary}</span></p>
+          {resultIsResearch ? (
+            <div className="research-panel-heading motion-enter motion-enter--after">
+              <div className="section-accent">
+                <h2 id="research-results-title">{resultTitle}</h2>
+                <p><span className="motion-status" key={resultSummary}>{resultSummary}</span></p>
+              </div>
+              {result.date && (
+                <p className="research-result-date">
+                  Tanggal riset <time dateTime={result.date}>{formatDate(result.date)}</time>
+                </p>
+              )}
             </div>
-            {result.date && (resultIsResearch || results.length > 0) && (
-              <p className="research-result-date">
-                {resultIsResearch ? 'Tanggal riset' : 'Sesi acuan'}{' '}
-                <time dateTime={result.date}>{formatDate(result.date)}</time>
-              </p>
-            )}
-          </div>
+          ) : (
+            <ScanResultHeading title={resultTitle} results={results} scope={scanScope} formatDate={formatDate} />
+          )}
           {ai?.summary && (
             <div className="research-summary">
               <h3>{resultIsResearch ? 'Ringkasan riset' : 'Catatan AI atas hasil scan'}</h3>
@@ -325,7 +468,14 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
               ))}
             </ul>
           ) : (
-            <ScanTable results={results} watched={watched} disabled={disabled} onAdd={onAdd} formatPrice={formatPrice} />
+            <ScanResults
+              results={results}
+              watched={watched}
+              disabled={disabled}
+              onAdd={onAdd}
+              formatPrice={formatPrice}
+              formatDate={formatDate}
+            />
           )}
           {ai?.error && !ai?.summary && <p className="research-empty" role="status">{ai.error}</p>}
         </section>
