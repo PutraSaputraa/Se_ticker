@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
+import UpdatedValue from './components/UpdatedValue.jsx';
 import { formatDateCompact, formatVolume } from './format.js';
 
 // Skor Trend Template Minervini per simbol (analyze.js tanpa RS agar cepat).
@@ -273,13 +274,13 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
       <td className="watchlist-notes">
         {notes && <p className="watchlist-note-preview">{notes}</p>}
         <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
-          aria-label={`${notesAction} ${symbol}`} onClick={() => onEditEntry(entry, 'notes')}>
+          aria-label={`${notesAction} ${symbol}`} onClick={(event) => onEditEntry(entry, 'notes', event.currentTarget)}>
           {notesAction}
         </button>
       </td>
       <td className="watchlist-image">
         <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
-          aria-label={`${imageAction} ${symbol}`} onClick={() => onEditEntry(entry, 'image')}>
+          aria-label={`${imageAction} ${symbol}`} onClick={(event) => onEditEntry(entry, 'image', event.currentTarget)}>
           {imageAction}
         </button>
       </td>
@@ -317,7 +318,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
       <td className="num">
         <span className={`watchlist-close ${direction?.className ?? ''}`}>
           {direction && <span role="img" aria-label={direction.label} title={direction.label}>{direction.icon}</span>}
-          {formatPrice(quote.close, quote.currency)}
+          <UpdatedValue value={quote.close} format={(price) => formatPrice(price, quote.currency)} />
         </span>
         {quote.date && <time className="research-cell-note" dateTime={quote.date}>{formatDateCompact(quote.date)}</time>}
       </td>

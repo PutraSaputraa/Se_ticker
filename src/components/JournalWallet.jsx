@@ -16,7 +16,7 @@ export default function JournalWallet({ wallet, ready, readError, disabled, savi
 
   return (
     <section id="journal-wallet" className="journal-section journal-wallet" aria-labelledby="journal-wallet-title">
-      <div className="journal-section-header">
+      <div className="journal-section-header motion-enter motion-enter--after">
         <div>
           <h2 id="journal-wallet-title" tabIndex={-1}>Wallet jurnal</h2>
           <p className="journal-help">Catat dana dalam USD untuk mendanai posisi baru.</p>

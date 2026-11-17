@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import WatchlistTable from '../WatchlistTable.jsx';
 import WatchlistEntryDialog from '../components/WatchlistEntryDialog.jsx';
@@ -10,6 +10,7 @@ import '../styles/research.css';
 export default function WatchlistPage({ account, uid }) {
   const navigate = useNavigate();
   const [editor, setEditor] = useState(null);
+  const editorTrigger = useRef(null);
   const [confirmation, setConfirmation] = useState(null);
   const { watchlist } = account;
   const watchlistDisabled = !account.ready || account.pending;
@@ -21,6 +22,15 @@ export default function WatchlistPage({ account, uid }) {
     loading: 'Memuat data akun…',
   }[sync];
   const justSaved = sync === 'ready' && confirmation;
+
+  useLayoutEffect(() => {
+    if (editor || watchlistDisabled) return;
+    const trigger = editorTrigger.current;
+    editorTrigger.current = null;
+    if (trigger?.isConnected && document.activeElement === document.body) {
+      trigger.focus({ preventScroll: true });
+    }
+  }, [editor, watchlistDisabled]);
 
   useEffect(() => {
     if (!confirmation) return;
@@ -36,7 +46,7 @@ export default function WatchlistPage({ account, uid }) {
 
   return (
     <div className="research-workspace watchlist-page">
-      <header className="page-heading page-heading--identity research-heading watchlist-heading">
+      <header className="page-heading page-heading--identity research-heading watchlist-heading motion-enter">
         <div>
           <h1>Pantauan saham</h1>
           <p>Bandingkan harga penutupan, volume, dan kriteria Stage 2.</p>
@@ -45,7 +55,7 @@ export default function WatchlistPage({ account, uid }) {
       </header>
 
       <section className="research-panel watchlist-panel" aria-label="Daftar pantauan">
-        <div className="research-panel-heading watchlist-toolbar">
+        <div className="research-panel-heading watchlist-toolbar motion-enter motion-enter--after">
           {watchlist.length > 0 && (
             <div>
               <strong>{watchlist.length} saham</strong>
@@ -76,7 +86,10 @@ export default function WatchlistPage({ account, uid }) {
                 `${symbol} · ${rating} bintang tersimpan`,
               )
             }
-            onEditEntry={(entry, mode) => setEditor({ entry, mode })}
+            onEditEntry={(entry, mode, trigger) => {
+              editorTrigger.current = trigger;
+              setEditor({ entry, mode });
+            }}
           />
         ) : account.ready ? (
           <div className="research-empty">

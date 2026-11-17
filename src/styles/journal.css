@@ -388,7 +388,6 @@
   border-color: var(--support-border);
   background: var(--support-soft);
   color: var(--support-text);
-  animation: overlay-enter var(--motion-standard) var(--motion-ease) both;
 }
 
 .journal-feedback--error {

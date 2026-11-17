@@ -127,8 +127,6 @@
   color: var(--support-text);
 }
 
-.research-sync[data-state="saved"] { animation: overlay-enter var(--motion-standard) var(--motion-ease) both; }
-
 .research-sync[data-state="error"] {
   border-color: var(--danger-border);
   background: var(--danger-soft);
@@ -434,7 +432,10 @@
 
 .research-remove { color: var(--danger); }
 
-.research-remove:hover:not(:disabled) { background: var(--danger-soft); }
+@media (hover: hover) {
+  .research-remove:hover:not(:disabled) { background: var(--danger-soft); }
+}
+.research-remove:active:not(:disabled) { background: var(--danger-soft); }
 
 @media (pointer: coarse), (max-width: 58rem) {
   .watchlist-table .ptw-input { font-size: 1rem; }
@@ -447,7 +448,14 @@
   color: var(--action-text);
 }
 
-.research-watch:hover:not(:disabled) {
+@media (hover: hover) {
+  .research-watch:hover:not(:disabled) {
+    border-color: var(--workspace-action);
+    background: var(--workspace-action-soft);
+  }
+}
+
+.research-watch:active:not(:disabled) {
   border-color: var(--workspace-action);
   background: var(--workspace-action-soft);
 }
@@ -514,6 +522,16 @@
   min-height: 3.125rem;
 }
 
+.recommend-panel .scan-button {
+  position: relative;
+  min-inline-size: 9rem;
+}
+
+.recommend-panel .scan-button[aria-disabled="true"],
+.research-mode .candle-timeframe-btn[aria-disabled="true"] {
+  cursor: wait;
+}
+
 .research-form-help {
   grid-column: 1 / -1;
   margin: 0;
@@ -554,6 +572,7 @@
   color: var(--support-text);
 }
 .research-progress {
+  display: block;
   width: min(12rem, 100%);
   height: 0.25rem;
   margin-top: 0.65rem;
@@ -566,16 +585,33 @@
   width: 38%;
   height: 100%;
   border-radius: inherit;
-  background: var(--support);
+  background: var(--research-progress-fill, var(--support));
   content: "";
   animation: research-indeterminate 1.25s var(--motion-ease) infinite;
 }
+
+.scan-button .research-progress {
+  --research-progress-fill: var(--workspace-on-action);
+  position: absolute;
+  inset: auto 0.75rem 0.35rem;
+  width: auto;
+  height: 0.1875rem;
+  margin: 0;
+  background: color-mix(in srgb, var(--workspace-on-action) 28%, transparent);
+}
+
 @keyframes research-indeterminate {
   from { transform: translateX(-100%); }
   to { transform: translateX(270%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .research-progress::before { animation: none; transform: translateX(80%); }
+  .research-progress::before {
+    width: 100%;
+    background: repeating-linear-gradient(
+      110deg, var(--research-progress-fill, var(--support)) 0 3px, transparent 3px 7px
+    );
+    animation: none;
+  }
 }
 
 .scan-table td strong { font-weight: 600; }

@@ -147,7 +147,6 @@ function TopBar({ user }) {
 export default function App({ user }) {
   const account = useAccountData(user.uid);
   const [legacy, setLegacy] = useState(readLegacyData);
-  const route = useRef(null);
   const { pathname, hash } = useLocation();
   const navigationType = useNavigationType();
 
@@ -156,18 +155,6 @@ export default function App({ user }) {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }
   }, [pathname, hash, navigationType]);
-
-  useEffect(() => {
-    const content = route.current;
-    const style = getComputedStyle(content);
-    const duration = Number.parseFloat(style.getPropertyValue('--motion-page'));
-    if (!duration) return;
-    const animation = content.animate(
-      [{ opacity: 0.76, transform: 'translateY(4px)' }, { opacity: 1, transform: 'translateY(0)' }],
-      { duration, easing: style.getPropertyValue('--motion-ease').trim() },
-    );
-    return () => animation.cancel();
-  }, [pathname]);
 
   async function importLegacy() {
     if (await account.update((current) => mergeLegacyData(current, legacy))) {
@@ -196,7 +183,7 @@ export default function App({ user }) {
             </div>
           )}
 
-          <div className="workspace-route" ref={route}>
+          <div className="workspace-route">
             <Routes>
               <Route path="/" element={<HomePage account={account} />} />
               <Route path="/stock/:symbol" element={<StockDetailPage account={account} />} />

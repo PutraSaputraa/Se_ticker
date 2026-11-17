@@ -183,7 +183,7 @@ export default function MinerviniPanel({ analysis, currency }) {
   const meta = statusMeta[status] ?? statusMeta.WATCHLIST;
 
   return (
-    <section className="stock-data-section stock-minervini" aria-labelledby="minervini-title">
+    <section className="stock-data-section stock-minervini motion-enter" aria-labelledby="minervini-title">
       <div className="stock-section-heading">
         <h2 id="minervini-title">Analisis Minervini</h2>
         <span className={`detail-status ${meta.className}`}>{meta.label}</span>

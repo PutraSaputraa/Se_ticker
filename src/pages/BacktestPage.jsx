@@ -46,7 +46,7 @@ function BacktestSummary({ data }) {
   const returnTone = stats.totalReturn > 0 ? 'trend--up' : stats.totalReturn < 0 ? 'trend--down' : undefined;
 
   return (
-    <section className="research-panel backtest-panel" aria-labelledby="backtest-results-title">
+    <section className="research-panel backtest-panel motion-enter" aria-labelledby="backtest-results-title">
       <div className="research-panel-heading">
         <div>
           <h2 id="backtest-results-title">Ringkasan simulasi</h2>
@@ -198,7 +198,7 @@ export default function BacktestPage() {
 
   return (
     <div className="research-workspace backtest-page">
-      <section className="research-panel backtest-panel research-config" aria-labelledby="backtest-controls-title">
+      <section className="research-panel backtest-panel research-config motion-enter" aria-labelledby="backtest-controls-title">
         <header className="page-heading backtest-heading">
           <h1 id="backtest-controls-title">Uji strategi</h1>
           <p>Simulasikan aturan breakout Minervini pada dua tahun data historis.</p>

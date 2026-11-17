@@ -149,10 +149,12 @@
   white-space: nowrap;
 }
 
-.stock-quote-actions .watch-toggle:hover:not(:disabled) { background: var(--workspace-action-hover); }
-.stock-quote-actions .watch-toggle:active:not(:disabled) { background: var(--workspace-action-active); }
 .stock-quote-actions .watch-toggle--active { background: var(--workspace-action-soft); color: var(--action-text); }
-.stock-quote-actions .watch-toggle--active:hover:not(:disabled) { background: var(--surface); }
+@media (hover: hover) {
+  .stock-quote-actions .watch-toggle:hover:not(:disabled) { background: var(--workspace-action-hover); }
+  .stock-quote-actions .watch-toggle--active:hover:not(:disabled) { background: var(--surface); }
+}
+.stock-quote-actions .watch-toggle:active:not(:disabled) { background: var(--workspace-action-active); }
 .stock-quote-actions .watch-toggle--active:active:not(:disabled) { background: var(--workspace-action-soft); }
 
 .stock-detail .detail-status { padding: 0.25rem 0.62rem; border-radius: 999px; }
@@ -234,8 +236,6 @@
   font-size: 0.8125rem;
   white-space: nowrap;
 }
-
-.stock-detail .candle-timeframe-btn:hover { color: var(--action-text); }
 
 .candle-request-status {
   display: flex;

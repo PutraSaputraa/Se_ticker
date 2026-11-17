@@ -6,6 +6,7 @@ import JournalTradeSetups from '../components/JournalTradeSetups.jsx';
 import TickerField from '../components/TickerField.jsx';
 import JournalWallet from '../components/JournalWallet.jsx';
 import TableScroll from '../components/TableScroll.jsx';
+import UpdatedValue from '../components/UpdatedValue.jsx';
 import { accountTickerSymbols, normalizeTicker } from '../tickers.js';
 import {
   calculateTradePnl,
@@ -116,21 +117,26 @@ function RunningPnlCells({ value, currency, children }) {
   return (
     <>
       <td className={`num ${pnlTone(pnl)}`}>
-        <strong>{formatPnl(pnlUsd, 'USD')}</strong>
-        {quote && <small className="journal-trade-note">{formatPct(pnlPct)}</small>}
+        <UpdatedValue as="strong" value={pnlUsd} format={(amount) => formatPnl(amount, 'USD')} />
+        {quote && (
+          <small className="journal-trade-note">
+            <UpdatedValue value={pnlPct} format={formatPct} />
+          </small>
+        )}
         {quote && !Number.isFinite(pnlUsd) && (
           <small className="journal-trade-note">{formatPnl(pnl, currency, quotePrecision(pnl, currency))} per unit</small>
         )}
         {children}
       </td>
       <td className="num">
+        <UpdatedValue
+          value={quote?.price}
+          format={(price) => quote ? formatJournalPrice(price, currency, quotePrecision(price, currency)) : null}
+        />
         {quote ? (
-          <>
-            {formatJournalPrice(quote.price, currency, quotePrecision(quote.price, currency))}
-            <small className="journal-trade-note">
-              <time dateTime={quoteTime?.toISOString() ?? quote.date}>{quoteTime ? quoteTimeFormat.format(quoteTime) : quote.date}</time>
-            </small>
-          </>
+          <small className="journal-trade-note">
+            <time dateTime={quoteTime?.toISOString() ?? quote.date}>{quoteTime ? quoteTimeFormat.format(quoteTime) : quote.date}</time>
+          </small>
         ) : <small className="journal-trade-note journal-quote-note">{message}</small>}
       </td>
     </>
@@ -595,7 +601,7 @@ export default function JournalPage({ account, uid }) {
 
   return (
     <div className="journal-page">
-      <header className="page-heading page-heading--identity journal-page-header">
+      <header className="page-heading page-heading--identity journal-page-header motion-enter">
         <div>
           <h1>Jurnal trading</h1>
           <p className="journal-help">Catat posisi dan evaluasi hasil trading.</p>

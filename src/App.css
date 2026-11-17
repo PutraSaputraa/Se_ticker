@@ -76,6 +76,7 @@
   --motion-fast: 150ms;
   --motion-standard: 180ms;
   --motion-page: 220ms;
+  --motion-stagger: 35ms;
   --motion-ease: cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
@@ -140,13 +141,23 @@ button, summary { cursor: pointer; }
 button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; opacity: 0.64; }
 
 :where(button, summary, input, select, textarea, a) {
-  transition: background-color var(--motion-fast), border-color var(--motion-fast),
-    color var(--motion-fast), box-shadow var(--motion-fast), transform var(--motion-fast);
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--motion-ease);
 }
 
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .skip-link {
@@ -406,13 +417,15 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   text-decoration: none;
 }
 
-.scan-button:hover:not(:disabled), .check-button:hover:not(:disabled) {
-  background: var(--workspace-action-hover);
-  box-shadow: var(--shadow-control);
+@media (hover: hover) {
+  :is(.scan-button, .check-button):hover:not(:disabled, [aria-disabled="true"]) {
+    background: var(--workspace-action-hover);
+    box-shadow: var(--shadow-control);
+  }
 }
-.scan-button:active:not(:disabled), .check-button:active:not(:disabled) {
+
+:is(.scan-button, .check-button):active:not(:disabled, [aria-disabled="true"]) {
   background: var(--workspace-action-active);
-  transform: scale(0.98);
 }
 
 .account-signout, .watch-toggle {
@@ -421,7 +434,10 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   color: var(--action-text);
 }
 
-.account-signout:hover:not(:disabled), .watch-toggle:hover:not(:disabled) { background: var(--workspace-action-soft); }
+@media (hover: hover) {
+  :is(.account-signout, .watch-toggle):hover:not(:disabled) { background: var(--workspace-action-soft); }
+}
+:is(.account-signout, .watch-toggle):active:not(:disabled) { background: var(--workspace-action-soft); }
 .watch-toggle--active { background: var(--workspace-action-soft); border-color: var(--workspace-action); }
 
 .text-button {
@@ -433,6 +449,11 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   text-decoration: underline;
   text-underline-offset: 0.16em;
 }
+
+@media (hover: hover) {
+  .text-button:hover:not(:disabled) { color: var(--text); }
+}
+.text-button:active:not(:disabled) { color: var(--text); }
 
 .account-message, .legacy-import {
   display: flex;
@@ -489,19 +510,61 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 
 @keyframes spin { to { transform: rotate(1turn); } }
 
-:where(.account-menu[open] .account-popover, .ticker-suggestions, dialog[open]) {
-  animation: overlay-enter var(--motion-standard) var(--motion-ease) both;
+.motion-enter--after { --motion-delay: var(--motion-stagger); }
+.motion-enter--last { --motion-delay: calc(2 * var(--motion-stagger)); }
+
+:where(.detail-status, .stock-rule-status, .research-badge, .research-sync) {
+  transition: background-color var(--motion-standard) var(--motion-ease),
+    border-color var(--motion-standard) var(--motion-ease),
+    color var(--motion-standard) var(--motion-ease);
 }
 
-@keyframes overlay-enter {
+.updated-value { border-radius: 0.2em; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .motion-enter {
+    animation: panel-enter var(--motion-page) var(--motion-ease) var(--motion-delay, 0ms) backwards;
+  }
+
+  :where(.account-menu[open] .account-popover, .ticker-suggestions) {
+    animation: dropdown-enter var(--motion-standard) var(--motion-ease);
+  }
+
+  dialog[open] { animation: dialog-enter var(--motion-standard) var(--motion-ease); }
+
+  :where(.motion-status, .research-sync[data-state="saved"], .journal-feedback--success) {
+    animation: status-enter var(--motion-standard) var(--motion-ease);
+  }
+
+  :where(button, a.scan-button, a.journal-secondary-button, .account-menu summary,
+    .search-shortcuts a):active:not(:disabled, [aria-disabled="true"]) {
+    transform: scale(0.98);
+  }
+}
+
+@keyframes panel-enter {
+  from { opacity: 0.78; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dropdown-enter {
   from { opacity: 0; transform: translateY(-0.25rem); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dialog-enter {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes status-enter {
+  from { opacity: 0.72; }
+  to { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root { --motion-fast: 0ms; --motion-standard: 0ms; --motion-page: 0ms; }
   .spinner { animation: none; }
-  .scan-button:active:not(:disabled), .check-button:active:not(:disabled) { transform: none; }
 }
 
 :where(.search-form, .auth-fields) :is(input, select) {
@@ -619,7 +682,13 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   overflow-wrap: anywhere;
 }
 
-.ticker-suggestions [role="option"]:hover,
+@media (hover: hover) {
+  .ticker-suggestions [role="option"]:hover {
+    background: var(--workspace-action-soft);
+    color: var(--action-text);
+  }
+}
+
 .ticker-suggestions [aria-selected="true"] {
   background: var(--workspace-action-soft);
   color: var(--action-text);
@@ -677,7 +746,10 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   text-decoration: none;
 }
 
-.search-shortcuts a:hover { background: var(--surface-hover); border-color: var(--workspace-action); }
+@media (hover: hover) {
+  .search-shortcuts a:hover { background: var(--surface-hover); border-color: var(--workspace-action); }
+}
+.search-shortcuts a:active { background: var(--surface-hover); border-color: var(--workspace-action); }
 .search-shortcuts a > svg { color: var(--muted); }
 
 .search-shortcut-icon {
@@ -771,7 +843,11 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   color: var(--action-text);
   box-shadow: var(--shadow-control);
 }
-.auth-tabs button:hover:not(:disabled), .candle-timeframe-btn:hover:not(:disabled) { color: var(--action-text); }
+@media (hover: hover) {
+  :is(.auth-tabs button, .candle-timeframe-btn):hover:not(:disabled, [aria-disabled="true"]) {
+    color: var(--action-text);
+  }
+}
 .auth-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .auth-fields input { margin-bottom: 0.85rem; }
 .auth-hint { margin: -0.55rem 0 0.85rem; color: var(--muted); font-size: 0.83rem; }

@@ -10,7 +10,7 @@ export default function HomePage({ account }) {
   return (
     <div className="search-page">
       <div className="search-layout">
-        <section className="search-panel" aria-labelledby="search-title">
+        <section className="search-panel motion-enter" aria-labelledby="search-title">
           <header className="page-heading search-heading">
             <span className="search-heading-icon"><WorkspaceIcon name="search" size={25} /></span>
             <div>
@@ -32,7 +32,7 @@ export default function HomePage({ account }) {
             </Link>
           </nav>
         </section>
-        <section className="search-history" aria-labelledby="history-label">
+        <section className="search-history motion-enter motion-enter--after" aria-labelledby="history-label">
           <header><WorkspaceIcon name="history" size={20} /><h2 id="history-label">Pencarian terakhir</h2></header>
           {history.length > 0 ? (
             <ul>

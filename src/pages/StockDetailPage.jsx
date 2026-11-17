@@ -262,7 +262,7 @@ function StockDetail({ symbol, account }) {
 
       {result.status === 'loading' && (
         <div className="stock-loading">
-          <div className="status-card" role="status">
+          <div className="status-card motion-status" role="status">
             <span className="spinner" aria-hidden="true" />
             <div>
               <p className="status-title">Memuat {symbol}…</p>
@@ -274,7 +274,7 @@ function StockDetail({ symbol, account }) {
       )}
 
       {result.status === 'error' && (
-        <div className="status-card status-card--error">
+        <div className="status-card status-card--error motion-status">
           <span className="status-mark" aria-hidden="true">!</span>
           <div>
             <div role="alert">
@@ -301,7 +301,7 @@ function StockDetail({ symbol, account }) {
 
       {quote && (
         <article className="stock-detail-content">
-          <header className="stock-identity">
+          <header className="stock-identity motion-enter">
             <div className="stock-identity-info">
               <div className="stock-instrument">
                 <span className="symbol-badge">{quote.symbol}</span>
@@ -353,7 +353,7 @@ function StockDetail({ symbol, account }) {
             />
 
             <div className="stock-market-aside">
-              <section className="stock-plan" aria-labelledby="stock-plan-title">
+              <section className="stock-plan motion-enter motion-enter--after" aria-labelledby="stock-plan-title">
                 <div className="stock-section-heading">
                   <h2 id="stock-plan-title">Rencana trading</h2>
                   <StatusBadge status={analysis.status} />
@@ -379,7 +379,7 @@ function StockDetail({ symbol, account }) {
                   />
                 </dl>
               </section>
-              <section className="stock-data-section stock-session" aria-labelledby="stock-session-title">
+              <section className="stock-data-section stock-session motion-enter motion-enter--last" aria-labelledby="stock-session-title">
                 <h2 id="stock-session-title">Rincian sesi acuan</h2>
                 <dl className="stock-session-values" aria-label="Harga dan volume saham">
                   <div><dt>Buka</dt><dd>{formatPrice(quote.open, currency)}</dd></div>
