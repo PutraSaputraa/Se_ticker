@@ -84,47 +84,49 @@ function AuthForm() {
             <span className="brand"><BrandMark />Cek Saham</span>
             <ThemeToggle />
           </div>
-          <h1 id="auth-title">{title}</h1>
-          <p className="auth-description">
-            {resetting ? 'Masukkan email akunmu untuk menerima tautan reset.' : 'Akses pantauan, riwayat pencarian, dan jurnal yang tersimpan di akunmu.'}
-          </p>
-          {!resetting && (
-            <div className="auth-tabs" aria-label="Akses akun">
-              <button type="button" aria-pressed={!registering} disabled={busy} onClick={() => changeMode('login')}>Masuk</button>
-              <button type="button" aria-pressed={registering} disabled={busy} onClick={() => changeMode('register')}>Daftar</button>
-            </div>
-          )}
-          {(firebaseSetupError || error) && <p className="account-message account-message--error" role="alert">{firebaseSetupError || error}</p>}
-          {notice && <p className="account-message" role="status">{notice}</p>}
-          <form onSubmit={handleSubmit}>
-            <fieldset className="auth-fields" disabled={busy || !auth}>
-              <label htmlFor="auth-email">Email</label>
-              <input id="auth-email" type="email" autoComplete="email" required maxLength={254}
-                placeholder="nama@email.com" value={email} onChange={(event) => setEmail(event.target.value)} />
-              {!resetting && (
-                <>
-                  <label htmlFor="auth-password">Password</label>
-                  <input id="auth-password" type="password" required minLength={registering ? 6 : undefined}
-                    autoComplete={registering ? 'new-password' : 'current-password'}
-                    value={password} onChange={(event) => setPassword(event.target.value)}
-                    aria-describedby={registering ? 'password-hint' : undefined} />
-                  {registering && <p className="auth-hint" id="password-hint">Gunakan minimal 6 karakter.</p>}
-                </>
-              )}
-              {registering && (
-                <>
-                  <label htmlFor="auth-confirmation">Konfirmasi password</label>
-                  <input id="auth-confirmation" type="password" autoComplete="new-password" required minLength={6}
-                    value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
-                </>
-              )}
-              <button type="submit" className="check-button auth-submit">{busy ? 'Memproses…' : submitLabel}</button>
-            </fieldset>
-          </form>
-          <button className="text-button auth-switch" type="button" disabled={busy}
-            onClick={() => changeMode(resetting ? 'login' : 'reset')}>
-            {resetting ? 'Kembali ke halaman masuk' : 'Lupa password?'}
-          </button>
+          <div className="auth-content">
+            <h1 id="auth-title">{title}</h1>
+            <p className="auth-description">
+              {resetting ? 'Masukkan email akunmu untuk menerima tautan reset.' : 'Akses pantauan, riwayat pencarian, dan jurnal yang tersimpan di akunmu.'}
+            </p>
+            {!resetting && (
+              <div className="auth-tabs" aria-label="Akses akun">
+                <button type="button" aria-pressed={!registering} disabled={busy} onClick={() => changeMode('login')}>Masuk</button>
+                <button type="button" aria-pressed={registering} disabled={busy} onClick={() => changeMode('register')}>Daftar</button>
+              </div>
+            )}
+            {(firebaseSetupError || error) && <p className="account-message account-message--error" role="alert">{firebaseSetupError || error}</p>}
+            {notice && <p className="account-message" role="status">{notice}</p>}
+            <form onSubmit={handleSubmit}>
+              <fieldset className="auth-fields" disabled={busy || !auth}>
+                <label htmlFor="auth-email">Email</label>
+                <input id="auth-email" type="email" autoComplete="email" required maxLength={254}
+                  placeholder="nama@email.com" value={email} onChange={(event) => setEmail(event.target.value)} />
+                {!resetting && (
+                  <>
+                    <label htmlFor="auth-password">Password</label>
+                    <input id="auth-password" type="password" required minLength={registering ? 6 : undefined}
+                      autoComplete={registering ? 'new-password' : 'current-password'}
+                      value={password} onChange={(event) => setPassword(event.target.value)}
+                      aria-describedby={registering ? 'password-hint' : undefined} />
+                    {registering && <p className="auth-hint" id="password-hint">Gunakan minimal 6 karakter.</p>}
+                  </>
+                )}
+                {registering && (
+                  <>
+                    <label htmlFor="auth-confirmation">Konfirmasi password</label>
+                    <input id="auth-confirmation" type="password" autoComplete="new-password" required minLength={6}
+                      value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
+                  </>
+                )}
+                <button type="submit" className="check-button auth-submit">{busy ? 'Memproses…' : submitLabel}</button>
+              </fieldset>
+            </form>
+            <button className="text-button auth-switch" type="button" disabled={busy}
+              onClick={() => changeMode(resetting ? 'login' : 'reset')}>
+              {resetting ? 'Kembali ke halaman masuk' : 'Lupa password?'}
+            </button>
+          </div>
         </section>
       </div>
     </main>

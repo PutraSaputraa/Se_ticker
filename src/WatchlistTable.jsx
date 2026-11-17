@@ -69,7 +69,7 @@ function useWatchlistData(symbolsKey) {
     async function load(symbol) {
       const controller = new AbortController();
       controllers.set(symbol, controller);
-      setRows((r) => (gen === generation.current ? { ...r, [symbol]: { status: 'loading' } } : r));
+      setRows((r) => (gen === generation.current && r[symbol]?.status !== 'success' ? { ...r, [symbol]: { status: 'loading' } } : r));
       try {
         const response = await fetch(
           `/.netlify/functions/price?${new URLSearchParams({ symbol })}`,
@@ -112,7 +112,7 @@ function TrendScoreBadge({ score }) {
   if (score === undefined) return <span className="research-cell-note">Memuat…</span>;
   if (score === null) return <span className="research-cell-note">Belum tersedia</span>;
   return (
-    <span className={`research-badge${score.eligible ? ' research-badge--positive' : ''}`}
+    <span className={`research-badge${score.eligible ? ' research-badge--support' : ''}`}
       title={`${score.passed} dari ${score.total} kriteria Stage 2 lolos`}>
       {score.passed}/{score.total}
     </span>
@@ -121,7 +121,7 @@ function TrendScoreBadge({ score }) {
 
 function CheckBadgeMini({ passed }) {
   return (
-    <span className={`research-cell-note${passed === true ? ' research-cell-note--positive' : ''}`}>
+    <span className={`research-cell-note${passed === true ? ' research-cell-note--support' : ''}`}>
       {passed == null ? 'Ambang belum tersedia' : passed ? 'Memenuhi ambang' : 'Di bawah ambang'}
     </span>
   );
@@ -145,7 +145,7 @@ function breakoutStatus(quote, priceToWatch) {
 }
 
 function BreakoutBadge({ state }) {
-  if (state === 'breakout') return <span className="research-badge research-badge--positive">Breakout</span>;
+  if (state === 'breakout') return <span className="research-badge research-badge--support">Breakout</span>;
   if (state === 'near') return <span className="research-badge research-badge--warning">Mendekati</span>;
   return <span className="research-badge">Menunggu</span>;
 }
@@ -208,23 +208,38 @@ const priceDirections = {
 const starValues = [1, 2, 3, 4, 5];
 
 function WatchlistRating({ symbol, rating, onSetRating, disabled }) {
+  const label = `Beri bintang untuk ${symbol}`;
+  function selectRating(value) {
+    if (!disabled && value !== rating) onSetRating(symbol, value);
+  }
+
   return (
-    <div className="watchlist-rating" role="group" aria-label={`Beri bintang untuk ${symbol}`}>
-      {starValues.map((value) => (
-        <button
-          key={value}
-          type="button"
-          aria-label={`${value} bintang`}
-          aria-pressed={value === rating}
-          aria-disabled={disabled}
-          title={`Beri ${value} bintang`}
-          onClick={() => { if (!disabled && value !== rating) onSetRating(symbol, value); }}
-        >
-          <span aria-hidden="true" className={value <= rating ? 'watchlist-star-filled' : undefined}>
-            {value <= rating ? '★' : '☆'}
-          </span>
-        </button>
-      ))}
+    <div className="watchlist-rating">
+      <div className="watchlist-rating-stars" role="group" aria-label={label}>
+        {starValues.map((value) => (
+          <button
+            key={value}
+            type="button"
+            aria-label={`${value} bintang`}
+            aria-pressed={value === rating}
+            aria-disabled={disabled}
+            title={`Beri ${value} bintang`}
+            onClick={() => selectRating(value)}
+          >
+            <span aria-hidden="true" className={value <= rating ? 'watchlist-star-filled' : undefined}>
+              {value <= rating ? '★' : '☆'}
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="watchlist-rating-picker">
+        <span aria-hidden="true">{rating ? '★' : '☆'}</span>
+        <select aria-label={label} value={rating ?? ''} disabled={disabled}
+          onChange={(event) => selectRating(Number(event.target.value))}>
+          <option value="" disabled>Bintang</option>
+          {starValues.map((value) => <option value={value} key={value}>{value} bintang</option>)}
+        </select>
+      </div>
     </div>
   );
 }
@@ -296,7 +311,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
 
   return (
     <tr className="watchlist-row" onClick={(event) => {
-      if (!event.target.closest('a, button, input, .watchlist-notes, .watchlist-image')) onOpen(symbol);
+      if (!event.target.closest('a, button, input, .watchlist-rating, .watchlist-notes, .watchlist-image')) onOpen(symbol);
     }}>
       {instrument}
       <td className="num">
@@ -356,7 +371,7 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
             <th scope="col" className="num">Harga pantauan</th>
             <th scope="col" className="watchlist-stage" title="Jumlah kriteria Trend Template Minervini yang lolos">Stage 2</th>
             <th scope="col" className="num">Volume (lembar)</th>
-            <th scope="col" className="num" title="Rata-rata volume yang dipakai untuk menghitung ambang breakout">
+            <th scope="col" className="num watchlist-average-volume" title="Rata-rata volume yang dipakai untuk menghitung ambang breakout">
               Rata-rata volume <span className="watchlist-header-note">50 sesi (lembar)</span>
             </th>
             <th scope="col">Catatan</th>

@@ -6,6 +6,9 @@ const paths = {
   journal: 'M6 4h13v16H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm2 0v16m3-11h5m-5 4h5',
   account: 'M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 20a8 8 0 0 1 16 0',
   arrow: 'M5 12h14m-6-6 6 6-6 6',
+  chevron: 'm6 9 6 6 6-6',
+  history: 'M3 12a9 9 0 1 1 2.4 6.1M3 7v5h5m4-5v5l3 2',
+  check: 'm5 12 4 4L19 6',
 };
 
 export default function WorkspaceIcon({ name, size = 19 }) {

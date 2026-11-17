@@ -261,12 +261,15 @@ function StockDetail({ symbol, account }) {
       </nav>
 
       {result.status === 'loading' && (
-        <div className="status-card" role="status">
-          <span className="spinner" aria-hidden="true" />
-          <div>
-            <p className="status-title">Memuat {symbol}…</p>
-            <p>Mengambil data detail dari Yahoo Finance.</p>
+        <div className="stock-loading">
+          <div className="status-card" role="status">
+            <span className="spinner" aria-hidden="true" />
+            <div>
+              <p className="status-title">Memuat {symbol}…</p>
+              <p>Mengambil data detail dari Yahoo Finance.</p>
+            </div>
           </div>
+          <div className="stock-loading-plot" aria-hidden="true" />
         </div>
       )}
 
@@ -330,33 +333,6 @@ function StockDetail({ symbol, account }) {
             </div>
           </header>
 
-          <section className="stock-plan" aria-labelledby="stock-plan-title">
-            <div className="stock-section-heading">
-              <h2 id="stock-plan-title">Rencana trading</h2>
-              <StatusBadge status={analysis.status} />
-            </div>
-            <dl className="stock-levels">
-              <TradingLevel label="Buy Trigger" value={formatPrice(buyTrigger.level, currency)} />
-              <TradingLevel
-                label="Sell Trigger / Stop loss"
-                value={formatPrice(buyTrigger.sellLevel ?? analysis.stop, currency)}
-                hint={analysis.riskPct != null ? `Risiko ${formatPct(-Math.abs(analysis.riskPct))}` : undefined}
-                tone="risk"
-              />
-              <TradingLevel
-                label="Target"
-                value={formatPrice(analysis.target, currency)}
-                hint={analysis.potentialPct != null ? `Potensi ${formatPct(analysis.potentialPct)}` : undefined}
-                tone="gain"
-              />
-              <TradingLevel
-                label="Resistance 50 hari"
-                value={formatPrice(analysis.resistance50, currency)}
-                hint={analysis.baseTightPct != null ? `Konsolidasi ${analysis.baseTightPct.toLocaleString('id-ID')}%` : undefined}
-              />
-            </dl>
-          </section>
-
           <div className="stock-market-grid">
             <CandlestickChart
               sessions={chartSnapshot?.priceHistory ?? quote.priceHistory ?? []}
@@ -376,17 +352,45 @@ function StockDetail({ symbol, account }) {
               onRetry={() => setChartAttempt((attempt) => attempt + 1)}
             />
 
-            <section className="stock-data-section stock-session" aria-labelledby="stock-session-title">
-              <h2 id="stock-session-title">Rincian sesi acuan</h2>
-              <dl className="stock-session-values" aria-label="Harga dan volume saham">
-                <div><dt>Buka</dt><dd>{formatPrice(quote.open, currency)}</dd></div>
-                <div><dt>Tertinggi</dt><dd>{formatPrice(quote.high, currency)}</dd></div>
-                <div><dt>Terendah</dt><dd>{formatPrice(quote.low, currency)}</dd></div>
-                <div><dt>Tutup</dt><dd>{formatPrice(quote.close, currency)}</dd></div>
-                <div><dt>Volume</dt><dd>{formatVolume(quote.volume)}</dd></div>
-                <div><dt>Rata-rata volume 50 sesi</dt><dd>{formatVolume(buyTrigger.averageVolume)}</dd></div>
-              </dl>
-            </section>
+            <div className="stock-market-aside">
+              <section className="stock-plan" aria-labelledby="stock-plan-title">
+                <div className="stock-section-heading">
+                  <h2 id="stock-plan-title">Rencana trading</h2>
+                  <StatusBadge status={analysis.status} />
+                </div>
+                <dl className="stock-levels">
+                  <TradingLevel label="Buy Trigger" value={formatPrice(buyTrigger.level, currency)} tone="entry" />
+                  <TradingLevel
+                    label="Sell Trigger / Stop loss"
+                    value={formatPrice(buyTrigger.sellLevel ?? analysis.stop, currency)}
+                    hint={analysis.riskPct != null ? `Risiko ${formatPct(-Math.abs(analysis.riskPct))}` : undefined}
+                    tone="risk"
+                  />
+                  <TradingLevel
+                    label="Target"
+                    value={formatPrice(analysis.target, currency)}
+                    hint={analysis.potentialPct != null ? `Potensi ${formatPct(analysis.potentialPct)}` : undefined}
+                    tone="gain"
+                  />
+                  <TradingLevel
+                    label="Resistance 50 hari"
+                    value={formatPrice(analysis.resistance50, currency)}
+                    hint={analysis.baseTightPct != null ? `Konsolidasi ${analysis.baseTightPct.toLocaleString('id-ID')}%` : undefined}
+                  />
+                </dl>
+              </section>
+              <section className="stock-data-section stock-session" aria-labelledby="stock-session-title">
+                <h2 id="stock-session-title">Rincian sesi acuan</h2>
+                <dl className="stock-session-values" aria-label="Harga dan volume saham">
+                  <div><dt>Buka</dt><dd>{formatPrice(quote.open, currency)}</dd></div>
+                  <div><dt>Tertinggi</dt><dd>{formatPrice(quote.high, currency)}</dd></div>
+                  <div><dt>Terendah</dt><dd>{formatPrice(quote.low, currency)}</dd></div>
+                  <div><dt>Tutup</dt><dd>{formatPrice(quote.close, currency)}</dd></div>
+                  <div><dt>Volume</dt><dd>{formatVolume(quote.volume)}</dd></div>
+                  <div><dt>Rata-rata volume 50 sesi</dt><dd>{formatVolume(buyTrigger.averageVolume)}</dd></div>
+                </dl>
+              </section>
+            </div>
           </div>
 
           {minervini.status === 'success' && (

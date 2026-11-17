@@ -1,151 +1,58 @@
 ---
 version: alpha
 name: Cek Saham
-description: Workspace riset untuk mencari kandidat, membandingkan saham, membaca level trading, menguji strategi, dan mencatat posisi.
-colors:
-  canvas: "#f3f6f8"
-  surface: "#ffffff"
-  surface-muted: "#f5f8fa"
-  border: "#d5dfe5"
-  text: "#172b3a"
-  muted: "#526474"
-  action: "#0052ff"
-  action-hover: "#0048e0"
-  action-active: "#003ecc"
-  action-soft: "#eaf1ff"
-  on-action: "#ffffff"
-  positive: "#176449"
-  negative: "#a13235"
-  warning: "#775017"
-  dark-canvas: "#101010"
-  dark-surface: "#1e1e20"
-  dark-surface-muted: "#181819"
-  dark-border: "#39393d"
-  dark-text: "#f0f0f2"
-  dark-muted: "#babac1"
-  dark-action: "#a9c4ff"
-  dark-action-hover: "#bfd3ff"
-  dark-action-active: "#95b3f5"
-  dark-action-soft: "#273650"
-  dark-on-action: "#101c3a"
-  dark-positive: "#85cca8"
-  dark-negative: "#f1a6a0"
-  dark-warning: "#f1cd87"
-typography:
-  page-title:
-    fontFamily: "'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif"
-    fontSize: "clamp(1.75rem, 3.2cqi, 2.25rem)"
-    fontWeight: 500
-    lineHeight: 1.12
-  section-title:
-    fontSize: "clamp(1.125rem, 2cqi, 1.3125rem)"
-    fontWeight: 600
-    lineHeight: 1.25
-  closing-price:
-    fontSize: "clamp(1.75rem, 3.5cqi, 2.5rem)"
-    fontWeight: 600
-    lineHeight: 1.08
-  trading-level:
-    fontSize: "clamp(1.125rem, 2cqi, 1.375rem)"
-    fontWeight: 600
-    lineHeight: 1.15
-  body:
-    fontSize: 16px
-    fontWeight: 400
-    lineHeight: 1.5
-  label:
-    fontSize: "13–14px"
-    fontWeight: 400
-    lineHeight: 1.45
-rounded:
-  card: 16px
-  inset: 12px
-  control: 8px
-  pill: 999px
-spacing:
-  card-padding: "clamp(0.875rem, 1.65vw, 1.375rem)"
-  card-gap: "clamp(0.75rem, 1.5vw, 1rem)"
-  touch-height: 44px
-components:
-  data-card:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.text}"
-    borderColor: "{colors.border}"
-    rounded: "{rounded.card}"
-    padding: "{spacing.card-padding}"
-  button-primary:
-    backgroundColor: "{colors.action}"
-    textColor: "{colors.on-action}"
-    rounded: "{rounded.pill}"
-    height: "{spacing.touch-height}"
-  chart-range-selected:
-    backgroundColor: "{colors.action-soft}"
-    textColor: "{colors.action}"
-    borderColor: "{colors.action}"
-    rounded: "{rounded.control}"
+description: Workspace riset saham, uji strategi, dan jurnal trading.
 ---
 
 # Cek Saham
 
-Sistem visual ini mengadaptasi palet netral, aksen biru yang hemat, tombol pil, dan garis pemisah tipis dari analisis desain Coinbase. Detail saham, Pantauan saham, Rekomendasi, Uji strategi, dan Jurnal memakai sistem ini. Gunakan nama dan simbol instrumen, tanggal sesi, grafik, dan angka untuk membangun hierarki halaman.
+**Precision with Energy** memakai struktur navy, aksi biru, dan aksen teal yang terukur. Angka dan grafik tetap menjadi pusat workspace. Wordmark, logo, dan nama aplikasi memakai aset Cek Saham yang sudah ada.
 
-## Warna dan tipografi
+## Sistem warna
 
-- Gunakan token tema bersama di `src/App.css` untuk kanvas, permukaan, teks, garis, dan status. Token `--workspace-*` menetapkan aksen biru, skala judul, dan ukuran panel.
-- Aksi utama memakai biru solid. Gunakan biru lembut dan garis biru untuk pilihan aktif, seperti rentang grafik atau tombol **Dipantau**. Gunakan label, tanda, atau pola garis untuk membedakan arah harga, risiko, dan status breakout.
-- Gunakan IBM Plex Sans yang sudah tersedia di aplikasi. Harga, persentase, volume, dan data tabel memakai angka tabular. Ratakan kolom numerik ke kanan dan tampilkan mata uang atau satuannya bila diperlukan untuk membaca nilai.
-- Pisahkan panel data dengan garis 1 px. Area di dalam panel, seperti sel level dan bingkai grafik, memakai permukaan netral yang sedikit berbeda dari kartu.
+Token semantik didefinisikan di `src/App.css`. Tema gelap memakai permukaan navy tersendiri untuk kanvas, panel, area inset, dan overlay.
 
-## Detail saham
+| Kegunaan | Token | Terang | Gelap |
+| --- | --- | --- | --- |
+| Kanvas | `--page` | `#F2F5FA` | `#0D1728` |
+| Panel utama | `--surface` | `#FFFFFF` | `#15243B` |
+| Panel inset | `--surface-muted` | `#F6F8FC` | `#111F34` |
+| Header tabel | `--surface-heading` | `#EEF3FA` | `#1A2C45` |
+| Area plot | `--chart-surface` | `#F8FAFE` | `#101D30` |
+| Teks utama | `--text` | `#15243B` | `#EDF3FC` |
+| Metadata | `--muted` | `#4C5F78` | `#ADBDD3` |
+| Pembatas panel | `--border` | `#DCE4EF` | `#2E425E` |
+| Aksi utama | `--workspace-action` | `#285AE8` | `#91B2FF` |
+| Tautan dan teks aksi | `--action-text` | `#234CC7` | `#AAC4FF` |
+| Aksen pendukung | `--support` | `#087F8C` | `#72D5D4` |
+| Latar navigasi | `--nav-surface` | `#15263F` | `#101C2F` |
+| Profit dan arah naik | `--positive` | `#176143` | `#83D0A7` |
+| Loss, risiko, dan arah turun | `--negative` | `#A02D3C` | `#FFADB7` |
+| Peringatan dan bintang | `--warning` | `#865200` | `#EFC77A` |
+| Galat dan aksi hapus | `--danger` | `#8A305A` | `#F3B0D1` |
 
-1. Mulai dari identitas instrumen, tanggal sesi acuan, harga penutupan, dan tindakan **Pantau**. Beri harga penutupan penekanan paling kuat. Tampilkan arah dan perubahan terhadap harga buka dengan kata dan persentase.
-2. Letakkan **Buy Trigger** dan **Sell Trigger / Stop loss** di awal Rencana trading, diikuti Target dan Resistance 50 hari. Pasangkan status breakout dengan teks yang menjelaskan statusnya.
-3. Tampilkan pilihan rentang di dekat judul grafik. Letakkan legenda dan data candle yang dipilih langsung di bawah grafik. Bedakan garis Buy Trigger, Sell Trigger, dan volume rata-rata dengan pola garis dan label.
-4. Tempatkan rincian sesi acuan di sebelah grafik saat ruangnya cukup. Lanjutkan dengan analisis Minervini, tabel OHLCV, dan fundamental.
+Gunakan `--workspace-on-action` di tombol biru. Pasangkan `--support-text` dengan `--support-soft` untuk sinkronisasi, status pemindaian, dan kriteria yang terpenuhi. Gunakan label, tanda angka, atau bentuk garis bersama warna. Periksa rasio kontras minimal 4,5:1 untuk teks biasa dan 3:1 untuk batas kontrol serta indikator fokus terhadap permukaannya.
 
-## Pantauan saham
+## Tipografi dan kedalaman
 
-1. Tempatkan **Cari saham** sebagai aksi utama. Di atas tabel, tampilkan jumlah saham, petunjuk urutan bintang, dan status sinkronisasi akun. Urutkan bintang tertinggi ke atas dan gunakan status breakout saat jumlah bintangnya sama.
-2. Mulai dari simbol, harga tutup, dan status agar data utama mudah dibandingkan. Ikuti dengan harga pantauan, Stage 2, volume, rata-rata volume 50 sesi, dan aksi baris. Gunakan panah atau tanda sama dengan untuk menunjukkan arah harga tutup terhadap harga buka.
-3. Di HP, pertahankan struktur tabel dan sematkan kolom saham di sisi kiri. Tempatkan pilihan 1–5 bintang di kolom saham agar mudah dijangkau saat tabel digeser. Tampilkan petunjuk geser saat kolom melampaui panel. Beri tinggi minimal `44px` untuk kontrol bintang, harga pantauan, dan aksi baris.
-4. Tampilkan keadaan harga yang sedang dimuat atau gagal di baris saham terkait. Tampilkan pesan daftar kosong beserta cara menambahkan saham setelah sinkronisasi selesai.
+- IBM Plex Sans dari aset lokal menjadi font antarmuka. Judul halaman memakai bobot 650 dengan jarak huruf rapat. Judul bagian memakai skala `--section-title-size`. Metadata dan label berada di kisaran 13–15 px.
+- Harga penutupan, saldo tersedia, dan PnL berjalan mendapat ukuran paling kuat di konteks masing-masing. Gunakan angka tabular dan rata kanan untuk kolom angka. Biarkan format persen, mata uang, dan tanda negatif terlihat.
+- Panel utama memakai radius 16 px dengan garis tipis dan `--shadow-panel`. Inset memakai radius 12 px. Kontrol memakai radius 9 px, sedangkan badge dapat berbentuk pil. Dialog dan daftar saran memakai `--shadow-raised`.
+- Gunakan gradien tonal ringan pada area identitas dan brand. Tabel dan plot memakai warna solid. Baris hover memakai perubahan permukaan.
 
-## Rekomendasi
+## Komposisi halaman
 
-1. Satukan pilihan **Scan matematis** atau **Riset AI**, pemilih bursa, dan tombol mulai dalam satu panel. Tampilkan status proses dan pesan gagal di dekat kontrol, serta tampilkan aksi **Coba lagi** untuk mengulang permintaan.
-2. Mulai tabel scan dari simbol, harga tutup, dan perubahan. Sematkan kolom saham saat tabel digeser di HP. Tampilkan resistance dan rasio volume dengan angka tabular. Catatan AI pada satu saham bisa dibuka dari baris saham tersebut.
-3. Tampilkan hasil riset AI sebagai kartu kandidat. Letakkan identitas saham dan aksi **Pantau** di bagian atas, lalu susun analisis teknikal, level pantauan, dan katalis sesuai data yang tersedia. Susun rincian dalam satu kolom jika ruang sempit.
-4. Tampilkan jumlah hasil dan sesi acuan atau tanggal riset di atas hasil. Gunakan tombol sekunder untuk **Pantau**, serta label **Dipantau** untuk saham yang sudah tersimpan.
+- **Shell.** Sidebar navy, indikator tepi, dan ikon teal menunjukkan lokasi aktif. Topbar memuat konteks halaman, tema, dan akun. Navigasi bawah dipakai hingga lebar viewport 58 rem.
+- **Cari saham.** Judul, form, dan contoh ticker berada di panel utama. Riwayat berfungsi sebagai daftar pindai cepat di samping atau di bawahnya. Pintasan Pantauan dan Rekomendasi memakai tautan yang sudah tersedia.
+- **Detail saham.** Identitas dan penutupan berada di header. Candlestick memakai kolom utama. Di ruang konten mulai 52 rem, Rencana trading dan rincian sesi memakai kolom samping. Di lebar yang lebih sempit, bagian itu mengikuti grafik. Buy Trigger, Stop loss, Target, dan Resistance memakai label dan aksen semantik. Baca nilai sesi lewat pointer, sentuhan, atau tombol panah.
+- **Pantauan.** Pertahankan ticker semat, isian harga, catatan, gambar, dan aksi baris. Bintang tampil sebagai tombol di desktop dan pemilih besar di layar sempit atau perangkat sentuh. Status penyimpanan berada di toolbar tabel.
+- **Rekomendasi.** Metode dan bursa berada dalam panel konfigurasi. Saat permintaan berjalan, indikator indeterminate mengikuti status asli. Hasil menampilkan jumlah kandidat, sesi, tabel scan, atau rincian riset AI.
+- **Uji strategi.** Panel hasil mendahulukan return dan drawdown, diikuti win rate dan expectancy. Kurva menampilkan basis awal 100 dan nilai yang dapat diperiksa lewat pointer atau keyboard. Asumsi eksekusi tersedia bersama hasil simulasi.
+- **Jurnal.** Saldo tersedia memimpin ringkasan wallet. Rincian posisi dan rencana keluar memakai kelompok inset. PnL berjalan berada di atas posisi terbuka. PnL terealisasi, statistik, dan grafik berada di bagian posisi ditutup.
+- **Autentikasi.** Brand band navy membingkai satu form fokus. Pilihan masuk dan daftar memakai kontrol segmented. Pesan login, pendaftaran, dan reset tampil di dekat form.
 
-## Uji strategi
+## Interaksi dan aksesibilitas
 
-1. Satukan pilihan **Per bursa** dan **Saham pilihan**, kolom sampel, serta aksi **Jalankan backtest** dalam satu panel. Tampilkan petunjuk input ticker dekat kolom tersebut dan letakkan status proses atau gagal di panel yang sama.
-2. Mulai ringkasan dari return simulasi dan drawdown maksimum, diikuti win rate, jumlah transaksi, dan expectancy. Letakkan asumsi eksekusi dalam bagian tersendiri di bawah metrik. Jika sampel kosong, tampilkan pesan yang membantu pengguna memilih sampel lain.
-3. Letakkan ringkasan dan kurva ekuitas berdampingan jika ruang cukup. Di HP, susun ringkasan sebelum kurva dan gunakan dua kolom untuk metrik. Tandai basis 100 pada grafik agar perubahan ekuitas mudah dibandingkan.
-4. Tampilkan saham dan return di awal tabel performa dan transaksi. Pertahankan kolom ticker saat tabel digeser di HP. Gunakan tanggal ringkas dengan tahun untuk transaksi lintas tahun.
-
-## Jurnal
-
-1. Sediakan tautan ke Wallet, Catat posisi, Posisi terbuka, dan Posisi ditutup di dekat judul. Utamakan saldo tersedia di Wallet dan tempatkan aksi tambah dan tarik saldo dekat input jumlah.
-2. Susun **Rincian posisi** dan **Rencana keluar** berdampingan saat ruang cukup. Letakkan **Type** di samping **Posisi**. Tempatkan **Notes** di samping **Setup** pada desktop dan di bawah **Setup** pada HP. Tampilkan umpan balik di dekat tombol buka posisi.
-3. Letakkan PnL berjalan di atas tabel posisi terbuka. Tempatkan ringkasan posisi ditutup dan grafik jurnal berdampingan jika ruang cukup dan susun vertikal di HP. Pakai biru untuk garis saldo dan warna status untuk membedakan batang untung dan rugi.
-4. Pertahankan ticker saat tabel posisi digeser dan tampilkan petunjuk saat tabel melampaui panel. Gunakan tinggi minimal `44px` untuk kontrol form, pemilih grafik, dan tombol aksi baris.
-
-## Desktop dan HP
-
-Ukuran berikut memakai lebar konten Detail saham setelah navigasi dan padding aplikasi. Batasi konten hingga `76rem`.
-
-| Lebar area Detail saham | Tata letak |
-| --- | --- |
-| Di bawah `36rem` | Harga dan **Pantau** berada di bawah identitas. Level trading tersusun dua kolom. Rincian sesi tampil setelah grafik. |
-| `36rem` hingga di bawah `52rem` | Identitas dan harga sejajar. Empat level trading tampil dalam satu baris. Rincian sesi tampil setelah grafik. |
-| Mulai `52rem` | Grafik memakai kolom utama. Rincian sesi memakai kolom kanan. Tabel fundamental dapat tampil berdampingan. |
-
-Pada area `22rem` atau lebih sempit, pilihan rentang grafik tersusun hingga tiga kolom. Gunakan tinggi minimal `44px` untuk **Pantau** dan pilihan rentang di HP. Pertahankan struktur kolom tabel dan izinkan gulir horizontal di panel tabel. Tampilkan petunjuk geser saat tabel melampaui panel.
-
-## Keadaan interaksi
-
-- Bedakan hover, fokus keyboard, pressed, dan disabled. Pakai cincin fokus yang terlihat di kedua tema. Tunjukkan pilihan menetap dengan batas, isian, serta status tombol `aria-pressed`.
-- Tampilkan pesan saat memuat detail. Saat mengganti rentang, tampilkan status permintaan dekat kontrol dan pertahankan grafik yang sedang terlihat sampai data baru siap.
-- Tampilkan pesan gagal di dekat bagian yang terdampak dan sediakan **Coba lagi** jika permintaan bisa diulang. Untuk data kosong, sebutkan bagian yang datanya belum tersedia.
-- Pastikan harga, level, dan grafik mudah ditemukan di desktop dan HP. Cek ticker panjang, harga bernilai besar, tabel yang melebar, serta keadaan tombol dan grafik di tema terang dan gelap.
+- Hover kontrol memakai 150 ms, segmented control dan overlay memakai 180 ms, dan pergantian halaman memakai satu transisi 220 ms. Perubahan angka harga dan PnL tampil langsung. Dengan `prefers-reduced-motion`, transisi ditiadakan dan teks loading tetap menjelaskan status.
+- Loading awal detail menampilkan bidang placeholder sesuai plot. Perubahan rentang mempertahankan grafik yang sudah dimuat sambil menunjukkan permintaan yang berlangsung.
+- Gunakan target utama minimal 44 px, cincin fokus di kedua tema, serta petunjuk saat tabel bergulir. Gulir horizontal dibatasi ke panel tabel. Uji lebar viewport 375, 768, dan 1440 px dengan ticker panjang, angka besar, serta nilai negatif.

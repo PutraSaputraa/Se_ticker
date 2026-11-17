@@ -63,7 +63,7 @@ function ChartHeader({ count, timeframe, selectedRange, ranges, onTimeframeChang
         )}
       </div>
       {loading && (
-        <div className="candle-request-status" role="status">
+        <div className="candle-request-status candle-request-status--loading" role="status">
           <span className="spinner" aria-hidden="true" />
           <span>Memuat grafik{requestedRange ? ` ${requestedRange}` : ''}…</span>
         </div>
@@ -113,7 +113,7 @@ export default function CandlestickChart({
 
   if (!latest) {
     return (
-      <section className="candle-chart" aria-labelledby="candle-title">
+      <section className="candle-chart candle-chart--empty" aria-labelledby="candle-title">
         {header}
         {!loading && !error && <p className="stock-muted">Riwayat harga belum tersedia.</p>}
       </section>

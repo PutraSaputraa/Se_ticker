@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import WatchlistTable from '../WatchlistTable.jsx';
 import WatchlistEntryDialog from '../components/WatchlistEntryDialog.jsx';
+import WorkspaceIcon from '../components/WorkspaceIcon.jsx';
 import { formatPrice } from '../format.js';
 import { setPriceToWatch, setWatchlistRating } from '../watchlist.js';
 import '../styles/research.css';
@@ -9,6 +10,7 @@ import '../styles/research.css';
 export default function WatchlistPage({ account, uid }) {
   const navigate = useNavigate();
   const [editor, setEditor] = useState(null);
+  const [confirmation, setConfirmation] = useState(null);
   const { watchlist } = account;
   const watchlistDisabled = !account.ready || account.pending;
   const sync = account.pending ? 'pending' : account.error ? 'error' : account.ready ? 'ready' : 'loading';
@@ -18,10 +20,23 @@ export default function WatchlistPage({ account, uid }) {
     ready: 'Tersinkron dengan akun',
     loading: 'Memuat data akun…',
   }[sync];
+  const justSaved = sync === 'ready' && confirmation;
+
+  useEffect(() => {
+    if (!confirmation) return;
+    const timeout = window.setTimeout(() => setConfirmation(null), 2600);
+    return () => window.clearTimeout(timeout);
+  }, [confirmation]);
+
+  async function saveWatchlistChange(change, message) {
+    const saved = await account.update((current) => ({ ...current, watchlist: change(current.watchlist) }));
+    if (saved) setConfirmation({ message });
+    return saved;
+  }
 
   return (
     <div className="research-workspace watchlist-page">
-      <header className="page-heading research-heading watchlist-heading">
+      <header className="page-heading page-heading--identity research-heading watchlist-heading">
         <div>
           <h1>Pantauan saham</h1>
           <p>Bandingkan harga penutupan, volume, dan kriteria Stage 2.</p>
@@ -37,7 +52,10 @@ export default function WatchlistPage({ account, uid }) {
               <p>Bintang tertinggi di atas</p>
             </div>
           )}
-          <span className="research-sync" data-state={sync} role="status">{syncLabel}</span>
+          <span className="research-sync" data-state={justSaved ? 'saved' : sync} role="status">
+            {sync === 'ready' && <WorkspaceIcon name="check" size={15} />}
+            {justSaved ? confirmation.message : syncLabel}
+          </span>
         </div>
         {watchlist.length > 0 ? (
           <WatchlistTable
@@ -47,10 +65,16 @@ export default function WatchlistPage({ account, uid }) {
             onOpen={(symbol) => navigate(`/stock/${encodeURIComponent(symbol)}`)}
             onRemove={account.removeWatchlistSymbol}
             onSetWatchPrice={(symbol, price) =>
-              account.update((current) => ({ ...current, watchlist: setPriceToWatch(current.watchlist, symbol, price) }))
+              saveWatchlistChange(
+                (list) => setPriceToWatch(list, symbol, price),
+                `Harga pantauan ${symbol} tersimpan`,
+              )
             }
             onSetRating={(symbol, rating) =>
-              account.update((current) => ({ ...current, watchlist: setWatchlistRating(current.watchlist, symbol, rating) }))
+              saveWatchlistChange(
+                (list) => setWatchlistRating(list, symbol, rating),
+                `${symbol} · ${rating} bintang tersimpan`,
+              )
             }
             onEditEntry={(entry, mode) => setEditor({ entry, mode })}
           />
@@ -67,6 +91,7 @@ export default function WatchlistPage({ account, uid }) {
       </section>
       {editor && (
         <WatchlistEntryDialog {...editor} account={account} uid={uid} disabled={watchlistDisabled}
+          onSaved={(message) => setConfirmation({ message })}
           onClose={() => setEditor(null)} />
       )}
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
+import ResearchRequestStatus from './components/ResearchRequestStatus.jsx';
 import { formatDateCompact, formatPct } from './format.js';
 
 const scanErrorMessage = 'Pemindaian breakout gagal. Coba lagi nanti.';
@@ -192,7 +193,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
 
   return (
     <>
-      <section className="research-panel recommend-panel" aria-labelledby="breakout-scanner-title">
+      <section className="research-panel recommend-panel research-config" aria-labelledby="breakout-scanner-title">
         <header className="page-heading recommend-heading">
           <h1 id="breakout-scanner-title">Rekomendasi</h1>
           <p>{description}</p>
@@ -228,23 +229,13 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         </form>
 
         {loading && (
-          <div className="status-card" role="status">
-            <span className="spinner" aria-hidden="true" />
-            <div>
-              <p className="status-title">{isResearch ? 'Menelusuri kandidat…' : 'Memindai data harga…'}</p>
-              <p>{isResearch ? 'Kenari mencari dan menilai sumber web.' : 'Memeriksa resistance, konsolidasi, dan volume tiap saham.'}</p>
-            </div>
-          </div>
+          <ResearchRequestStatus loading
+            title={isResearch ? 'Menelusuri kandidat…' : 'Memindai data harga…'}
+            message={isResearch ? 'Kenari mencari dan menilai sumber web.' : 'Memeriksa resistance, konsolidasi, dan volume tiap saham.'} />
         )}
 
         {state.status === 'error' && (
-          <div className="status-card status-card--error" role="alert">
-            <span className="status-mark" aria-hidden="true">!</span>
-            <div>
-              <p className="status-title">{isResearch ? 'Riset gagal' : 'Pemindaian gagal'}</p>
-              <p>{state.message}</p>
-            </div>
-          </div>
+          <ResearchRequestStatus title={isResearch ? 'Riset gagal' : 'Pemindaian gagal'} message={state.message} />
         )}
       </section>
 
@@ -253,7 +244,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           <div className="research-panel-heading">
             <div>
               <h2 id="research-results-title">{isResearch ? 'Kandidat riset AI' : 'Hasil scan matematis'}</h2>
-              <p>
+              <p role="status">
                 {isResearch
                   ? `${result.universe} · ${results.length} kandidat`
                   : `${result.scanned} saham dipindai · ${result.universe} · ${results.length} memenuhi kriteria`}

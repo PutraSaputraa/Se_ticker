@@ -582,7 +582,7 @@ export default function JournalPage({ account, uid }) {
 
   return (
     <div className="journal-page">
-      <header className="journal-page-header">
+      <header className="page-heading page-heading--identity journal-page-header">
         <div>
           <h1>Jurnal trading</h1>
           <p className="journal-help">Catat posisi dan evaluasi hasil trading.</p>
@@ -725,7 +725,7 @@ export default function JournalPage({ account, uid }) {
         </form>
       </section>
 
-      <section id="journal-open" className="journal-section" aria-labelledby="journal-open-title">
+      <section id="journal-open" className="journal-section journal-open" aria-labelledby="journal-open-title">
         <div className="journal-section-header">
           <div>
             <h2 id="journal-open-title">Posisi terbuka</h2>

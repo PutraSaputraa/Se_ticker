@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Route, Routes, useLocation, useMatch, useNavigationType } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from './firebase.js';
@@ -58,9 +58,19 @@ function Sidebar() {
 function TopBar({ user }) {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
+  const accountMenu = useRef(null);
   const { pathname } = useLocation();
   const stock = useMatch('/stock/:symbol');
-  const section = navigation.find(({ to }) => to === pathname)?.name ?? 'Cari saham';
+  const section = navigation.find(({ to }) => to === pathname) ?? navigation[0];
+
+  useEffect(() => {
+    function closeOutside(event) {
+      const menu = accountMenu.current;
+      if (menu?.open && !menu.contains(event.target)) menu.open = false;
+    }
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, []);
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -79,18 +89,26 @@ function TopBar({ user }) {
         <div className="workspace-bar-inner">
           <Brand />
           <div className="workspace-location">
-            <strong>{stock ? 'Detail saham' : section}</strong>
+            <span className="workspace-location-icon"><WorkspaceIcon name={stock ? 'test' : section.icon} size={17} /></span>
+            <strong>{stock ? 'Detail saham' : section.name}</strong>
           </div>
           <div className="account-controls">
             <ThemeToggle />
-            <details className="account-menu" key={pathname}
+            <details className="account-menu" key={pathname} ref={accountMenu}
+              onBlur={(event) => {
+                if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Escape' && event.currentTarget.open) {
                   event.currentTarget.open = false;
                   event.currentTarget.querySelector('summary').focus();
                 }
               }}>
-              <summary><WorkspaceIcon name="account" size={17} /><span>Akun</span></summary>
+              <summary>
+                <WorkspaceIcon name="account" size={17} />
+                <span>Akun</span>
+                <span className="account-chevron"><WorkspaceIcon name="chevron" size={14} /></span>
+              </summary>
               <div className="account-popover">
                 <span className="account-email">{user.email}</span>
                 <button type="button" className="account-signout" disabled={signingOut} onClick={handleSignOut}>
@@ -113,12 +131,25 @@ function TopBar({ user }) {
 export default function App({ user }) {
   const account = useAccountData(user.uid);
   const [legacy, setLegacy] = useState(readLegacyData);
+  const route = useRef(null);
   const { pathname } = useLocation();
   const navigationType = useNavigationType();
 
   useEffect(() => {
     if (navigationType !== 'POP') window.scrollTo(0, 0);
   }, [pathname, navigationType]);
+
+  useEffect(() => {
+    const content = route.current;
+    const style = getComputedStyle(content);
+    const duration = Number.parseFloat(style.getPropertyValue('--motion-page'));
+    if (!duration) return;
+    const animation = content.animate(
+      [{ opacity: 0.76, transform: 'translateY(4px)' }, { opacity: 1, transform: 'translateY(0)' }],
+      { duration, easing: style.getPropertyValue('--motion-ease').trim() },
+    );
+    return () => animation.cancel();
+  }, [pathname]);
 
   async function importLegacy() {
     if (await account.update((current) => mergeLegacyData(current, legacy))) {
@@ -147,15 +178,17 @@ export default function App({ user }) {
             </div>
           )}
 
-          <Routes>
-            <Route path="/" element={<HomePage account={account} />} />
-            <Route path="/stock/:symbol" element={<StockDetailPage account={account} />} />
-            <Route path="/watchlist" element={<WatchlistPage account={account} uid={user.uid} />} />
-            <Route path="/rekomendasi" element={<RecommendPage account={account} />} />
-            <Route path="/uji-strategi" element={<BacktestPage />} />
-            <Route path="/jurnal" element={<JournalPage account={account} uid={user.uid} />} />
-            <Route path="*" element={<HomePage account={account} />} />
-          </Routes>
+          <div className="workspace-route" ref={route}>
+            <Routes>
+              <Route path="/" element={<HomePage account={account} />} />
+              <Route path="/stock/:symbol" element={<StockDetailPage account={account} />} />
+              <Route path="/watchlist" element={<WatchlistPage account={account} uid={user.uid} />} />
+              <Route path="/rekomendasi" element={<RecommendPage account={account} />} />
+              <Route path="/uji-strategi" element={<BacktestPage />} />
+              <Route path="/jurnal" element={<JournalPage account={account} uid={user.uid} />} />
+              <Route path="*" element={<HomePage account={account} />} />
+            </Routes>
+          </div>
 
           <footer className="source">Data historis dari Yahoo Finance.</footer>
         </main>

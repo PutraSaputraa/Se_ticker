@@ -51,11 +51,18 @@ export function JournalScreenshotField({ file, onChange, disabled }) {
         PNG, JPG, atau WebP hingga {maxImageSizeLabel}. Unggahan disimpan sebagai WebP.
       </p>
       {error && <p className="journal-feedback journal-feedback--error" id={errorId} role="alert">{error}</p>}
-      {file && preview && (
+      {file && (
         <>
-          <img src={preview} alt="Pratinjau screenshot chart" className="journal-screenshot-preview" />
+          {preview && (
+            <img src={preview} alt="Pratinjau screenshot chart" className="journal-screenshot-preview"
+              onError={() => {
+                setPreview('');
+                setError('Pratinjau gambar gagal ditampilkan.');
+              }} />
+          )}
           <button type="button" className="text-button journal-screenshot-button" disabled={disabled} onClick={() => {
             input.current.value = '';
+            setError('');
             onChange(null);
             input.current.focus();
           }}>
@@ -106,7 +113,8 @@ export function JournalScreenshotDialog({ uid, trade, onClose }) {
         <h2 id={titleId}>Screenshot chart {trade.pair}</h2>
         <button type="button" className="journal-secondary-button" onClick={() => dialog.current.close()}>Tutup</button>
       </div>
-      {result?.url && <img src={result.url} alt={`Screenshot chart ${trade.pair}`} />}
+      {result?.url && <img src={result.url} alt={`Screenshot chart ${trade.pair}`}
+        onError={() => setResult({ message: 'Screenshot chart gagal ditampilkan.' })} />}
       {!result && <p className="journal-help" role="status">Memuat screenshot chart…</p>}
       {result?.message && (
         <div className="journal-feedback journal-feedback--error">

@@ -3,7 +3,7 @@ import { imageContentTypes, imageFileError, maxImageSizeLabel } from '../imageFi
 import { maxWatchlistNotesLength } from '../watchlist.js';
 import { downloadWatchlistImage } from '../watchlistImage.js';
 
-export default function WatchlistEntryDialog({ entry, mode, account, uid, disabled, onClose }) {
+export default function WatchlistEntryDialog({ entry, mode, account, uid, disabled, onClose, onSaved }) {
   const dialog = useRef(null);
   const submitting = useRef(false);
   const titleId = useId();
@@ -50,13 +50,14 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
     setError(message);
   }
 
-  async function save(operation, failureMessage) {
+  async function save(operation, failureMessage, successMessage) {
     if (disabled || submitting.current) return;
     submitting.current = true;
     setSaving(true);
     setError('');
     try {
       if (!await operation()) throw new Error(failureMessage);
+      onSaved(successMessage);
       dialog.current?.close();
     } catch (failure) {
       setError(failure.message || failureMessage);
@@ -69,9 +70,9 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
   function handleSubmit(event) {
     event.preventDefault();
     if (imageMode) {
-      if (file) save(() => account.saveWatchlistImage(symbol, imageId, file), 'Gambar gagal disimpan. Coba lagi.');
+      if (file) save(() => account.saveWatchlistImage(symbol, imageId, file), 'Gambar gagal disimpan. Coba lagi.', `Gambar ${symbol} tersimpan`);
     } else if (notes.trim() !== savedNotes) {
-      save(() => account.saveWatchlistNotes(symbol, savedNotes, notes), 'Catatan gagal disimpan. Coba lagi.');
+      save(() => account.saveWatchlistNotes(symbol, savedNotes, notes), 'Catatan gagal disimpan. Coba lagi.', `Catatan ${symbol} tersimpan`);
     }
   }
 
@@ -82,13 +83,20 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
         <h2 id={titleId}>{imageMode ? 'Gambar' : 'Catatan'} {symbol}</h2>
         {imageMode ? (
           <>
-            {preview?.url && <img src={preview.url} alt={file ? `Pratinjau gambar ${symbol}` : `Gambar pantauan ${symbol}`} />}
+            {preview?.url && (
+              <img src={preview.url} alt={file ? `Pratinjau gambar ${symbol}` : `Gambar pantauan ${symbol}`}
+                onError={() => setPreview({ error: 'Gambar gagal ditampilkan.' })} />
+            )}
             {preview?.error && <p className="watchlist-dialog-error" role="alert">{preview.error}</p>}
             {imageId && !preview && !file && <p className="research-form-help" role="status">Memuat gambar…</p>}
             <label className="research-field">
               {imageId ? 'Ganti gambar' : 'Pilih gambar'}
-              <input type="file" accept={imageContentTypes.join(',')} aria-describedby={hintId}
-                onChange={selectImage} disabled={disabled || saving} />
+              <span className="watchlist-file-picker">
+                <span className="research-watch" aria-hidden="true">Pilih file</span>
+                <span aria-hidden="true">{file?.name ?? 'Belum ada file'}</span>
+                <input type="file" accept={imageContentTypes.join(',')} aria-describedby={hintId}
+                  onChange={selectImage} disabled={disabled || saving} />
+              </span>
             </label>
             <p className="research-form-help" id={hintId}>
               PNG, JPG, atau WebP hingga {maxImageSizeLabel}. Unggahan disimpan sebagai WebP.
@@ -112,7 +120,7 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
           )}
           {imageMode && imageId && (
             <button type="button" className="research-remove" disabled={disabled || saving}
-              onClick={() => save(() => account.saveWatchlistImage(symbol, imageId, null), 'Gambar gagal dihapus. Coba lagi.')}>
+              onClick={() => save(() => account.saveWatchlistImage(symbol, imageId, null), 'Gambar gagal dihapus. Coba lagi.', `Gambar ${symbol} dihapus`)}>
               Hapus gambar
             </button>
           )}
