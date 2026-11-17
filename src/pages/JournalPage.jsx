@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import JournalCharts from '../components/JournalCharts.jsx';
 import { ExitPlanFields, LeverageFields, PriceField } from '../components/JournalOrderFields.jsx';
 import { JournalScreenshotDialog, JournalScreenshotField } from '../components/JournalScreenshot.jsx';
@@ -28,7 +28,15 @@ import { calculateLevels, levelPrecision, validateLevels } from '../journalLevel
 import { journalSetupMarkets } from '../journalSetups.js';
 import { deleteJournalScreenshot, uploadJournalScreenshot } from '../journalScreenshot.js';
 import useJournalQuotes, { fetchJournalInstrument, fetchJournalQuote } from '../useJournalQuotes.js';
-import { closeWalletPosition, openWalletPosition, parseWalletUsd, recordWalletCash, removeWalletPosition, summarizeWallet } from '../wallet.js';
+import {
+  closeWalletPosition,
+  openWalletPosition,
+  parseWalletUsd,
+  recordInitialPositionValue,
+  recordWalletCash,
+  removeWalletPosition,
+  summarizeWallet,
+} from '../wallet.js';
 import '../styles/journal.css';
 
 const quoteTimeFormat = new Intl.DateTimeFormat('id-ID', {
@@ -90,14 +98,18 @@ function valueOpenTrade(trade, quoteState) {
   return { quote, ...result, pnlUsd: positionPnlUsd(trade, result.pnlPct) };
 }
 
-function RunningPnlCells({ value, currency }) {
+function RunningPnlCells({ value, currency, children }) {
   const { quote, pnl, pnlPct, pnlUsd, message } = value;
   const quoteTime = quote?.timestamp ? new Date(quote.timestamp * 1000) : null;
   return (
     <>
       <td className={`num ${pnlTone(pnl)}`}>
-        {pnlUsd == null ? formatPnl(pnl, currency, quotePrecision(pnl, currency)) : formatPnl(pnlUsd, 'USD')}
-        {quote && <small className="journal-trade-note">{pnlUsd == null ? 'Per unit · ' : ''}{formatPct(pnlPct)}</small>}
+        <strong>{formatPnl(pnlUsd, 'USD')}</strong>
+        {quote && <small className="journal-trade-note">{formatPct(pnlPct)}</small>}
+        {quote && !Number.isFinite(pnlUsd) && (
+          <small className="journal-trade-note">{formatPnl(pnl, currency, quotePrecision(pnl, currency))} per unit</small>
+        )}
+        {children}
       </td>
       <td className="num">
         {quote ? (
@@ -163,8 +175,45 @@ function JournalFeedback({ feedback, section }) {
   );
 }
 
+function PositionValueDialog({ trade, disabled, saving, feedback, onSave, onClose }) {
+  const dialog = useRef(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!dialog.current.open) dialog.current.showModal();
+  }, []);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const amount = new FormData(event.currentTarget).get('amount');
+    if (await onSave(trade, amount)) dialog.current?.close();
+  }
+
+  return (
+    <dialog ref={dialog} className="journal-position-value-dialog" aria-labelledby={titleId} onClose={onClose}
+      onCancel={(event) => { if (saving) event.preventDefault(); }}>
+      <form className="journal-form" onSubmit={handleSubmit}>
+        <h2 id={titleId}>Isi nilai awal {trade.pair}</h2>
+        <label>
+          {trade.type === 'futures' ? 'Margin awal (USD)' : 'Nilai awal posisi (USD)'}
+          <input name="amount" type="text" inputMode="decimal" placeholder="125,50" disabled={disabled} required />
+        </label>
+        <p className="journal-help">Nilai ini dipakai untuk menghitung PnL posisi di jurnal.</p>
+        <JournalFeedback feedback={feedback} section="open" />
+        <div className="journal-position-value-actions">
+          <button type="submit" className="scan-button" disabled={disabled}>{saving ? 'Menyimpan…' : 'Simpan'}</button>
+          <button type="button" className="journal-secondary-button" disabled={saving} onClick={() => dialog.current.close()}>
+            Batal
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
 function TradeTable({
   trades, closed = false, manualCurrency, runningValues, ready, readError, disabled, activeAction, onClose, onRemove, onViewScreenshot,
+  onFillPositionValue,
 }) {
   if (trades.length === 0) {
     return (
@@ -193,7 +242,7 @@ function TradeTable({
               </>
             ) : (
               <>
-                <th scope="col" className="num">PnL berjalan</th>
+                <th scope="col" className="num">PnL berjalan (USD)</th>
                 <th scope="col" className="num">Harga terbaru</th>
                 <th scope="col" className="num">Aksi</th>
               </>
@@ -267,7 +316,15 @@ function TradeTable({
                   </>
                 ) : (
                   <>
-                    <RunningPnlCells value={runningValues.get(trade.id)} currency={currency} />
+                    <RunningPnlCells value={runningValues.get(trade.id)} currency={currency}>
+                      {trade.positionUsd == null && (
+                        <button type="button" className="text-button journal-position-value-button" disabled={disabled}
+                          aria-label={`Isi nilai awal ${side.label} ${trade.pair}`} aria-haspopup="dialog"
+                          onClick={() => onFillPositionValue(trade)}>
+                          Isi nilai awal
+                        </button>
+                      )}
+                    </RunningPnlCells>
                     {actions}
                   </>
                 )}
@@ -326,6 +383,7 @@ export default function JournalPage({ account, uid }) {
   const [activeAction, setActiveAction] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [viewingScreenshot, setViewingScreenshot] = useState(null);
+  const [positionValueTrade, setPositionValueTrade] = useState(null);
   const running = useRef(false);
   const disabled = !account.ready || account.pending || activeAction !== null;
   const { side, type, rewardMultiple } = form;
@@ -496,6 +554,14 @@ export default function JournalPage({ account, uid }) {
       const saved = await account.update((current) => closeWalletPosition(current, trade.id, quote, at));
       if (!saved) throw new Error('Posisi gagal ditutup. Coba lagi.');
       return `Posisi ${trade.pair} ditutup.`;
+    });
+  }
+
+  function handleSavePositionValue(trade, amount) {
+    return runAction('position-value', 'open', async () => {
+      const saved = await account.update((current) => recordInitialPositionValue(current, trade.id, amount));
+      if (!saved) throw new Error('Nilai awal posisi gagal disimpan. Coba lagi.');
+      return `Nilai awal ${trade.pair} tersimpan.`;
     });
   }
 
@@ -671,7 +737,7 @@ export default function JournalPage({ account, uid }) {
             </button>
           )}
         </div>
-        <JournalFeedback feedback={feedback} section="open" />
+        {!positionValueTrade && <JournalFeedback feedback={feedback} section="open" />}
         {openTrades.length > 0 && (
           <div className="journal-running">
             <StatCard
@@ -696,7 +762,18 @@ export default function JournalPage({ account, uid }) {
           onClose={handleClose}
           onRemove={(trade) => handleRemove(trade, 'open')}
           onViewScreenshot={setViewingScreenshot}
+          onFillPositionValue={(trade) => {
+            setFeedback(null);
+            setPositionValueTrade(trade);
+          }}
         />
+        {positionValueTrade && (
+          <PositionValueDialog trade={positionValueTrade} disabled={disabled} saving={activeAction === 'position-value'}
+            feedback={feedback} onSave={handleSavePositionValue} onClose={() => {
+              setPositionValueTrade(null);
+              setFeedback((current) => current?.type === 'error' ? null : current);
+            }} />
+        )}
       </section>
 
       <section id="journal-closed" className="journal-section journal-closed" aria-labelledby="journal-closed-title">

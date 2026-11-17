@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import WatchlistTable from '../WatchlistTable.jsx';
+import WatchlistEntryDialog from '../components/WatchlistEntryDialog.jsx';
 import { formatPrice } from '../format.js';
-import { removeSymbol, setPriceToWatch, setWatchlistRating } from '../watchlist.js';
+import { setPriceToWatch, setWatchlistRating } from '../watchlist.js';
 import '../styles/research.css';
 
-export default function WatchlistPage({ account }) {
+export default function WatchlistPage({ account, uid }) {
   const navigate = useNavigate();
+  const [editor, setEditor] = useState(null);
   const { watchlist } = account;
   const watchlistDisabled = !account.ready || account.pending;
   const sync = account.pending ? 'pending' : account.error ? 'error' : account.ready ? 'ready' : 'loading';
@@ -42,15 +45,14 @@ export default function WatchlistPage({ account }) {
             formatPrice={formatPrice}
             disabled={watchlistDisabled}
             onOpen={(symbol) => navigate(`/stock/${encodeURIComponent(symbol)}`)}
-            onRemove={(symbol) =>
-              account.update((current) => ({ ...current, watchlist: removeSymbol(current.watchlist, symbol) }))
-            }
+            onRemove={account.removeWatchlistSymbol}
             onSetWatchPrice={(symbol, price) =>
               account.update((current) => ({ ...current, watchlist: setPriceToWatch(current.watchlist, symbol, price) }))
             }
             onSetRating={(symbol, rating) =>
               account.update((current) => ({ ...current, watchlist: setWatchlistRating(current.watchlist, symbol, rating) }))
             }
+            onEditEntry={(entry, mode) => setEditor({ entry, mode })}
           />
         ) : account.ready ? (
           <div className="research-empty">
@@ -63,6 +65,10 @@ export default function WatchlistPage({ account }) {
             : 'Mengambil daftar saham yang tersimpan di akunmu.'}</p>
         )}
       </section>
+      {editor && (
+        <WatchlistEntryDialog {...editor} account={account} uid={uid} disabled={watchlistDisabled}
+          onClose={() => setEditor(null)} />
+      )}
     </div>
   );
 }

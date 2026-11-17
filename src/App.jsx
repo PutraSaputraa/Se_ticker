@@ -150,7 +150,7 @@ export default function App({ user }) {
           <Routes>
             <Route path="/" element={<HomePage account={account} />} />
             <Route path="/stock/:symbol" element={<StockDetailPage account={account} />} />
-            <Route path="/watchlist" element={<WatchlistPage account={account} />} />
+            <Route path="/watchlist" element={<WatchlistPage account={account} uid={user.uid} />} />
             <Route path="/rekomendasi" element={<RecommendPage account={account} />} />
             <Route path="/uji-strategi" element={<BacktestPage />} />
             <Route path="/jurnal" element={<JournalPage account={account} uid={user.uid} />} />

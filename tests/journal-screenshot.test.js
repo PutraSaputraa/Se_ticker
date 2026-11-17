@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { setEnvironmentContext } from '@netlify/blobs';
 import journalScreenshot from '../netlify/functions/journal-screenshot.js';
-import { maxScreenshotBytes } from '../src/journalScreenshotFile.js';
+import watchlistImage from '../netlify/functions/watchlist-image.js';
+import { maxImageBytes } from '../src/imageFile.js';
 
 const projectId = 'test-seticker';
 process.env.VITE_FIREBASE_PROJECT_ID = projectId;
@@ -28,16 +29,18 @@ const png = Buffer.from(
   'base64',
 );
 
-function request(method, idToken, body, contentType = 'image/png') {
-  const headers = idToken ? { Authorization: `Bearer ${idToken}` } : {};
-  if (body) headers['Content-Type'] = contentType;
-  return journalScreenshot(new Request(
-    'https://test.example/.netlify/functions/journal-screenshot?tradeId=trade-1&uid=owner',
-    { method, headers, body },
-  ));
+function requestImage(handler, path) {
+  return (method, idToken, body, contentType = 'image/png') => {
+    const headers = idToken ? { Authorization: `Bearer ${idToken}` } : {};
+    if (body) headers['Content-Type'] = contentType;
+    return handler(new Request(`https://test.example/.netlify/functions/${path}&uid=owner`, { method, headers, body }));
+  };
 }
 
-test('screenshot memakai UID dari Firebase dan membatasi format serta ukuran', async (t) => {
+const request = requestImage(journalScreenshot, 'journal-screenshot?tradeId=trade-1');
+const requestWatchlist = requestImage(watchlistImage, 'watchlist-image?imageId=trade-1');
+
+test('gambar jurnal dan pantauan memakai UID Firebase serta penyimpanan terpisah', async (t) => {
   const blobs = new Map();
   t.mock.method(globalThis, 'fetch', async (input, init) => {
     const url = new URL(input);
@@ -82,10 +85,19 @@ test('screenshot memakai UID dari Firebase dan membatasi format serta ukuran', a
   assert.equal((await request('PUT', ownerToken + 'invalid', png)).status, 401);
   assert.equal((await request('PUT', ownerToken, png, 'image/svg+xml')).status, 415);
   assert.equal((await request('PUT', ownerToken, Buffer.from('not an image'))).status, 415);
-  assert.equal((await request('PUT', ownerToken, new Uint8Array(maxScreenshotBytes + 1))).status, 413);
+  assert.equal((await request('PUT', ownerToken, new Uint8Array(maxImageBytes + 1))).status, 413);
   assert.equal(blobs.size, 0);
   assert.equal((await request('PUT', ownerToken, png)).status, 201);
   assert.equal((await request('PUT', ownerToken, png)).status, 409);
+  assert.equal((await requestWatchlist('PUT', ownerToken, png)).status, 201);
+  assert.equal(blobs.size, 2);
+  assert.equal((await requestWatchlist('GET')).status, 401);
+  assert.equal((await requestWatchlist('GET', otherToken)).status, 404);
+  assert.equal((await requestWatchlist('DELETE', otherToken)).status, 204);
+  const image = await requestWatchlist('GET', ownerToken);
+  assert.equal(image.status, 200);
+  assert.equal(image.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
   assert.equal((await request('GET')).status, 401);
   assert.equal((await request('GET', otherToken)).status, 404);
   assert.equal((await request('DELETE', otherToken)).status, 204);
@@ -96,4 +108,7 @@ test('screenshot memakai UID dari Firebase dan membatasi format serta ukuran', a
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), png);
   assert.equal((await request('DELETE', ownerToken)).status, 204);
   assert.equal((await request('GET', ownerToken)).status, 404);
+  assert.equal((await requestWatchlist('GET', ownerToken)).status, 200);
+  assert.equal((await requestWatchlist('DELETE', ownerToken)).status, 204);
+  assert.equal((await requestWatchlist('GET', ownerToken)).status, 404);
 });

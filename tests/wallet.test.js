@@ -2,7 +2,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { AccountChangeError, normalizeAccountData } from '../src/accountData.js';
 import { calculateTradePnl, parseJournalLeverage, positionPnlUsd, realizedTradePnl } from '../src/journal.js';
-import { closeWalletPosition, openWalletPosition, parseWalletUsd, recordWalletCash, removeWalletPosition, summarizeWallet } from '../src/wallet.js';
+import {
+  closeWalletPosition,
+  openWalletPosition,
+  parseWalletUsd,
+  recordInitialPositionValue,
+  recordWalletCash,
+  removeWalletPosition,
+  summarizeWallet,
+} from '../src/wallet.js';
 
 const at = Date.parse('2026-02-03T03:00:00Z');
 const trade = {
@@ -52,6 +60,30 @@ test('pembatalan melepas dana dan posisi lama tidak mengubah saldo wallet', () =
   assert.equal(closed.wallet, cancelled.wallet);
   const withdrawn = recordWalletCash(closed, { id: 'withdraw', kind: 'withdraw', cents: 50_000, at });
   assert.deepEqual(balances(withdrawn), [0, 0, 0]);
+});
+
+test('nilai awal posisi lama dapat diisi satu kali untuk PnL berjalan dan terealisasi', () => {
+  const legacy = { ...trade, positionUsd: undefined, side: 'short', quoteCurrency: 'IDR', chartScreenshot: true };
+  const account = deposit(normalizeAccountData({ journal: [legacy] }), 5000);
+  const [before] = account.journal;
+  assert.equal(positionPnlUsd(before, 50), null);
+  for (const invalid of ['0', '-25', '125,501']) {
+    assert.throws(() => recordInitialPositionValue(account, legacy.id, invalid), /lebih dari nol/);
+  }
+
+  const updated = recordInitialPositionValue(account, legacy.id, '125,50');
+  assert.equal(updated.wallet, account.wallet);
+  const [position] = normalizeAccountData(updated).journal;
+  assert.deepEqual(position, { ...before, positionUsd: 125.5 });
+  const exit = { ...quote, price: 50, currency: 'IDR' };
+  assert.equal(positionPnlUsd(position, calculateTradePnl(position, exit.price).pnlPct), 62.75);
+  assert.equal(recordInitialPositionValue(updated, legacy.id, '125.50'), updated);
+  assert.throws(() => recordInitialPositionValue(updated, legacy.id, '200'), /sudah tercatat/);
+
+  const closed = closeWalletPosition(updated, legacy.id, exit, at);
+  assert.equal(closed.wallet, account.wallet);
+  assert.deepEqual(realizedTradePnl(closed.journal[0], 'IDR'), { currency: 'USD', amount: 62.75 });
+  assert.throws(() => recordInitialPositionValue(closed, legacy.id, '200'), /sudah tidak terbuka/);
 });
 
 test('kerugian short yang melampaui dana tetap bisa dicatat sebagai defisit', () => {

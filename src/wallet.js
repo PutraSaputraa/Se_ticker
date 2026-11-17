@@ -81,6 +81,26 @@ export function openWalletPosition(account, trade, at) {
   });
 }
 
+export function recordInitialPositionValue(account, id, amount) {
+  const cents = parseWalletUsd(amount);
+  if (cents == null) {
+    throw new AccountChangeError('Isi nilai awal USD lebih dari nol dengan maksimal dua desimal.');
+  }
+  const trade = account.journal.find((item) => item.id === id && item.status === 'open');
+  if (!trade) throw new AccountChangeError('Posisi ini sudah tidak terbuka.');
+
+  const positionUsd = cents / 100;
+  if (trade.positionUsd === positionUsd) return account;
+  if (trade.positionUsd != null) throw new AccountChangeError('Nilai awal posisi ini sudah tercatat.');
+
+  const reserved = summarizeWallet(account.wallet).positions.get(id);
+  if (reserved != null && reserved !== cents) {
+    throw new AccountChangeError('Nilai awal harus sesuai dana posisi yang tercatat di wallet.');
+  }
+  const journal = account.journal.map((item) => item.id === id ? { ...item, positionUsd } : item);
+  return { ...account, journal };
+}
+
 export function closeWalletPosition(account, id, quote, at) {
   const trade = account.journal.find((item) => item.id === id && item.status === 'open');
   if (!trade) return account;

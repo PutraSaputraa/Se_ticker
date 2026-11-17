@@ -1,10 +1,12 @@
+import { imageIdPattern } from './imageFile.js';
+
 const storageKey = 'cek-saham:watchlist';
+export const maxWatchlistNotesLength = 2000;
 
 function normalizeRating(rating) {
   return Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : null;
 }
 
-// Rating disimpan pada entri yang sudah diberi bintang.
 function normalizeEntry(entry) {
   if (typeof entry === 'string') {
     // Format lama: daftar pantauan hanya berupa daftar simbol.
@@ -16,7 +18,9 @@ function normalizeEntry(entry) {
     if (!symbol) return null;
     const priceToWatch = Number.isFinite(entry.priceToWatch) ? entry.priceToWatch : null;
     const rating = normalizeRating(entry.rating);
-    return { symbol, priceToWatch, ...(rating !== null && { rating }) };
+    const notes = typeof entry.notes === 'string' ? entry.notes.slice(0, maxWatchlistNotesLength).trim() : '';
+    const imageId = typeof entry.imageId === 'string' && imageIdPattern.test(entry.imageId) ? entry.imageId : null;
+    return { symbol, priceToWatch, ...(rating !== null && { rating }), ...(notes && { notes }), ...(imageId && { imageId }) };
   }
   return null;
 }
@@ -74,4 +78,12 @@ export function setWatchlistRating(list, symbol, value) {
   return list.map((entry) =>
     entry.symbol === symbol ? { ...entry, rating } : entry,
   );
+}
+
+export function setWatchlistNotes(list, symbol, notes) {
+  return list.map((entry) => entry.symbol === symbol ? normalizeEntry({ ...entry, notes }) : entry);
+}
+
+export function setWatchlistImage(list, symbol, imageId) {
+  return list.map((entry) => entry.symbol === symbol ? normalizeEntry({ ...entry, imageId }) : entry);
 }

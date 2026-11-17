@@ -11,7 +11,7 @@ import {
   formatVolume,
 } from '../format.js';
 import { suggestTickerAlternatives } from '../tickers.js';
-import { addSymbol, removeSymbol } from '../watchlist.js';
+import { addSymbol } from '../watchlist.js';
 import '../styles/stock.css';
 
 const serviceError = 'Layanan harga tidak dapat diakses. Coba lagi.';
@@ -217,11 +217,10 @@ function StockDetail({ symbol, account }) {
   }, [quote, symbol, range, chartAttempt]);
 
   function toggleWatchlist() {
+    if (inWatchlist) return account.removeWatchlistSymbol(symbol);
     account.update((current) => ({
       ...current,
-      watchlist: inWatchlist
-        ? removeSymbol(current.watchlist, symbol)
-        : addSymbol(current.watchlist, symbol),
+      watchlist: addSymbol(current.watchlist, symbol),
     }));
   }
 

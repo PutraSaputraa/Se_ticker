@@ -35,9 +35,13 @@ Watchlist dan lima pencarian terakhir disinkronkan antarperangkat melalui listen
 
 Jika browser memiliki data dari versi sebelumnya, tombol **Impor ke akun** memindahkan watchlist dan riwayat lokal ke akun yang sedang masuk. Impor mempertahankan harga pantauan yang sudah tersimpan di akun dan bisa diulang dengan aman. Data lokal lama dibersihkan setelah transaksi berhasil.
 
-### Screenshot chart Jurnal
+### Gambar di Jurnal dan Pantauan
 
 Setiap posisi bisa memiliki satu screenshot dalam format PNG, JPG, atau WebP hingga 4 MB. Netlify Blobs menyimpan file dan Firestore menyimpan penanda lampiran pada posisi. Netlify Function memverifikasi token login Firebase dan memakai UID dari hasil verifikasi untuk membaca, menulis, atau menghapus file pemilik.
+
+Setiap ticker di Pantauan bisa memiliki catatan dan satu gambar dengan format serta batas ukuran yang sama. Firestore menyimpan catatan dan referensi gambar pada entri pantauan.
+
+Sebelum upload dari Jurnal atau Pantauan, browser mengompresi PNG dan JPG ke WebP. Jika sisi terpanjang melebihi 2.048 piksel, browser mengecilkan gambar sesuai proporsinya. File WebP diunggah langsung.
 
 Untuk mengaktifkan unggahan di Netlify, sediakan `VITE_FIREBASE_API_KEY` dan `VITE_FIREBASE_PROJECT_ID` pada scope **Builds** dan **Functions**. Netlify menyediakan akses Blobs untuk Function pada situs tersebut.
 

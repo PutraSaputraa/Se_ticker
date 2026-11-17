@@ -229,8 +229,8 @@ function WatchlistRating({ symbol, rating, onSetRating, disabled }) {
   );
 }
 
-function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, onSetRating, disabled, trendScore }) {
-  const { symbol, priceToWatch, rating } = entry;
+function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled, trendScore }) {
+  const { symbol, priceToWatch, rating, notes, imageId } = entry;
   const quote = row?.quote;
   const instrument = (
     <th scope="row" className="research-instrument">
@@ -251,6 +251,25 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
       Hapus
     </button>
   );
+  const notesAction = notes ? 'Ubah catatan' : 'Tambah catatan';
+  const imageAction = imageId ? 'Lihat gambar' : 'Unggah gambar';
+  const details = (
+    <>
+      <td className="watchlist-notes">
+        {notes && <p className="watchlist-note-preview">{notes}</p>}
+        <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
+          aria-label={`${notesAction} ${symbol}`} onClick={() => onEditEntry(entry, 'notes')}>
+          {notesAction}
+        </button>
+      </td>
+      <td className="watchlist-image">
+        <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
+          aria-label={`${imageAction} ${symbol}`} onClick={() => onEditEntry(entry, 'image')}>
+          {imageAction}
+        </button>
+      </td>
+    </>
+  );
 
   if (row?.status !== 'success') {
     const error = row?.status === 'error';
@@ -264,6 +283,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
         </td>
         <td className="watchlist-stage"><TrendScoreBadge score={trendScore} /></td>
         <td colSpan={2} />
+        {details}
         <td className="num">{removeButton}</td>
       </tr>
     );
@@ -276,7 +296,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
 
   return (
     <tr className="watchlist-row" onClick={(event) => {
-      if (!event.target.closest('a, button, input')) onOpen(symbol);
+      if (!event.target.closest('a, button, input, .watchlist-notes, .watchlist-image')) onOpen(symbol);
     }}>
       {instrument}
       <td className="num">
@@ -302,6 +322,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
         <CheckBadgeMini passed={volumePass} />
       </td>
       <td className="num">{formatVolume(quote.buyTrigger?.averageVolume, { includeUnit: false })}</td>
+      {details}
       <td className="num">{removeButton}</td>
     </tr>
   );
@@ -309,7 +330,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
 
 const stateRank = { breakout: 0, near: 1, none: 2 };
 
-export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove, onSetWatchPrice, onSetRating, disabled }) {
+export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled }) {
   const symbolsKey = entries.map((entry) => entry.symbol).join('\n');
   const rows = useWatchlistData(symbolsKey);
   const trendScores = useTrendScores(symbolsKey);
@@ -338,6 +359,8 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
             <th scope="col" className="num" title="Rata-rata volume yang dipakai untuk menghitung ambang breakout">
               Rata-rata volume <span className="watchlist-header-note">50 sesi (lembar)</span>
             </th>
+            <th scope="col">Catatan</th>
+            <th scope="col">Gambar</th>
             <th scope="col" className="num">Aksi</th>
           </tr>
         </thead>
@@ -352,6 +375,7 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
               onRemove={onRemove}
               onSetWatchPrice={onSetWatchPrice}
               onSetRating={onSetRating}
+              onEditEntry={onEditEntry}
               disabled={disabled}
               trendScore={trendScores[entry.symbol]}
             />

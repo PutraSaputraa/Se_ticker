@@ -312,7 +312,8 @@
   border-radius: 0.5rem;
 }
 
-.text-button.journal-screenshot-button {
+.text-button.journal-screenshot-button,
+.text-button.journal-position-value-button {
   justify-self: start;
   min-height: 2.75rem;
   color: var(--workspace-action);
@@ -320,8 +321,16 @@
   text-align: start;
 }
 
-.journal-screenshot-dialog {
-  width: min(66rem, calc(100% - 2rem));
+.journal-position-value-button {
+  display: block;
+  margin-inline-start: auto;
+}
+
+.journal-screenshot-dialog { width: min(66rem, calc(100% - 2rem)); }
+.journal-position-value-dialog { width: min(26rem, calc(100% - 2rem)); }
+
+.journal-screenshot-dialog,
+.journal-position-value-dialog {
   max-height: calc(100dvh - 2rem);
   padding: var(--workspace-card-padding);
   border: 1px solid var(--border);
@@ -330,9 +339,17 @@
   color: var(--text);
 }
 
-.journal-screenshot-dialog::backdrop { background: rgb(16 24 40 / 0.65); }
+.journal-screenshot-dialog::backdrop,
+.journal-position-value-dialog::backdrop { background: rgb(16 24 40 / 0.65); }
+
+.journal-screenshot-dialog h2,
+.journal-position-value-dialog h2 { font-size: 1.125rem; overflow-wrap: anywhere; }
+
+.journal-position-value-dialog .journal-form { display: grid; gap: 0.75rem; }
+.journal-position-value-dialog .scan-button { min-height: 2.75rem; }
+.journal-position-value-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+
 .journal-screenshot-dialog .journal-section-header { flex-wrap: nowrap; }
-.journal-screenshot-dialog h2 { font-size: 1.125rem; overflow-wrap: anywhere; }
 .journal-screenshot-dialog > :not(:first-child) { margin-top: 0.875rem; }
 .journal-screenshot-dialog img {
   display: block;

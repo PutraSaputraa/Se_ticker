@@ -305,6 +305,41 @@
 .watchlist-table .watchlist-stage .research-cell-note { min-width: 3.75rem; white-space: normal; }
 .watchlist-header-note { display: block; font-weight: 400; }
 
+.watchlist-table .watchlist-notes {
+  min-width: 10rem;
+  max-width: 16rem;
+  white-space: normal;
+}
+
+.watchlist-note-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.watchlist-dialog {
+  width: min(36rem, calc(100% - 1.5rem));
+  max-height: calc(100dvh - 1.5rem);
+  padding: var(--workspace-card-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--workspace-card-radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.watchlist-dialog::backdrop { background: rgb(16 24 40 / 0.65); }
+.watchlist-dialog form { display: grid; gap: 0.75rem; }
+.watchlist-dialog h2 { font-size: 1.125rem; overflow-wrap: anywhere; }
+.watchlist-dialog textarea { resize: vertical; }
+.watchlist-dialog img { width: 100%; max-height: 48dvh; object-fit: contain; background: var(--surface-muted); }
+.watchlist-dialog-error { color: var(--negative); font-size: 0.875rem; overflow-wrap: anywhere; }
+.watchlist-dialog-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.watchlist-dialog .scan-button { min-height: 2.75rem; }
+
 .watchlist-rating {
   display: flex;
   width: max-content;
@@ -444,7 +479,7 @@
   min-width: 0;
 }
 
-.research-field :is(input, select) {
+.research-field :is(input, select, textarea) {
   width: 100%;
   min-width: 0;
   min-height: 3.125rem;
