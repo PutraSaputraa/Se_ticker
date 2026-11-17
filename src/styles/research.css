@@ -362,8 +362,7 @@
   line-height: 1;
 }
 
-.watchlist-rating-stars button:hover:not([aria-disabled="true"]),
-.watchlist-rating-stars button[aria-pressed="true"] { background: var(--warning-soft); }
+.watchlist-rating-stars button:hover:not([aria-disabled="true"]) { color: var(--warning); }
 .watchlist-rating-stars button[aria-disabled="true"] { cursor: not-allowed; opacity: 0.64; }
 .watchlist-rating-stars button:focus-visible { outline-offset: -2px; }
 .watchlist-star-filled { color: var(--warning); }
