@@ -162,7 +162,7 @@ export default function JournalTradeSetups({ uid, knownTickers, availableCents, 
     <section id="journal-setups" className="journal-section" aria-labelledby="journal-setups-title">
       <div className="journal-section-header">
         <div>
-          <h2 id="journal-setups-title">Trade Setup / Pending Order</h2>
+          <h2 id="journal-setups-title" tabIndex={-1}>Trade Setup / Pending Order</h2>
           <p className="journal-help">Kuotasi Yahoo Finance diperiksa di latar belakang. Posisi tercatat otomatis saat harga mencapai atau melewati batas dan saldo wallet cukup.</p>
         </div>
         <button type="button" className={editing ? 'journal-secondary-button' : 'scan-button'} disabled={locked}

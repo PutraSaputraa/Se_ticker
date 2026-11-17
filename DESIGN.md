@@ -14,14 +14,14 @@ Token semantik didefinisikan di `src/App.css`. Tema gelap memakai permukaan navy
 
 | Kegunaan | Token | Terang | Gelap |
 | --- | --- | --- | --- |
-| Kanvas | `--page` | `#F2F5FA` | `#0D1728` |
-| Panel utama | `--surface` | `#FFFFFF` | `#15243B` |
-| Panel inset | `--surface-muted` | `#F6F8FC` | `#111F34` |
-| Header tabel | `--surface-heading` | `#EEF3FA` | `#1A2C45` |
-| Area plot | `--chart-surface` | `#F8FAFE` | `#101D30` |
+| Kanvas | `--page` | `#F2F5FA` | `#0A1220` |
+| Panel utama | `--surface` | `#FFFFFF` | `#17263E` |
+| Panel inset | `--surface-muted` | `#F6F8FC` | `#111D31` |
+| Header tabel | `--surface-heading` | `#EEF3FA` | `#1C2F4B` |
+| Area plot | `--chart-surface` | `#F8FAFE` | `#101C30` |
 | Teks utama | `--text` | `#15243B` | `#EDF3FC` |
-| Metadata | `--muted` | `#4C5F78` | `#ADBDD3` |
-| Pembatas panel | `--border` | `#DCE4EF` | `#2E425E` |
+| Metadata | `--muted` | `#4C5F78` | `#A8BAD0` |
+| Pembatas panel | `--border` | `#DCE4EF` | `#33465F` |
 | Aksi utama | `--workspace-action` | `#285AE8` | `#91B2FF` |
 | Tautan dan teks aksi | `--action-text` | `#234CC7` | `#AAC4FF` |
 | Aksen pendukung | `--support` | `#087F8C` | `#72D5D4` |
@@ -37,7 +37,7 @@ Gunakan `--workspace-on-action` di tombol biru. Pasangkan `--support-text` denga
 
 - IBM Plex Sans dari aset lokal menjadi font antarmuka. Judul halaman memakai bobot 650 dengan jarak huruf rapat. Judul bagian memakai skala `--section-title-size`. Metadata dan label berada di kisaran 13–15 px.
 - Harga penutupan, saldo tersedia, dan PnL berjalan mendapat ukuran paling kuat di konteks masing-masing. Gunakan angka tabular dan rata kanan untuk kolom angka. Biarkan format persen, mata uang, dan tanda negatif terlihat.
-- Panel utama memakai radius 16 px dengan garis tipis dan `--shadow-panel`. Inset memakai radius 12 px. Kontrol memakai radius 9 px, sedangkan badge dapat berbentuk pil. Dialog dan daftar saran memakai `--shadow-raised`.
+- Panel utama memakai radius 16 px dengan garis tipis dan `--shadow-panel`. Inset memakai radius 12 px. Kontrol memakai radius 9 px, sedangkan badge dapat berbentuk pil. Dialog dan daftar saran memakai `--shadow-raised`; kartu autentikasi memakai `--shadow-panel` agar tidak terasa mengambang. Kontrol di atas pita navy memakai `--nav-current` dengan garis `--nav-edge`, bukan permukaan kartu, sehingga tetap terbaca di kedua tema.
 - Gunakan gradien tonal ringan pada area identitas dan brand. Tabel dan plot memakai warna solid. Baris hover memakai perubahan permukaan.
 
 ## Komposisi halaman

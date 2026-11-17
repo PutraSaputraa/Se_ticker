@@ -60,10 +60,22 @@
   color: var(--action-text);
 }
 
+.journal-jump-links a[aria-current="location"] {
+  border-color: var(--workspace-action);
+  background: var(--workspace-action-soft);
+  color: var(--action-text);
+  box-shadow: inset 0 -2px 0 var(--workspace-action);
+}
+
 .journal-section {
   display: grid;
   gap: var(--workspace-card-gap);
-  scroll-margin-block-start: 1rem;
+  scroll-margin-block-start: 0;
+}
+
+.journal-section h2[tabindex="-1"]:focus-visible {
+  outline: 2px solid var(--workspace-action);
+  outline-offset: 5px;
 }
 
 .journal-section h2 {

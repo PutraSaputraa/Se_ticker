@@ -13,7 +13,10 @@
   font-variant-numeric: lining-nums tabular-nums;
   color: var(--text);
   background: var(--page);
-  scroll-padding-block-start: 5rem;
+  /* Tinggi topbar diukur saat runtime; nilai cadangan menyamai tinggi minimumnya. */
+  --header-height: 4.2rem;
+  --anchor-gap: 0.75rem;
+  scroll-padding-block-start: calc(var(--header-height) + var(--anchor-gap));
   --page: #f2f5fa;
   --surface: #ffffff;
   --surface-muted: #f6f8fc;
@@ -78,20 +81,20 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0d1728;
-  --surface: #15243b;
-  --surface-muted: #111f34;
-  --surface-tint: #1c2e47;
-  --surface-heading: #1a2c45;
-  --surface-hover: #203654;
-  --surface-identity: #172c45;
-  --chart-surface: #101d30;
-  --chart-grid: #30465f;
+  --page: #0a1220;
+  --surface: #17263e;
+  --surface-muted: #111d31;
+  --surface-tint: #1e3250;
+  --surface-heading: #1c2f4b;
+  --surface-hover: #24395a;
+  --surface-identity: #19304d;
+  --chart-surface: #101c30;
+  --chart-grid: #31455e;
   --text: #edf3fc;
-  --muted: #adbdd3;
-  --border: #2e425e;
-  --field: #101e31;
-  --field-border: #758cac;
+  --muted: #a8bad0;
+  --border: #33465f;
+  --field: #0e1a2c;
+  --field-border: #6e86a6;
   --workspace-action: #91b2ff;
   --action-text: #aac4ff;
   --workspace-action-hover: #bdd1ff;
@@ -121,9 +124,9 @@
   --nav-accent: #7ddfd7;
   --brand-surface: #1a304c;
   --backdrop: rgb(4 10 21 / 0.76);
-  --shadow-panel: 0 1px 3px rgb(0 0 0 / 0.18), 0 7px 18px rgb(0 0 0 / 0.10);
-  --shadow-raised: 0 0.9rem 2.5rem rgb(0 0 0 / 0.43);
-  --shadow-control: 0 2px 5px rgb(0 0 0 / 0.22);
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.28), 0 6px 16px rgb(0 0 0 / 0.14);
+  --shadow-raised: 0 0.9rem 2.5rem rgb(0 0 0 / 0.5);
+  --shadow-control: 0 2px 5px rgb(0 0 0 / 0.3);
 }
 
 * { box-sizing: border-box; }
@@ -315,6 +318,15 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   border-color: var(--field-border);
   background: var(--surface-hover);
 }
+
+/* Pada pita brand navy, tombol tema memakai permukaan navigasi yang
+   sedikit lebih terang dari pita agar tetap terbaca di kedua tema. */
+.auth-brand-row .theme-toggle {
+  background: var(--nav-current);
+  border-color: var(--nav-edge);
+  color: var(--nav-text);
+}
+.auth-brand-row .theme-toggle:hover { background: var(--nav-edge); }
 .account-menu { position: relative; }
 .account-menu summary { list-style: none; }
 .account-menu summary::-webkit-details-marker { display: none; }
@@ -715,7 +727,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 }
 
 .auth-layout { width: min(100%, 28.5rem); }
-.auth-card { box-shadow: var(--shadow-raised); }
+.auth-card { box-shadow: var(--shadow-panel); }
 .auth-brand-row {
   --focus: var(--nav-focus);
   display: flex;
@@ -727,8 +739,6 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   background: linear-gradient(115deg, var(--nav-surface), var(--brand-surface));
 }
 .auth-brand-row .brand { color: var(--nav-text); }
-.auth-brand-row .theme-toggle { border-color: var(--nav-edge); background: var(--nav-hover); color: var(--nav-text); }
-.auth-brand-row .theme-toggle:hover { background: var(--nav-current); }
 .auth-content { padding: clamp(1rem, 4.2vw, 1.75rem); }
 .auth-card h1 { font-size: clamp(1.65rem, 5vw, 1.95rem); font-weight: 650; letter-spacing: -0.03em; }
 .auth-description { margin: 0.45rem 0 1.1rem; color: var(--muted); font-size: 0.94rem; }

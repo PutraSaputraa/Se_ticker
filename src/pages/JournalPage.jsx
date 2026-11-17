@@ -28,6 +28,7 @@ import { calculateLevels, levelPrecision, validateLevels } from '../journalLevel
 import { journalSetupMarkets } from '../journalSetups.js';
 import { deleteJournalScreenshot, uploadJournalScreenshot } from '../journalScreenshot.js';
 import useJournalQuotes, { fetchJournalInstrument, fetchJournalQuote } from '../useJournalQuotes.js';
+import useSectionNavigation from '../useSectionNavigation.js';
 import {
   closeWalletPosition,
   openWalletPosition,
@@ -38,6 +39,17 @@ import {
   summarizeWallet,
 } from '../wallet.js';
 import '../styles/journal.css';
+
+// Urutan mengikuti posisi bagian di halaman; navigasi menandai bagian aktif
+// berdasarkan urutan ini.
+const journalSections = [
+  { id: 'journal-wallet', label: 'Wallet' },
+  { id: 'journal-setups', label: 'Trade Setup' },
+  { id: 'journal-entry', label: 'Catat posisi' },
+  { id: 'journal-open', label: 'Posisi terbuka' },
+  { id: 'journal-closed', label: 'Posisi ditutup' },
+];
+const journalSectionIds = journalSections.map(({ id }) => id);
 
 const quoteTimeFormat = new Intl.DateTimeFormat('id-ID', {
   day: 'numeric', month: 'short', year: 'numeric',
@@ -385,6 +397,7 @@ export default function JournalPage({ account, uid }) {
   const [viewingScreenshot, setViewingScreenshot] = useState(null);
   const [positionValueTrade, setPositionValueTrade] = useState(null);
   const running = useRef(false);
+  const sections = useSectionNavigation(journalSectionIds);
   const disabled = !account.ready || account.pending || activeAction !== null;
   const { side, type, rewardMultiple } = form;
   const levels = calculateLevels(form);
@@ -588,11 +601,16 @@ export default function JournalPage({ account, uid }) {
           <p className="journal-help">Catat posisi dan evaluasi hasil trading.</p>
         </div>
         <nav className="journal-jump-links" aria-label="Bagian jurnal">
-          <a href="#journal-wallet">Wallet</a>
-          <a href="#journal-setups">Trade Setup</a>
-          <a href="#journal-entry">Catat posisi</a>
-          <a href="#journal-open">Posisi terbuka</a>
-          <a href="#journal-closed">Posisi ditutup</a>
+          {journalSections.map(({ id, label }) => (
+            <a
+              key={id}
+              href={`#${id}`}
+              aria-current={sections.active === id ? 'location' : undefined}
+              onClick={(event) => sections.handleClick(event, id)}
+            >
+              {label}
+            </a>
+          ))}
         </nav>
       </header>
 
@@ -606,7 +624,7 @@ export default function JournalPage({ account, uid }) {
 
       <section id="journal-entry" className="journal-section journal-entry" aria-labelledby="journal-entry-title">
         <div className="journal-entry-header">
-          <h2 id="journal-entry-title">Catat posisi</h2>
+          <h2 id="journal-entry-title" tabIndex={-1}>Catat posisi</h2>
           {ready && (
             <dl className="journal-account-context">
               <div><dt>Mata uang akun</dt><dd>{currency}</dd></div>
@@ -690,7 +708,8 @@ export default function JournalPage({ account, uid }) {
                   />
                 </label>
               </div>
-              <p className="journal-help" id="journal-wallet-note">Nilai posisi diambil dari <a href="#journal-wallet">saldo wallet USD</a>.</p>
+              <p className="journal-help" id="journal-wallet-note">Nilai posisi diambil dari <a href="#journal-wallet"
+                onClick={(event) => sections.handleClick(event, 'journal-wallet')}>saldo wallet USD</a>.</p>
               <p className="journal-help" id="journal-ticker-note">
                 Untuk kripto, gunakan <code>BTC-USD</code> atau <code>CRYPTO:BTC</code>. Awali dengan <code>US:</code> untuk memilih ticker AS jika kodenya sama.{' '}
                 {type === 'futures'
@@ -728,7 +747,7 @@ export default function JournalPage({ account, uid }) {
       <section id="journal-open" className="journal-section journal-open" aria-labelledby="journal-open-title">
         <div className="journal-section-header">
           <div>
-            <h2 id="journal-open-title">Posisi terbuka</h2>
+            <h2 id="journal-open-title" tabIndex={-1}>Posisi terbuka</h2>
             <p className="journal-help">Harga keluar memakai kuotasi terakhir Yahoo Finance saat posisi ditutup.</p>
           </div>
           {openTrades.length > 0 && (
@@ -779,7 +798,7 @@ export default function JournalPage({ account, uid }) {
       <section id="journal-closed" className="journal-section journal-closed" aria-labelledby="journal-closed-title">
         <div className="journal-section-header">
           <div>
-            <h2 id="journal-closed-title">Posisi ditutup</h2>
+            <h2 id="journal-closed-title" tabIndex={-1}>Posisi ditutup</h2>
             <p className="journal-help">PnL terealisasi dan statistik hasil trading.</p>
           </div>
         </div>

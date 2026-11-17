@@ -59,9 +59,25 @@ function TopBar({ user }) {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const accountMenu = useRef(null);
+  const header = useRef(null);
   const { pathname } = useLocation();
   const stock = useMatch('/stock/:symbol');
   const section = navigation.find(({ to }) => to === pathname) ?? navigation[0];
+
+  // Topbar menempel di atas konten, jadi tinggi aslinya menentukan jarak aman
+  // untuk scroll ke anchor. Tinggi berubah mengikuti breakpoint dan ukuran teks.
+  useEffect(() => {
+    const bar = header.current;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(([entry]) => {
+      root.style.setProperty('--header-height', `${entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height}px`);
+    });
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--header-height');
+    };
+  }, []);
 
   useEffect(() => {
     function closeOutside(event) {
@@ -85,7 +101,7 @@ function TopBar({ user }) {
 
   return (
     <>
-      <header className="workspace-bar">
+      <header className="workspace-bar" ref={header}>
         <div className="workspace-bar-inner">
           <Brand />
           <div className="workspace-location">
@@ -132,12 +148,14 @@ export default function App({ user }) {
   const account = useAccountData(user.uid);
   const [legacy, setLegacy] = useState(readLegacyData);
   const route = useRef(null);
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   const navigationType = useNavigationType();
 
   useEffect(() => {
-    if (navigationType !== 'POP') window.scrollTo(0, 0);
-  }, [pathname, navigationType]);
+    if (navigationType !== 'POP' && !hash) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }
+  }, [pathname, hash, navigationType]);
 
   useEffect(() => {
     const content = route.current;
