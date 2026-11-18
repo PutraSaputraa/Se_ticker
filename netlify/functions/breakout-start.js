@@ -17,10 +17,11 @@ export default async function breakoutStart(request) {
     const params = new URL(request.url).searchParams;
     const mode = params.get('mode') === 'research' ? 'research' : 'scan';
     const region = params.get('region') ?? 'auto';
+    const language = params.get('lang') === 'en' ? 'en' : 'id';
 
     const jobId = crypto.randomUUID();
     const store = getStore('breakout-jobs');
-    const job = { status: 'pending', mode, region, createdAt: Date.now() };
+    const job = { status: 'pending', mode, region, language, createdAt: Date.now() };
     const { etag } = await store.setJSON(jobId, job);
 
     try {

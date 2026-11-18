@@ -1,7 +1,9 @@
+import { localizedDateFormat } from './i18n.js';
+import useTranslation from './useTranslation.js';
 import { useEffect, useRef, useState } from 'react';
 import { formatCompactNumber, formatDateCompact } from './format.js';
 
-const axisDateFormat = new Intl.DateTimeFormat('id-ID', {
+const axisDateFormat = localizedDateFormat({
   timeZone: 'UTC',
   day: 'numeric',
   month: 'short',
@@ -13,41 +15,43 @@ const defaultRanges = [
 ];
 
 function CandleReadout({ session, active, isReference, formatDate, formatPrice, formatVolume }) {
+  const { t } = useTranslation();
   return (
     <div className={active ? 'candle-readout candle-tooltip' : 'candle-readout'} id="candle-tooltip" role={active ? 'tooltip' : undefined}>
       <div className="candle-readout-date">
         <time dateTime={session.date}>{formatDate(session.date)}</time>
-        {isReference && <span>Sesi acuan</span>}
+        {isReference && <span>{t("Sesi acuan")}</span>}
       </div>
       <dl>
-        <div><dt>Buka</dt><dd>{formatPrice(session.open)}</dd></div>
-        <div><dt>Tertinggi</dt><dd>{formatPrice(session.high)}</dd></div>
-        <div><dt>Terendah</dt><dd>{formatPrice(session.low)}</dd></div>
-        <div><dt>Tutup</dt><dd>{formatPrice(session.close)}</dd></div>
-        <div><dt>Volume</dt><dd>{formatVolume(session.volume)}</dd></div>
+        <div><dt>{t("Buka")}</dt><dd>{formatPrice(session.open)}</dd></div>
+        <div><dt>{t("Tertinggi")}</dt><dd>{formatPrice(session.high)}</dd></div>
+        <div><dt>{t("Terendah")}</dt><dd>{formatPrice(session.low)}</dd></div>
+        <div><dt>{t("Tutup")}</dt><dd>{formatPrice(session.close)}</dd></div>
+        <div><dt>{t("Volume")}</dt><dd>{formatVolume(session.volume)}</dd></div>
       </dl>
     </div>
   );
 }
 
 function ChartHeader({ count, timeframe, selectedRange, ranges, onTimeframeChange, latestDate, loading, error, onRetry }) {
+  const { t } = useTranslation();
   const isWeekly = ['1wk', '1y', '2y'].includes(timeframe);
-  const loadedRange = ranges.find(({ value }) => value === timeframe)?.label;
-  const requestedRange = ranges.find(({ value }) => value === selectedRange)?.label;
+  const loadedRange = t(ranges.find(({ value }) => value === timeframe)?.label);
+  const requestedRange = t(ranges.find(({ value }) => value === selectedRange)?.label);
   return (
     <>
       <div className="candle-chart-head">
         <div>
-          <h2 id="candle-title">Grafik harga</h2>
+          <h2 id="candle-title">{t("Grafik harga")}</h2>
           {latestDate && (
             <p className="stock-muted">
-              {loadedRange && `${loadedRange} · `}{count} candle {isWeekly ? 'mingguan' : 'harian'} hingga{' '}
+              {loadedRange && `${loadedRange} · `}{count} {t("candle")} {isWeekly ? t("mingguan") : t("harian")} {t("hingga")}{' '}
               <time dateTime={latestDate}>{formatDateCompact(latestDate)}</time>
             </p>
           )}
         </div>
         {typeof onTimeframeChange === 'function' && (
-          <div className="candle-timeframe stock-chart-ranges" role="group" aria-label="Rentang waktu grafik">
+          <div className="candle-timeframe stock-chart-ranges" role="group" aria-label={t("Rentang waktu grafik")}>
             {ranges.map(({ value, label }) => (
               <button
                 key={value}
@@ -56,7 +60,7 @@ function ChartHeader({ count, timeframe, selectedRange, ranges, onTimeframeChang
                 onClick={() => onTimeframeChange(value)}
                 aria-pressed={selectedRange === value}
               >
-                {label}
+                {t(label)}
               </button>
             ))}
           </div>
@@ -65,13 +69,13 @@ function ChartHeader({ count, timeframe, selectedRange, ranges, onTimeframeChang
       {loading && (
         <div className="candle-request-status candle-request-status--loading" role="status">
           <span className="spinner" aria-hidden="true" />
-          <span>Memuat grafik{requestedRange ? ` ${requestedRange}` : ''}…</span>
+          <span>{t("Memuat grafik")}{requestedRange ? ` ${requestedRange}` : ''}…</span>
         </div>
       )}
       {error && (
         <div className="candle-request-status candle-request-status--error" role="alert">
-          <span>Grafik{requestedRange ? ` ${requestedRange}` : ''} gagal dimuat. {error}</span>
-          {onRetry && <button className="watch-toggle" type="button" onClick={onRetry}>Coba lagi</button>}
+          <span>{t("Grafik")}{requestedRange ? ` ${requestedRange}` : ''} {t("gagal dimuat.")} {t(error)}</span>
+          {onRetry && <button className="watch-toggle" type="button" onClick={onRetry}>{t("Coba lagi")}</button>}
         </div>
       )}
     </>
@@ -82,6 +86,7 @@ export default function CandlestickChart({
   sessions, referenceDate, buyLevel, sellLevel, averageVolume, formatPrice, formatDate, formatVolume,
   timeframe = '1d', selectedRange = timeframe, onTimeframeChange, ranges, loading, error, onRetry,
 }) {
+  const { t } = useTranslation();
   const plotRef = useRef(null);
   const [selection, setSelection] = useState(null);
   const activeIndex = selection?.sessions === sessions ? selection.index : null;
@@ -115,7 +120,7 @@ export default function CandlestickChart({
     return (
       <section className="candle-chart candle-chart--empty" aria-labelledby="candle-title">
         {header}
-        {!loading && !error && <p className="stock-muted">Riwayat harga belum tersedia.</p>}
+        {!loading && !error && <p className="stock-muted">{t("Riwayat harga belum tersedia.")}</p>}
       </section>
     );
   }
@@ -176,7 +181,7 @@ export default function CandlestickChart({
           ref={plotRef}
           tabIndex={0}
           role="group"
-          aria-label="Grafik harga. Gunakan panah kiri atau kanan untuk melihat data sesi."
+          aria-label={t("Grafik harga. Gunakan panah kiri atau kanan untuk melihat data sesi.")}
           aria-describedby={tooltipOpen ? 'candle-tooltip' : undefined}
           onPointerMove={(event) => {
             if (event.pointerType !== 'touch') inspectPointer(event);
@@ -193,7 +198,7 @@ export default function CandlestickChart({
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
             role="img"
-            aria-label={`Grafik OHLC ${sessions.length} candle. Harga tutup terakhir ${formatPrice(latest.close)}.`}
+            aria-label={t("Grafik OHLC {0} candle. Harga tutup terakhir {1}.", sessions.length, formatPrice(latest.close))}
           >
             {latest.date === referenceDate && (
               <rect className="candle-reference" x={100 - step} y="0" width={step} height="100" />
@@ -229,7 +234,7 @@ export default function CandlestickChart({
           </svg>
         </div>
         <div className="candle-volume-axis" aria-hidden="true">
-          <span>Volume</span>
+          <span>{t("Volume")}</span>
           <span>{formatCompactNumber(maxVolume)}</span>
         </div>
         <svg
@@ -237,7 +242,7 @@ export default function CandlestickChart({
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           role="img"
-          aria-label={hasAverage ? `Volume per candle. Rata-rata 50 sesi ${formatVolume(averageVolume)}.` : 'Volume per candle.'}
+          aria-label={hasAverage ? t("Volume per candle. Rata-rata 50 sesi {0}.", formatVolume(averageVolume)) : t("Volume per candle.")}
         >
           <path className="candle-guide" d="M0 0H100 M0 100H100" vectorEffect="non-scaling-stroke" />
           {sessions.map(({ date, open, close, volume }, index) => {
@@ -278,13 +283,13 @@ export default function CandlestickChart({
         </div>
       </div>
       {(triggers.length > 0 || hasAverage) && (
-        <ul className="candle-legend" aria-label="Legenda grafik">
+        <ul className="candle-legend" aria-label={t("Legenda grafik")}>
           {triggers.map(({ type, label, level }) => (
             <li className={`candle-legend--${type}`} key={type}>
-              {label} <strong>{formatPrice(level)}</strong>{!isOnScale(level) && ' · di luar skala'}
+              {t(label)} <strong>{formatPrice(level)}</strong>{!isOnScale(level) && t(" · di luar skala")}
             </li>
           ))}
-          {hasAverage && <li className="candle-legend--average">Volume rata-rata 50 sesi</li>}
+          {hasAverage && <li className="candle-legend--average">{t("Volume rata-rata 50 sesi")}</li>}
         </ul>
       )}
       <CandleReadout

@@ -1,3 +1,4 @@
+import useTranslation from '../useTranslation.js';
 import { useId, useState } from 'react';
 import { suggestTickers } from '../tickers.js';
 
@@ -5,6 +6,7 @@ export default function TickerField({
   value, onChange, onSelect, knownSymbols, market, className, icon,
   placeholder, describedBy, maxLength, disabled,
 }) {
+  const { t } = useTranslation();
   const inputId = useId();
   const listId = `${inputId}-suggestions`;
   const [open, setOpen] = useState(false);
@@ -45,7 +47,7 @@ export default function TickerField({
 
   return (
     <div className={className}>
-      <label htmlFor={inputId}>Kode ticker</label>
+      <label htmlFor={inputId}>{t("Kode ticker")}</label>
       <div className={icon ? 'ticker-input ticker-input--icon' : 'ticker-input'}>
         {icon}
         <input
@@ -76,7 +78,7 @@ export default function TickerField({
           required
         />
         {expanded && (
-          <ul id={listId} className="ticker-suggestions" role="listbox" aria-label="Saran ticker">
+          <ul id={listId} className="ticker-suggestions" role="listbox" aria-label={t("Saran ticker")}>
             {suggestions.map(({ symbol, market }, index) => (
               <li
                 key={symbol}
@@ -87,7 +89,7 @@ export default function TickerField({
                 onClick={() => select(symbol)}
               >
                 <strong>{symbol}</strong>
-                {market && <span>{market}</span>}
+                {market && <span>{t(market)}</span>}
               </li>
             ))}
           </ul>

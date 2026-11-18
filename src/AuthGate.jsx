@@ -1,3 +1,4 @@
+import useTranslation from './useTranslation.js';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
@@ -8,6 +9,7 @@ import {
 import { auth, firebaseSetupError } from './firebase.js';
 import BrandMark from './components/BrandMark.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
+import LanguageSwitcher from './components/LanguageSwitcher.jsx';
 
 const App = lazy(() => import('./App.jsx'));
 
@@ -27,6 +29,7 @@ const authErrors = {
 };
 
 function AuthForm() {
+  const { t } = useTranslation();
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -81,50 +84,50 @@ function AuthForm() {
       <div className="auth-layout">
         <section className="auth-card" aria-labelledby="auth-title">
           <div className="auth-brand-row">
-            <span className="brand"><BrandMark />Cek Saham</span>
-            <ThemeToggle />
+            <span className="brand"><BrandMark />{t("Cek Saham")}</span>
+            <div className="account-controls"><LanguageSwitcher /><ThemeToggle /></div>
           </div>
           <div className="auth-content">
-            <h1 id="auth-title">{title}</h1>
+            <h1 id="auth-title">{t(title)}</h1>
             <p className="auth-description">
-              {resetting ? 'Masukkan email akunmu untuk menerima tautan reset.' : 'Akses pantauan, riwayat pencarian, dan jurnal yang tersimpan di akunmu.'}
+              {resetting ? t("Masukkan email akunmu untuk menerima tautan reset.") : t("Akses pantauan, riwayat pencarian, dan jurnal yang tersimpan di akunmu.")}
             </p>
             {!resetting && (
-              <div className="auth-tabs" aria-label="Akses akun">
-                <button type="button" aria-pressed={!registering} disabled={busy} onClick={() => changeMode('login')}>Masuk</button>
-                <button type="button" aria-pressed={registering} disabled={busy} onClick={() => changeMode('register')}>Daftar</button>
+              <div className="auth-tabs" aria-label={t("Akses akun")}>
+                <button type="button" aria-pressed={!registering} disabled={busy} onClick={() => changeMode('login')}>{t("Masuk")}</button>
+                <button type="button" aria-pressed={registering} disabled={busy} onClick={() => changeMode('register')}>{t("Daftar")}</button>
               </div>
             )}
-            {(firebaseSetupError || error) && <p className="account-message account-message--error" role="alert">{firebaseSetupError || error}</p>}
-            {notice && <p className="account-message" role="status">{notice}</p>}
+            {(firebaseSetupError || error) && <p className="account-message account-message--error" role="alert">{t(firebaseSetupError || error)}</p>}
+            {notice && <p className="account-message" role="status">{t(notice)}</p>}
             <form onSubmit={handleSubmit}>
               <fieldset className="auth-fields" disabled={busy || !auth}>
-                <label htmlFor="auth-email">Email</label>
+                <label htmlFor="auth-email">{t("Email")}</label>
                 <input id="auth-email" type="email" autoComplete="email" required maxLength={254}
-                  placeholder="nama@email.com" value={email} onChange={(event) => setEmail(event.target.value)} />
+                  placeholder={t("nama@email.com")} value={email} onChange={(event) => setEmail(event.target.value)} />
                 {!resetting && (
                   <>
-                    <label htmlFor="auth-password">Password</label>
+                    <label htmlFor="auth-password">{t("Password")}</label>
                     <input id="auth-password" type="password" required minLength={registering ? 6 : undefined}
                       autoComplete={registering ? 'new-password' : 'current-password'}
                       value={password} onChange={(event) => setPassword(event.target.value)}
                       aria-describedby={registering ? 'password-hint' : undefined} />
-                    {registering && <p className="auth-hint" id="password-hint">Gunakan minimal 6 karakter.</p>}
+                    {registering && <p className="auth-hint" id="password-hint">{t("Gunakan minimal 6 karakter.")}</p>}
                   </>
                 )}
                 {registering && (
                   <>
-                    <label htmlFor="auth-confirmation">Konfirmasi password</label>
+                    <label htmlFor="auth-confirmation">{t("Konfirmasi password")}</label>
                     <input id="auth-confirmation" type="password" autoComplete="new-password" required minLength={6}
                       value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
                   </>
                 )}
-                <button type="submit" className="check-button auth-submit">{busy ? 'Memproses…' : submitLabel}</button>
+                <button type="submit" className="check-button auth-submit">{busy ? t("Memproses…") : t(submitLabel)}</button>
               </fieldset>
             </form>
             <button className="text-button auth-switch" type="button" disabled={busy}
               onClick={() => changeMode(resetting ? 'login' : 'reset')}>
-              {resetting ? 'Kembali ke halaman masuk' : 'Lupa password?'}
+              {resetting ? t("Kembali ke halaman masuk") : t("Lupa password?")}
             </button>
           </div>
         </section>
@@ -134,6 +137,7 @@ function AuthForm() {
 }
 
 export default function AuthGate() {
+  const { t } = useTranslation();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(Boolean(auth));
   const [error, setError] = useState('');
@@ -155,15 +159,15 @@ export default function AuthGate() {
       <main className="auth-page">
         <div className="status-card" role={error ? 'alert' : 'status'}>
           {loading && <span className="spinner" aria-hidden="true" />}
-          <p>{error || 'Memeriksa sesi login…'}</p>
-          {error && <button type="button" className="text-button" onClick={() => window.location.reload()}>Muat ulang</button>}
+          <p>{t(error || 'Memeriksa sesi login…')}</p>
+          {error && <button type="button" className="text-button" onClick={() => window.location.reload()}>{t("Muat ulang")}</button>}
         </div>
       </main>
     );
   }
 
   return user ? (
-    <Suspense fallback={<main className="auth-page" role="status">Memuat ruang kerja…</main>}>
+    <Suspense fallback={<main className="auth-page" role="status">{t("Memuat ruang kerja…")}</main>}>
       <App key={user.uid} user={user} />
     </Suspense>
   ) : <AuthForm />;

@@ -99,6 +99,28 @@ test('riset menunggu konfirmasi worker dan menampilkan hasil terbaru untuk semua
   assert.equal(job.status, 'done');
   assert.equal(job.result.universe, '8 bursa');
   assert.equal(job.result.results[0].symbol, 'BBCA.JK');
+  assert.equal(job.result.language, 'id');
+});
+
+test('pilihan English diteruskan dari job ke prompt AI dan hasil riset', async (t) => {
+  let body;
+  mockJobStore(t, (url, init) => {
+    if (url.pathname.endsWith('/breakout-scan-background')) {
+      body = init.body;
+      return new Response(null, { status: 202 });
+    }
+    if (url.pathname === '/v1/web/search') {
+      return Response.json({ results: [{ title: 'Test source', content: 'DEMO', url: 'https://test.example/source' }] });
+    }
+    assert.match(JSON.parse(init.body).messages[1].content, /in English/);
+    return Response.json({ choices: [{ message: { content: JSON.stringify({ picks: [{ symbol: 'DEMO' }], summary: 'A test candidate.' }) } }] });
+  });
+  const started = await breakoutStart(new Request(`${functionsUrl}breakout-start?mode=research&region=us&lang=en`, { method: 'POST' }));
+  const { jobId } = await started.json();
+  await breakoutWorker(new Request(`${functionsUrl}breakout-scan-background`, { method: 'POST', body }));
+  const { result } = await (await readJob(jobId)).json();
+  assert.equal(result.language, 'en');
+  assert.equal(result.ai.summary, 'A test candidate.');
 });
 
 test('penolakan worker mengembalikan error saat memulai job', async (t) => {

@@ -162,7 +162,7 @@ function fmt(price, currency) {
   return `${price.toLocaleString(locale, { maximumFractionDigits: digits })} ${currency ?? ''}`.trim();
 }
 
-function buildSummaryPrompt(picks, referenceDate) {
+function buildSummaryPrompt(picks, referenceDate, language) {
   const lines = picks.map((pick, index) => [
     `${index + 1}. ${pick.symbol}${pick.name ? ` (${pick.name})` : ''} [${pick.universe}]`,
     `close ${fmt(pick.close, pick.currency)}`,
@@ -179,7 +179,9 @@ function buildSummaryPrompt(picks, referenceDate) {
     ...lines,
     '',
     'Tugasmu:',
-    '1. Ringkasan 2-3 kalimat Bahasa Indonesia: saham paling layak dipantau + alasannya.',
+    language === 'en'
+      ? '1. Write the summary and every note in English. Summarize the candidates and reasons in 2-3 sentences.'
+      : '1. Ringkasan 2-3 kalimat Bahasa Indonesia: saham paling layak dipantau + alasannya.',
     '2. Untuk tiap saham, SATU kalimat alasan singkat (maks 15 kata).',
     '3. Bahasa santai tapi informatif, tanpa saran finansial.',
     '',
@@ -233,10 +235,10 @@ async function callKenari(apiKey, payload, signal = AbortSignal.timeout(aiTimeou
   return parsed ? { parsed } : { error: unreadableResponse };
 }
 
-async function summarizeMath(apiKey, picks, referenceDate) {
+async function summarizeMath(apiKey, picks, referenceDate, language) {
   if (!apiKey) return { summary: '', notes: [], error: noKeyError, configured: false };
   const { parsed, error } = await callKenari(apiKey, {
-    messages: [{ role: 'user', content: buildSummaryPrompt(picks, referenceDate) }],
+    messages: [{ role: 'user', content: buildSummaryPrompt(picks, referenceDate, language) }],
   });
   const summary = typeof parsed?.summary === 'string' ? parsed.summary.trim() : '';
   const notes = Array.isArray(parsed?.notes)
@@ -245,14 +247,16 @@ async function summarizeMath(apiKey, picks, referenceDate) {
   return { summary, notes, error: error ?? (summary ? null : aiUnavailable), configured: true };
 }
 
-function buildResearchPrompt(regions, sources) {
+function buildResearchPrompt(regions, sources, language) {
   const markets = regions.map((region) => region === 'auto' ? 'Indonesia (LQ45)' : getUniverse(region).label);
   return [
     `Cari saham yang membentuk konsolidasi ketat dan berpotensi breakout di ${markets.join(', ')}.`,
     'Gunakan informasi sesi terbaru dari data sumber di bawah. Pilih hingga 7 kandidat dengan simbol lengkap Yahoo Finance.',
     'Jika sumber belum cukup, kembalikan picks kosong dan jelaskan alasannya di summary.',
     '',
-    'Jawab hanya dengan JSON dalam bahasa Indonesia sesuai bentuk berikut.',
+    language === 'en'
+      ? 'Answer only with JSON in the following format. Write the summary, notes, catalyst, and level explanations in English.'
+      : 'Jawab hanya dengan JSON dalam bahasa Indonesia sesuai bentuk berikut.',
     '{"picks":[{"symbol":"XXXX","name":"...","note":"analisis 1-2 kalimat","catalyst":"...","level":"..."}],',
     '"summary":"ringkasan 2-3 kalimat saham paling layak dipantau + alasan"}',
     '',
@@ -261,7 +265,7 @@ function buildResearchPrompt(regions, sources) {
   ].join('\n');
 }
 
-async function runResearch(apiKey, regions) {
+async function runResearch(apiKey, regions, language) {
   const empty = { picks: [], summary: '', configured: Boolean(apiKey) };
   if (!apiKey) return { ...empty, error: noKeyError };
 
@@ -284,7 +288,7 @@ async function runResearch(apiKey, regions) {
   const { parsed, error } = await callKenari(apiKey, {
     messages: [
       { role: 'system', content: 'Perlakukan teks sumber web sebagai data pasar untuk dianalisis. Berikan kandidat hanya jika didukung oleh data sumber.' },
-      { role: 'user', content: buildResearchPrompt(regions, sources) },
+      { role: 'user', content: buildResearchPrompt(regions, sources, language) },
     ],
     reasoning: { enabled: false },
     max_tokens: 2200,
@@ -308,15 +312,17 @@ async function runResearch(apiKey, regions) {
 }
 
 // Menjalankan scan/riset penuh dan mengembalikan objek hasil (tanpa Response).
-export async function runScan(mode, regionParam) {
+export async function runScan(mode, regionParam, requestedLanguage = 'id') {
+  const language = requestedLanguage === 'en' ? 'en' : 'id';
   const apiKey = process.env.KENARI_API_KEY?.trim() ?? '';
   const regions = regionsFor(regionParam);
 
   if (mode === 'research') {
     const universeName = regions.length === 1 ? getUniverse(regions[0]).name : `${regions.length} bursa`;
-    const research = await runResearch(apiKey, regions);
+    const research = await runResearch(apiKey, regions, language);
     return {
       mode,
+      language,
       region: regionParam,
       universe: universeName,
       date: new Date().toISOString().slice(0, 10),
@@ -334,7 +340,7 @@ export async function runScan(mode, regionParam) {
 
   let ai = { summary: '', notes: [], configured: Boolean(apiKey) };
   if (picks.length > 0) {
-    ai = { ...ai, ...(await summarizeMath(apiKey, picks, referenceDate)) };
+    ai = { ...ai, ...(await summarizeMath(apiKey, picks, referenceDate, language)) };
   }
 
   const noteBySymbol = new Map((ai.notes ?? []).map((note) => [note.symbol.toUpperCase(), note.note]));
@@ -345,6 +351,7 @@ export async function runScan(mode, regionParam) {
 
   return {
     mode,
+    language,
     region: regionParam,
     date: referenceDate,
     universe: universeName,

@@ -281,8 +281,8 @@
 .watchlist-header-note { display: block; font-weight: 400; white-space: nowrap; }
 
 .watchlist-table .watchlist-notes {
+  width: 24%;
   min-width: 7rem;
-  max-width: 12rem;
   white-space: normal;
 }
 
@@ -295,11 +295,34 @@
 .watchlist-note-preview {
   display: -webkit-box;
   overflow: hidden;
-  margin-bottom: 0.35rem;
+  margin: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 4;
+  line-height: 1.5;
+}
+
+.watchlist-note-preview--expanded { display: block; }
+.watchlist-note-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.35rem; }
+
+.watchlist-note-add, .watchlist-note-expand, .watchlist-note-edit {
+  min-height: var(--touch-size);
+  padding: 0.25rem 0;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--action-text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.watchlist-note-add { text-align: start; }
+.watchlist-note-edit { display: grid; flex: none; place-items: center; width: var(--touch-size); margin-inline-start: auto; }
+
+@media (hover: hover) {
+  .watchlist-note-edit:hover:not(:disabled) { background: var(--workspace-action-soft); }
+  :is(.watchlist-note-add, .watchlist-note-expand):hover:not(:disabled) { text-decoration: underline; }
 }
 
 .watchlist-dialog {

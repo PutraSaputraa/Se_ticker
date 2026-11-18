@@ -1,9 +1,11 @@
+import useTranslation from '../useTranslation.js';
 import { useEffect, useId, useRef, useState } from 'react';
 import { imageContentTypes, imageFileError, maxImageSizeLabel } from '../imageFile.js';
 import { maxWatchlistNotesLength } from '../watchlist.js';
 import { downloadWatchlistImage } from '../watchlistImage.js';
 
 export default function WatchlistEntryDialog({ entry, mode, account, uid, disabled, onClose, onSaved }) {
+  const { t } = useTranslation();
   const dialog = useRef(null);
   const submitting = useRef(false);
   const titleId = useId();
@@ -80,51 +82,45 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
     <dialog ref={dialog} className="watchlist-dialog" aria-labelledby={titleId} onClose={onClose}
       onCancel={(event) => { if (submitting.current) event.preventDefault(); }}>
       <form onSubmit={handleSubmit} aria-busy={saving}>
-        <h2 id={titleId}>{imageMode ? 'Gambar' : 'Catatan'} {symbol}</h2>
+        <h2 id={titleId}>{imageMode ? t("Gambar") : t("Catatan")} {symbol}</h2>
         {imageMode ? (
           <>
             {preview?.url && (
-              <img src={preview.url} alt={file ? `Pratinjau gambar ${symbol}` : `Gambar pantauan ${symbol}`}
+              <img src={preview.url} alt={file ? t("Pratinjau gambar {0}", symbol) : t("Gambar pantauan {0}", symbol)}
                 onError={() => setPreview({ error: 'Gambar gagal ditampilkan.' })} />
             )}
-            {preview?.error && <p className="watchlist-dialog-error" role="alert">{preview.error}</p>}
-            {imageId && !preview && !file && <p className="research-form-help" role="status">Memuat gambar…</p>}
+            {preview?.error && <p className="watchlist-dialog-error" role="alert">{t(preview.error)}</p>}
+            {imageId && !preview && !file && <p className="research-form-help" role="status">{t("Memuat gambar…")}</p>}
             <label className="research-field">
-              {imageId ? 'Ganti gambar' : 'Pilih gambar'}
+              {imageId ? t("Ganti gambar") : t("Pilih gambar")}
               <span className="watchlist-file-picker">
-                <span className="research-watch" aria-hidden="true">Pilih file</span>
-                <span aria-hidden="true">{file?.name ?? 'Belum ada file'}</span>
+                <span className="research-watch" aria-hidden="true">{t("Pilih file")}</span>
+                <span aria-hidden="true">{file?.name ?? t("Belum ada file")}</span>
                 <input type="file" accept={imageContentTypes.join(',')} aria-describedby={hintId}
                   onChange={selectImage} disabled={disabled || saving} />
               </span>
             </label>
-            <p className="research-form-help" id={hintId}>
-              PNG, JPG, atau WebP hingga {maxImageSizeLabel}. Unggahan disimpan sebagai WebP.
-            </p>
+            <p className="research-form-help" id={hintId}>{t("PNG, JPG, atau WebP hingga")} {maxImageSizeLabel}{t(". Unggahan disimpan sebagai WebP.")}</p>
           </>
         ) : (
-          <label className="research-field">
-            Catatan
-            <textarea rows={5} maxLength={maxWatchlistNotesLength} value={notes} disabled={disabled || saving}
+          <label className="research-field">{t("Catatan")}<textarea rows={5} maxLength={maxWatchlistNotesLength} value={notes} disabled={disabled || saving}
               onChange={(event) => setNotes(event.target.value)} />
           </label>
         )}
-        {error && <p className="watchlist-dialog-error" role="alert">{error}</p>}
-        {saving && <p className="research-form-help" role="status">Menyimpan perubahan…</p>}
+        {error && <p className="watchlist-dialog-error" role="alert">{t(error)}</p>}
+        {saving && <p className="research-form-help" role="status">{t("Menyimpan perubahan…")}</p>}
         <div className="watchlist-dialog-actions">
           {(!imageMode || !imageId || file) && (
             <button type="submit" className="scan-button"
               disabled={disabled || saving || (imageMode ? !file : notes.trim() === savedNotes)}>
-              {imageMode ? 'Unggah gambar' : 'Simpan catatan'}
+              {imageMode ? t("Unggah gambar") : t("Simpan catatan")}
             </button>
           )}
           {imageMode && imageId && (
             <button type="button" className="research-remove" disabled={disabled || saving}
-              onClick={() => save(() => account.saveWatchlistImage(symbol, imageId, null), 'Gambar gagal dihapus. Coba lagi.', `Gambar ${symbol} dihapus`)}>
-              Hapus gambar
-            </button>
+              onClick={() => save(() => account.saveWatchlistImage(symbol, imageId, null), 'Gambar gagal dihapus. Coba lagi.', `Gambar ${symbol} dihapus`)}>{t("Hapus gambar")}</button>
           )}
-          <button type="button" className="research-watch" disabled={saving} onClick={() => dialog.current.close()}>Tutup</button>
+          <button type="button" className="research-watch" disabled={saving} onClick={() => dialog.current.close()}>{t("Tutup")}</button>
         </div>
       </form>
     </dialog>

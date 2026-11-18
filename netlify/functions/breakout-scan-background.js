@@ -18,7 +18,7 @@ export default async function breakoutScanBackground(request) {
   if (!modified) return;
 
   try {
-    const result = await runScan(job.mode, job.region);
+    const result = await runScan(job.mode, job.region, job.language);
     await store.setJSON(jobId, {
       ...job,
       status: 'done',

@@ -1,3 +1,4 @@
+import useTranslation from '../useTranslation.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import WatchlistTable from '../WatchlistTable.jsx';
@@ -8,6 +9,7 @@ import { setPriceToWatch, setWatchlistRating } from '../watchlist.js';
 import '../styles/research.css';
 
 export default function WatchlistPage({ account, uid }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [editor, setEditor] = useState(null);
   const editorTrigger = useRef(null);
@@ -48,23 +50,23 @@ export default function WatchlistPage({ account, uid }) {
     <div className="research-workspace watchlist-page">
       <header className="page-heading page-heading--identity research-heading watchlist-heading motion-enter">
         <div>
-          <h1>Pantauan saham</h1>
-          <p>Bandingkan harga penutupan, volume, dan kriteria Stage 2.</p>
+          <h1>{t("Pantauan saham")}</h1>
+          <p>{t("Bandingkan harga penutupan, volume, dan kriteria Stage 2.")}</p>
         </div>
-        <Link className="scan-button" to="/">Cari saham</Link>
+        <Link className="scan-button" to="/">{t("Cari saham")}</Link>
       </header>
 
-      <section className="research-panel watchlist-panel" aria-label="Daftar pantauan">
+      <section className="research-panel watchlist-panel" aria-label={t("Daftar pantauan")}>
         <div className="research-panel-heading watchlist-toolbar motion-enter motion-enter--after">
           {watchlist.length > 0 && (
             <div>
-              <strong>{watchlist.length} saham</strong>
-              <p>Bintang tertinggi di atas</p>
+              <strong>{watchlist.length} {t("saham")}</strong>
+              <p>{t("Bintang tertinggi di atas")}</p>
             </div>
           )}
           <span className="research-sync" data-state={justSaved ? 'saved' : sync} role="status">
             {sync === 'ready' && <WorkspaceIcon name="check" size={15} />}
-            {justSaved ? confirmation.message : syncLabel}
+            {justSaved ? t(confirmation.message) : t(syncLabel)}
           </span>
         </div>
         {watchlist.length > 0 ? (
@@ -93,13 +95,11 @@ export default function WatchlistPage({ account, uid }) {
           />
         ) : account.ready ? (
           <div className="research-empty">
-            <h2>Belum ada saham dipantau</h2>
-            <p>Cari ticker, buka detail saham, lalu pilih Pantau.</p>
+            <h2>{t("Belum ada saham dipantau")}</h2>
+            <p>{t("Cari ticker, buka detail saham, lalu pilih Pantau.")}</p>
           </div>
         ) : (
-          <p className="research-empty">{account.readError
-            ? 'Daftar pantauan tersedia setelah sinkronisasi berhasil.'
-            : 'Mengambil daftar saham yang tersimpan di akunmu.'}</p>
+          <p className="research-empty">{account.readError ? t("Daftar pantauan tersedia setelah sinkronisasi berhasil.") : t("Mengambil daftar saham yang tersimpan di akunmu.")}</p>
         )}
       </section>
       {editor && (

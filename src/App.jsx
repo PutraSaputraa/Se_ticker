@@ -1,3 +1,4 @@
+import useTranslation from './useTranslation.js';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Route, Routes, useLocation, useMatch, useNavigationType } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
@@ -6,6 +7,7 @@ import useAccountData from './useAccountData.js';
 import { clearLegacyData, mergeLegacyData, readLegacyData } from './accountData.js';
 import BrandMark from './components/BrandMark.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
+import LanguageSwitcher from './components/LanguageSwitcher.jsx';
 import WorkspaceIcon from './components/WorkspaceIcon.jsx';
 import HomePage from './pages/HomePage.jsx';
 import StockDetailPage from './pages/StockDetailPage.jsx';
@@ -23,29 +25,29 @@ const navigation = [
 ];
 
 function Brand() {
+  const { t } = useTranslation();
   return (
     <Link to="/" className="brand">
-      <BrandMark />
-      Cek Saham
-    </Link>
+      <BrandMark />{t("Cek Saham")}</Link>
   );
 }
 
 function WorkspaceNav() {
+  const { t } = useTranslation();
   const stock = useMatch('/stock/:symbol');
   return (
-    <nav className="workspace-nav" aria-label="Menu utama">
+    <nav className="workspace-nav" aria-label={t("Menu utama")}>
       {navigation.map(({ to, name, mobile, icon }) => (
         <NavLink
           key={to}
           to={to}
           end={to === '/'}
-          aria-label={name}
+          aria-label={t(name)}
           className={({ isActive }) => `workspace-nav-link${isActive || (stock && to === '/') ? ' workspace-nav-link--active' : ''}`}
         >
           <WorkspaceIcon name={icon} />
-          <span className="workspace-nav-name">{name}</span>
-          <span className="workspace-nav-mobile" aria-hidden="true">{mobile ?? name}</span>
+          <span className="workspace-nav-name">{t(name)}</span>
+          <span className="workspace-nav-mobile" aria-hidden="true">{t(mobile ?? name)}</span>
         </NavLink>
       ))}
     </nav>
@@ -53,6 +55,7 @@ function WorkspaceNav() {
 }
 
 function TopBar({ user }) {
+  const { t } = useTranslation();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const accountMenu = useRef(null);
@@ -101,6 +104,7 @@ function TopBar({ user }) {
           <Brand />
           <WorkspaceNav />
           <div className="account-controls">
+            <LanguageSwitcher />
             <ThemeToggle />
             <details className="account-menu" key={pathname} ref={accountMenu}
               onBlur={(event) => {
@@ -114,13 +118,13 @@ function TopBar({ user }) {
               }}>
               <summary>
                 <WorkspaceIcon name="account" size={17} />
-                <span>Akun</span>
+                <span>{t("Akun")}</span>
                 <span className="account-chevron"><WorkspaceIcon name="chevron" size={14} /></span>
               </summary>
               <div className="account-popover">
                 <span className="account-email">{user.email}</span>
                 <button type="button" className="account-signout" disabled={signingOut} onClick={handleSignOut}>
-                  {signingOut ? 'Keluar…' : 'Keluar'}
+                  {signingOut ? t("Keluar…") : t("Keluar")}
                 </button>
               </div>
             </details>
@@ -129,7 +133,7 @@ function TopBar({ user }) {
       </header>
       {signOutError && (
         <div className="account-message account-message--error" role="alert">
-          <p>{signOutError}</p>
+          <p>{t(signOutError)}</p>
         </div>
       )}
     </>
@@ -137,6 +141,7 @@ function TopBar({ user }) {
 }
 
 export default function App({ user }) {
+  const { t } = useTranslation();
   const account = useAccountData(user.uid);
   const [legacy, setLegacy] = useState(readLegacyData);
   const { pathname, hash } = useLocation();
@@ -157,19 +162,19 @@ export default function App({ user }) {
 
   return (
     <div className="workspace-shell">
-      <a className="skip-link" href="#workspace-content">Lewati ke konten</a>
+      <a className="skip-link" href="#workspace-content">{t("Lewati ke konten")}</a>
       <TopBar user={user} />
       <main className="workspace" id="workspace-content" tabIndex={-1}>
         {account.error && (
           <div className="account-message account-message--error" role="alert">
-            <p>{account.error}</p>
-            {account.readError && <button type="button" className="text-button" onClick={account.retry}>Coba lagi</button>}
+            <p>{t(account.error)}</p>
+            {account.readError && <button type="button" className="text-button" onClick={account.retry}>{t("Coba lagi")}</button>}
           </div>
         )}
         {(legacy.watchlist.length > 0 || legacy.history.length > 0) && (
           <div className="legacy-import">
-            <p>Data lama di browser ini tersedia. Impor {legacy.watchlist.length} saham pantauan dan {legacy.history.length} riwayat pencarian ke akun {user.email}.</p>
-            <button type="button" className="account-signout" disabled={!account.ready || account.pending} onClick={importLegacy}>Impor ke akun</button>
+            <p>{t("Data lama di browser ini tersedia. Impor")} {legacy.watchlist.length} {t("saham pantauan dan")} {legacy.history.length} {t("riwayat pencarian ke akun")} {user.email}.</p>
+            <button type="button" className="account-signout" disabled={!account.ready || account.pending} onClick={importLegacy}>{t("Impor ke akun")}</button>
           </div>
         )}
 
@@ -185,7 +190,7 @@ export default function App({ user }) {
           </Routes>
         </div>
 
-        <footer className="source">Data historis dari Yahoo Finance.</footer>
+        <footer className="source">{t("Data historis dari Yahoo Finance.")}</footer>
       </main>
     </div>
   );

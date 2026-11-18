@@ -1,3 +1,5 @@
+import { getLocale } from '../i18n.js';
+import useTranslation from '../useTranslation.js';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import CandlestickChart from '../CandlestickChart.jsx';
@@ -26,8 +28,9 @@ const breakoutStatusMeta = {
 };
 
 function StatusBadge({ status }) {
+  const { t } = useTranslation();
   const meta = breakoutStatusMeta[status];
-  return meta ? <span className={`detail-status ${meta.className}`}>{meta.label}</span> : null;
+  return meta ? <span className={`detail-status ${meta.className}`}>{t(meta.label)}</span> : null;
 }
 
 function percentFromReference(value, reference) {
@@ -44,6 +47,7 @@ function entryContext(distance) {
 }
 
 function TradingLevel({ label, level, distance, currency, tone }) {
+  const { t } = useTranslation();
   let hint;
   if (distance === 0) hint = '0%';
   else if (distance != null) {
@@ -54,22 +58,23 @@ function TradingLevel({ label, level, distance, currency, tone }) {
 
   return (
     <div className={`stock-level stock-level--${tone}`}>
-      <dt>{label}</dt>
+      <dt>{t(label)}</dt>
       <dd>
-        {Number.isFinite(level) ? <strong>{formatPrice(level, currency)}</strong> : <small>Tidak tersedia</small>}
-        {hint && <small>{hint}</small>}
+        {Number.isFinite(level) ? <strong>{formatPrice(level, currency)}</strong> : <small>{t("Tidak tersedia")}</small>}
+        {hint && <small>{t(hint)}</small>}
       </dd>
     </div>
   );
 }
 
 function FundamentalsTable({ fundamentals }) {
+  const { t } = useTranslation();
   const { quarterlyEps = [], annualRevenue = [] } = fundamentals ?? {};
   if (!quarterlyEps.length && !annualRevenue.length) {
     return (
       <section className="stock-data-section" aria-labelledby="fundamentals-title">
-        <h2 id="fundamentals-title">Fundamental</h2>
-        <p className="stock-muted">Data EPS dan pendapatan belum tersedia.</p>
+        <h2 id="fundamentals-title">{t("Fundamental")}</h2>
+        <p className="stock-muted">{t("Data EPS dan pendapatan belum tersedia.")}</p>
       </section>
     );
   }
@@ -92,21 +97,21 @@ function FundamentalsTable({ fundamentals }) {
 
   return (
     <section className="stock-data-section" aria-labelledby="fundamentals-title">
-      <h2 id="fundamentals-title">Fundamental</h2>
+      <h2 id="fundamentals-title">{t("Fundamental")}</h2>
       <div className="stock-fundamentals-grid">
         {latestQ.length > 0 && (
           <div>
-            <h3>EPS kuartalan</h3>
-            <TableScroll className="stock-table-scroll" label="Tabel EPS kuartalan">
+            <h3>{t("EPS kuartalan")}</h3>
+            <TableScroll className="stock-table-scroll" label={t("Tabel EPS kuartalan")}>
               <table className="fund-table">
               <thead>
-                <tr><th>Kuartal</th><th className="num">EPS</th><th className="num">Perubahan QoQ</th></tr>
+                <tr><th>{t("Kuartal")}</th><th className="num">{t("EPS")}</th><th className="num">{t("Perubahan QoQ")}</th></tr>
               </thead>
               <tbody>
                 {latestQ.map((point, idx) => (
                   <tr key={point.date}>
                     <td>{point.date}</td>
-                    <td className="num">{point.value.toLocaleString('id-ID', { maximumFractionDigits: 2 })}</td>
+                    <td className="num">{point.value.toLocaleString(getLocale(), { maximumFractionDigits: 2 })}</td>
                     <td className={`num ${epsGrowth[idx] != null && epsGrowth[idx] >= 0 ? 'trend--up' : 'trend--down'}`}>
                       {epsGrowth[idx] == null ? '–' : formatPct(epsGrowth[idx])}
                     </td>
@@ -119,11 +124,11 @@ function FundamentalsTable({ fundamentals }) {
         )}
         {latestAnnualRev.length > 0 && (
           <div>
-            <h3>Pendapatan tahunan</h3>
-            <TableScroll className="stock-table-scroll" label="Tabel pendapatan tahunan">
+            <h3>{t("Pendapatan tahunan")}</h3>
+            <TableScroll className="stock-table-scroll" label={t("Tabel pendapatan tahunan")}>
               <table className="fund-table">
               <thead>
-                <tr><th>Tahun</th><th className="num">Pendapatan</th><th className="num">Perubahan YoY</th></tr>
+                <tr><th>{t("Tahun")}</th><th className="num">{t("Pendapatan")}</th><th className="num">{t("Perubahan YoY")}</th></tr>
               </thead>
               <tbody>
                 {latestAnnualRev.map((point, idx) => (
@@ -146,11 +151,13 @@ function FundamentalsTable({ fundamentals }) {
 }
 
 export default function StockDetailPage({ account }) {
+  const { t } = useTranslation();
   const { symbol = '' } = useParams();
   return <StockDetail key={symbol} symbol={symbol.trim().toUpperCase()} account={account} />;
 }
 
 function StockDetail({ symbol, account }) {
+  const { t } = useTranslation();
   const [range, setRange] = useState(defaultRange);
   const [result, setResult] = useState({ status: 'loading' });
   const [detailAttempt, setDetailAttempt] = useState(0);
@@ -275,8 +282,8 @@ function StockDetail({ symbol, account }) {
 
   return (
     <div className="stock-detail">
-      <nav className="stock-breadcrumb" aria-label="Jalur halaman">
-        <Link to={searchUrl}>← Cari saham</Link>
+      <nav className="stock-breadcrumb" aria-label={t("Jalur halaman")}>
+        <Link to={searchUrl}>{t("← Cari saham")}</Link>
       </nav>
 
       {result.status === 'loading' && (
@@ -284,8 +291,8 @@ function StockDetail({ symbol, account }) {
           <div className="status-card motion-status" role="status">
             <span className="spinner" aria-hidden="true" />
             <div>
-              <p className="status-title">Memuat {symbol}…</p>
-              <p>Mengambil data detail dari Yahoo Finance.</p>
+              <p className="status-title">{t("Memuat")} {symbol}…</p>
+              <p>{t("Mengambil data detail dari Yahoo Finance.")}</p>
             </div>
           </div>
           <div className="stock-loading-plot" aria-hidden="true" />
@@ -297,22 +304,20 @@ function StockDetail({ symbol, account }) {
           <span className="status-mark" aria-hidden="true">!</span>
           <div>
             <div role="alert">
-              <p className="status-title">Gagal memuat</p>
-              <p>{result.message}</p>
+              <p className="status-title">{t("Gagal memuat")}</p>
+              <p>{t(result.message)}</p>
             </div>
             {alternatives.length > 0 && (
-              <ul className="stock-ticker-alternatives" aria-label="Ticker serupa">
+              <ul className="stock-ticker-alternatives" aria-label={t("Ticker serupa")}>
                 {alternatives.map(({ symbol: candidate, market }) => (
                   <li key={candidate}>
-                    <Link to={`/stock/${encodeURIComponent(candidate)}`}>{candidate} · {market}</Link>
+                    <Link to={`/stock/${encodeURIComponent(candidate)}`}>{candidate} · {t(market)}</Link>
                   </li>
                 ))}
               </ul>
             )}
             {result.retryable && (
-              <button className="text-button" type="button" onClick={() => setDetailAttempt((attempt) => attempt + 1)}>
-                Coba lagi
-              </button>
+              <button className="text-button" type="button" onClick={() => setDetailAttempt((attempt) => attempt + 1)}>{t("Coba lagi")}</button>
             )}
           </div>
         </div>
@@ -329,7 +334,7 @@ function StockDetail({ symbol, account }) {
                   <span>{currency}</span>
                 </div>
                 <h1>{quote.name}</h1>
-                <p className="stock-muted">Sesi acuan · <time dateTime={quote.date}>{formatDate(quote.date)}</time></p>
+                <p className="stock-muted">{t("Sesi acuan ·")} <time dateTime={quote.date}>{formatDate(quote.date)}</time></p>
               </div>
               <button
                 type="button"
@@ -338,12 +343,12 @@ function StockDetail({ symbol, account }) {
                 aria-pressed={inWatchlist}
                 disabled={watchlistDisabled}
               >
-                {inWatchlist ? '✓ Dipantau' : '+ Pantau'}
+                {inWatchlist ? t("✓ Dipantau") : t("+ Pantau")}
               </button>
             </div>
             <div className="stock-quote">
               <div className="stock-quote-heading">
-                <span>Harga penutupan</span>
+                <span>{t("Harga penutupan")}</span>
                 <StatusBadge status={analysis.status} />
               </div>
               <div className="stock-quote-readout">
@@ -351,11 +356,11 @@ function StockDetail({ symbol, account }) {
                 {changeFromOpen != null && (
                   <span className={`stock-quote-change ${changeTone}`}>
                     <UpdatedValue as="strong" value={changeFromOpen} format={formatPct} />
-                    {' '}<small>vs buka</small>
+                    {' '}<small>{t("vs buka")}</small>
                   </span>
                 )}
               </div>
-              {quoteContext && <p className="stock-quote-context">{quoteContext}</p>}
+              {quoteContext && <p className="stock-quote-context">{t(quoteContext)}</p>}
             </div>
           </header>
 
@@ -380,19 +385,19 @@ function StockDetail({ symbol, account }) {
 
             <div className="stock-market-aside">
               <section className="stock-plan motion-enter motion-enter--after" aria-labelledby="stock-plan-title">
-                <h2 id="stock-plan-title">Rencana trading</h2>
-                <p className="stock-muted" id="stock-plan-reference">Jarak level dari harga penutupan</p>
+                <h2 id="stock-plan-title">{t("Rencana trading")}</h2>
+                <p className="stock-muted" id="stock-plan-reference">{t("Jarak level dari harga penutupan")}</p>
                 <dl className="stock-levels" aria-describedby="stock-plan-reference">
-                  <TradingLevel label="Entry" level={buyTrigger.level} distance={entryDistance} currency={currency} tone="entry" />
+                  <TradingLevel label={t("Entry")} level={buyTrigger.level} distance={entryDistance} currency={currency} tone="entry" />
                   <TradingLevel
-                    label="Stop loss"
+                    label={t("Stop loss")}
                     level={stopLevel}
                     distance={percentFromReference(stopLevel, quote.close)}
                     currency={currency}
                     tone="risk"
                   />
                   <TradingLevel
-                    label="Target"
+                    label={t("Target")}
                     level={analysis.target}
                     distance={percentFromReference(analysis.target, quote.close)}
                     currency={currency}
@@ -401,26 +406,26 @@ function StockDetail({ symbol, account }) {
                 </dl>
                 <dl className="stock-plan-context">
                   <div>
-                    <dt>Resistance 50 sesi</dt>
+                    <dt>{t("Resistance 50 sesi")}</dt>
                     <dd>{formatPrice(analysis.resistance50, currency)}</dd>
                   </div>
                   {Number.isFinite(analysis.baseTightPct) && (
                     <div>
-                      <dt>Konsolidasi</dt>
-                      <dd>{analysis.baseTightPct.toLocaleString('id-ID')}%</dd>
+                      <dt>{t("Konsolidasi")}</dt>
+                      <dd>{analysis.baseTightPct.toLocaleString(getLocale())}%</dd>
                     </div>
                   )}
                 </dl>
               </section>
               <section className="stock-data-section stock-session motion-enter motion-enter--last" aria-labelledby="stock-session-title">
-                <h2 id="stock-session-title">Rincian sesi acuan</h2>
-                <dl className="stock-session-values" aria-label="Harga dan volume saham">
-                  <div><dt>Buka</dt><dd>{formatPrice(quote.open, currency)}</dd></div>
-                  <div><dt>Tertinggi</dt><dd>{formatPrice(quote.high, currency)}</dd></div>
-                  <div><dt>Terendah</dt><dd>{formatPrice(quote.low, currency)}</dd></div>
-                  <div><dt>Tutup</dt><dd>{formatPrice(quote.close, currency)}</dd></div>
-                  <div><dt>Volume</dt><dd>{formatVolume(quote.volume)}</dd></div>
-                  <div><dt>Rata-rata volume 50 sesi</dt><dd>{formatVolume(buyTrigger.averageVolume)}</dd></div>
+                <h2 id="stock-session-title">{t("Rincian sesi acuan")}</h2>
+                <dl className="stock-session-values" aria-label={t("Harga dan volume saham")}>
+                  <div><dt>{t("Buka")}</dt><dd>{formatPrice(quote.open, currency)}</dd></div>
+                  <div><dt>{t("Tertinggi")}</dt><dd>{formatPrice(quote.high, currency)}</dd></div>
+                  <div><dt>{t("Terendah")}</dt><dd>{formatPrice(quote.low, currency)}</dd></div>
+                  <div><dt>{t("Tutup")}</dt><dd>{formatPrice(quote.close, currency)}</dd></div>
+                  <div><dt>{t("Volume")}</dt><dd>{formatVolume(quote.volume)}</dd></div>
+                  <div><dt>{t("Rata-rata volume 50 sesi")}</dt><dd>{formatVolume(buyTrigger.averageVolume)}</dd></div>
                 </dl>
               </section>
             </div>
@@ -434,26 +439,26 @@ function StockDetail({ symbol, account }) {
           )}
           {minervini.status === 'loading' && (
             <section className="stock-data-section" aria-labelledby="minervini-title">
-              <h2 id="minervini-title">Analisis Minervini</h2>
-              <p className="stock-muted" role="status">Memuat analisis tren dan pivot…</p>
+              <h2 id="minervini-title">{t("Analisis Minervini")}</h2>
+              <p className="stock-muted" role="status">{t("Memuat analisis tren dan pivot…")}</p>
             </section>
           )}
           {minervini.status === 'error' && (
             <section className="stock-data-section" aria-labelledby="minervini-title">
-              <h2 id="minervini-title">Analisis Minervini</h2>
-              <p className="stock-muted" role="alert">{minervini.message || 'Analisis Minervini gagal dimuat.'}</p>
+              <h2 id="minervini-title">{t("Analisis Minervini")}</h2>
+              <p className="stock-muted" role="alert">{t(minervini.message || 'Analisis Minervini gagal dimuat.')}</p>
             </section>
           )}
 
           <section className="stock-data-section" aria-labelledby="daily-title">
-            <h2 id="daily-title">Harga harian (OHLCV)</h2>
+            <h2 id="daily-title">{t("Harga harian (OHLCV)")}</h2>
             {quote.recentBars?.length ? (
-              <TableScroll className="stock-table-scroll" label="Tabel harga harian">
+              <TableScroll className="stock-table-scroll" label={t("Tabel harga harian")}>
                 <table className="fund-table stock-ohlcv-table">
                   <thead>
                     <tr>
-                      <th>Tanggal</th><th className="num">Buka</th><th className="num">Tertinggi</th>
-                      <th className="num">Terendah</th><th className="num">Tutup</th><th className="num">Volume</th>
+                      <th>{t("Tanggal")}</th><th className="num">{t("Buka")}</th><th className="num">{t("Tertinggi")}</th>
+                      <th className="num">{t("Terendah")}</th><th className="num">{t("Tutup")}</th><th className="num">{t("Volume")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -470,7 +475,7 @@ function StockDetail({ symbol, account }) {
                   </tbody>
                 </table>
               </TableScroll>
-            ) : <p className="stock-muted">Riwayat harga harian belum tersedia.</p>}
+            ) : <p className="stock-muted">{t("Riwayat harga harian belum tersedia.")}</p>}
           </section>
 
           <FundamentalsTable fundamentals={quote.fundamentals} />

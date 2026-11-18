@@ -1,3 +1,5 @@
+import { getLocale } from '../i18n.js';
+import useTranslation from '../useTranslation.js';
 import { useState } from 'react';
 import { formatPct, formatPrice } from '../format.js';
 
@@ -30,18 +32,19 @@ const trendValueLabels = {
 const ruleStatus = { pass: 'Lolos', fail: 'Gagal', missing: 'Belum tersedia' };
 
 function formatTrendValue(field, value, currency) {
-  if (field === 'rsRating') return value.toLocaleString('id-ID');
-  if (field.endsWith('Pct')) return `${value.toLocaleString('id-ID', { maximumFractionDigits: 2 })}%`;
+  if (field === 'rsRating') return value.toLocaleString(getLocale());
+  if (field.endsWith('Pct')) return `${value.toLocaleString(getLocale(), { maximumFractionDigits: 2 })}%`;
   return formatPrice(value, currency);
 }
 
 function TrendRules({ trendTemplate, currency }) {
+  const { t } = useTranslation();
   const { passed, total, eligible, rules = [], values = {} } = trendTemplate;
   return (
     <section className="stock-trend-module" aria-labelledby="stock-stage-title">
       <div className="stock-section-heading">
-        <h3 id="stock-stage-title">Tren Stage 2</h3>
-        <span className={`stock-rule-status${eligible ? ' stock-rule-status--pass' : ''}`}>{passed}/{total} kriteria lolos</span>
+        <h3 id="stock-stage-title">{t("Tren Stage 2")}</h3>
+        <span className={`stock-rule-status${eligible ? ' stock-rule-status--pass' : ''}`}>{passed}/{total} {t("kriteria lolos")}</span>
       </div>
       {rules.length > 0 ? (
         <ul className="stock-trend-rules">
@@ -49,50 +52,51 @@ function TrendRules({ trendTemplate, currency }) {
             const fields = ruleFields[rule.key] ?? [];
             const available = fields.filter((field) => Number.isFinite(values[field]));
             const status = rule.passed ? 'pass' : available.length < fields.length ? 'missing' : 'fail';
-            const evidence = available.map((field) => `${trendValueLabels[field]} ${formatTrendValue(field, values[field], currency)}`).join(' · ');
+            const evidence = available.map((field) => `${t(trendValueLabels[field])} ${formatTrendValue(field, values[field], currency)}`).join(' · ');
             return (
               <li key={rule.key}>
                 <div>
-                  <strong>{rule.label}</strong>
+                  <strong>{t(rule.label)}</strong>
                   {evidence && <small>{evidence}</small>}
                 </div>
-                <span className={`stock-rule-status stock-rule-status--${status}`}>{ruleStatus[status]}</span>
+                <span className={`stock-rule-status stock-rule-status--${status}`}>{t(ruleStatus[status])}</span>
               </li>
             );
           })}
         </ul>
-      ) : <p className="stock-muted">Rincian kriteria belum tersedia.</p>}
+      ) : <p className="stock-muted">{t("Rincian kriteria belum tersedia.")}</p>}
     </section>
   );
 }
 
 function VcpBlock({ vcp }) {
-  if (!vcp) return <p className="stock-muted">Data VCP dan VDU belum tersedia.</p>;
+  const { t } = useTranslation();
+  if (!vcp) return <p className="stock-muted">{t("Data VCP dan VDU belum tersedia.")}</p>;
   const depths = vcp.depths ?? [];
   return (
     <section className="stock-analysis-module" aria-labelledby="stock-vcp-title">
       <div className="stock-section-heading">
-        <h3 id="stock-vcp-title">Kontraksi dan volume</h3>
+        <h3 id="stock-vcp-title">{t("Kontraksi dan volume")}</h3>
         <span className={`stock-rule-status${vcp.forming ? ' stock-rule-status--pass' : ''}`}>
-          {vcp.forming ? 'VCP terbentuk' : 'VCP belum terbentuk'}
+          {vcp.forming ? t("VCP terbentuk") : t("VCP belum terbentuk")}
         </span>
       </div>
       {depths.length > 0 && (
-        <ol className="stock-contractions" aria-label="Kedalaman kontraksi VCP">
+        <ol className="stock-contractions" aria-label={t("Kedalaman kontraksi VCP")}>
           {depths.map((depth, i) => (
             <li key={i}>
-              <span>T{i + 1}</span>
-              <strong>{depth.toLocaleString('id-ID')}%</strong>
-              {vcp.ratios?.[i] != null && <span>{vcp.ratios[i].toLocaleString('id-ID')}×</span>}
+              <span>{t("T")}{i + 1}</span>
+              <strong>{depth.toLocaleString(getLocale())}%</strong>
+              {vcp.ratios?.[i] != null && <span>{vcp.ratios[i].toLocaleString(getLocale())}×</span>}
             </li>
           ))}
         </ol>
       )}
       <dl className="stock-analysis-values">
-        <div><dt>Kontraksi</dt><dd>{vcp.contractionCount}</dd></div>
+        <div><dt>{t("Kontraksi")}</dt><dd>{vcp.contractionCount}</dd></div>
         <div>
-          <dt>Volume dry-up (VDU)</dt>
-          <dd>{vcp.vdu == null ? 'Belum tersedia' : `${vcp.vdu.toLocaleString('id-ID')}× · ${vcp.vduStrong ? 'Kuat' : vcp.vduOk ? 'Cukup' : 'Lemah'}`}</dd>
+          <dt>{t("Volume dry-up (VDU)")}</dt>
+          <dd>{vcp.vdu == null ? t("Belum tersedia") : `${vcp.vdu.toLocaleString(getLocale())}× · ${t(vcp.vduStrong ? 'Kuat' : vcp.vduOk ? 'Cukup' : 'Lemah')}`}</dd>
         </div>
       </dl>
     </section>
@@ -100,24 +104,25 @@ function VcpBlock({ vcp }) {
 }
 
 function PivotBlock({ pivot, currency }) {
-  if (!pivot) return <p className="stock-muted">Data pivot belum tersedia.</p>;
+  const { t } = useTranslation();
+  if (!pivot) return <p className="stock-muted">{t("Data pivot belum tersedia.")}</p>;
   return (
     <section className="stock-analysis-module" aria-labelledby="stock-pivot-title">
       <div className="stock-section-heading">
-        <h3 id="stock-pivot-title">Pivot dan breakout</h3>
+        <h3 id="stock-pivot-title">{t("Pivot dan breakout")}</h3>
         <span className={`stock-rule-status${pivot.breakout ? ' stock-rule-status--pass' : ''}`}>
-          {pivot.pivot == null ? 'Belum tersedia' : pivot.breakout ? 'Breakout' : 'Belum menembus'}
+          {pivot.pivot == null ? t("Belum tersedia") : pivot.breakout ? t("Breakout") : t("Belum menembus")}
         </span>
       </div>
       <dl className="stock-analysis-values">
-        <div><dt>Pivot</dt><dd>{formatPrice(pivot.pivot, currency)}</dd></div>
+        <div><dt>{t("Pivot")}</dt><dd>{formatPrice(pivot.pivot, currency)}</dd></div>
         <div>
-          <dt>Jarak dari pivot (extension)</dt>
-          <dd>{pivot.extension == null ? 'Belum tersedia' : `${formatPct(pivot.extension)} · ${pivot.chaseOk ? 'Dalam batas' : 'Di atas batas'}`}</dd>
+          <dt>{t("Jarak dari pivot (extension)")}</dt>
+          <dd>{pivot.extension == null ? t("Belum tersedia") : `${formatPct(pivot.extension)} · ${t(pivot.chaseOk ? 'Dalam batas' : 'Di atas batas')}`}</dd>
         </div>
         <div>
-          <dt>Volume relatif (RVOL)</dt>
-          <dd>{pivot.rvol == null ? 'Belum tersedia' : `${pivot.rvol.toLocaleString('id-ID')}× · ${pivot.rvolOk ? 'Memenuhi ambang' : 'Di bawah ambang'}`}</dd>
+          <dt>{t("Volume relatif (RVOL)")}</dt>
+          <dd>{pivot.rvol == null ? t("Belum tersedia") : `${pivot.rvol.toLocaleString(getLocale())}× · ${t(pivot.rvolOk ? 'Memenuhi ambang' : 'Di bawah ambang')}`}</dd>
         </div>
       </dl>
     </section>
@@ -125,6 +130,7 @@ function PivotBlock({ pivot, currency }) {
 }
 
 function RiskCalculator({ entry, stop, currency }) {
+  const { t } = useTranslation();
   const [equityInput, setEquityInput] = useState('100000000');
   const [riskPctInput, setRiskPctInput] = useState('1.25');
 
@@ -141,36 +147,32 @@ function RiskCalculator({ entry, stop, currency }) {
   if (!Number.isFinite(entry) || !Number.isFinite(stop) || riskPerShare <= 0) {
     return (
       <section className="stock-analysis-module stock-risk-module" aria-labelledby="stock-risk-title">
-        <h3 id="stock-risk-title">Kalkulator risiko</h3>
-        <p className="stock-muted">Perhitungan memerlukan level entry di atas stop loss.</p>
+        <h3 id="stock-risk-title">{t("Kalkulator risiko")}</h3>
+        <p className="stock-muted">{t("Perhitungan memerlukan level entry di atas stop loss.")}</p>
       </section>
     );
   }
 
   return (
     <section className="stock-analysis-module stock-risk-module" aria-labelledby="stock-risk-title">
-      <h3 id="stock-risk-title">Kalkulator risiko</h3>
+      <h3 id="stock-risk-title">{t("Kalkulator risiko")}</h3>
       <div className="stock-risk-grid">
         <div>
-          <p className="stock-muted">Simulasi long, 100 saham per lot, sebelum biaya dan slippage.</p>
-          {currency && currency !== 'IDR' && <p className="stock-risk-currency">Harga saham dalam {currency}. Kalkulator memakai satuan rupiah.</p>}
+          <p className="stock-muted">{t("Simulasi long, 100 saham per lot, sebelum biaya dan slippage.")}</p>
+          {currency && currency !== 'IDR' && <p className="stock-risk-currency">{t("Harga saham dalam")} {currency}{t(". Kalkulator memakai satuan rupiah.")}</p>}
           <div className="stock-risk-inputs">
-            <label>
-              Modal (Rp)
-              <input type="text" inputMode="numeric" value={equityInput} onChange={(e) => setEquityInput(e.target.value)} />
+            <label>{t("Modal (Rp)")}<input type="text" inputMode="numeric" value={equityInput} onChange={(e) => setEquityInput(e.target.value)} />
             </label>
-            <label>
-              Risiko per trade (%)
-              <input type="text" inputMode="decimal" value={riskPctInput} onChange={(e) => setRiskPctInput(e.target.value)} />
+            <label>{t("Risiko per trade (%)")}<input type="text" inputMode="decimal" value={riskPctInput} onChange={(e) => setRiskPctInput(e.target.value)} />
             </label>
           </div>
         </div>
         <dl className="stock-analysis-values">
-          <div><dt>Maks. pembelian</dt><dd><strong>{lots.toLocaleString('id-ID')} lot</strong></dd></div>
-          <div><dt>Nilai posisi</dt><dd>{formatPrice(positionValue, 'IDR')}</dd></div>
-          <div><dt>Risiko rencana</dt><dd>{formatPrice(lots * 100 * riskPerShare, 'IDR')}</dd></div>
-          <div><dt>Alokasi modal</dt><dd>{formatPct(allocation)}</dd></div>
-          <div><dt>Jarak stop</dt><dd>{formatPct(stopDistance)}</dd></div>
+          <div><dt>{t("Maks. pembelian")}</dt><dd><strong>{lots.toLocaleString(getLocale())} {t("lot")}</strong></dd></div>
+          <div><dt>{t("Nilai posisi")}</dt><dd>{formatPrice(positionValue, 'IDR')}</dd></div>
+          <div><dt>{t("Risiko rencana")}</dt><dd>{formatPrice(lots * 100 * riskPerShare, 'IDR')}</dd></div>
+          <div><dt>{t("Alokasi modal")}</dt><dd>{formatPct(allocation)}</dd></div>
+          <div><dt>{t("Jarak stop")}</dt><dd>{formatPct(stopDistance)}</dd></div>
         </dl>
       </div>
     </section>
@@ -178,6 +180,7 @@ function RiskCalculator({ entry, stop, currency }) {
 }
 
 export default function MinerviniPanel({ analysis, currency }) {
+  const { t } = useTranslation();
   if (!analysis) return null;
   const { status, trendTemplate, vcp, pivot, rs } = analysis;
   const meta = statusMeta[status] ?? statusMeta.WATCHLIST;
@@ -185,11 +188,11 @@ export default function MinerviniPanel({ analysis, currency }) {
   return (
     <section className="stock-data-section stock-minervini motion-enter" aria-labelledby="minervini-title">
       <div className="stock-section-heading">
-        <h2 id="minervini-title">Analisis Minervini</h2>
-        <span className={`detail-status ${meta.className}`}>{meta.label}</span>
+        <h2 id="minervini-title">{t("Analisis Minervini")}</h2>
+        <span className={`detail-status ${meta.className}`}>{t(meta.label)}</span>
       </div>
       {rs?.rating != null && (
-        <p className="stock-muted">RS Rating <strong>{rs.rating}</strong> · Return 12 bulan {formatPct(rs.return12m)} dibanding {rs.sample} saham</p>
+        <p className="stock-muted">{t("RS Rating")} <strong>{rs.rating}</strong> {t("· Return 12 bulan")} {formatPct(rs.return12m)} {t("dibanding")} {rs.sample} {t("saham")}</p>
       )}
       <div className="stock-minervini-grid">
         {trendTemplate && <TrendRules trendTemplate={trendTemplate} currency={currency} />}

@@ -17,7 +17,7 @@ export default async function breakoutScan(request) {
     const params = new URL(request.url).searchParams;
     const mode = params.get('mode') === 'research' ? 'research' : 'scan';
     const region = params.get('region') ?? 'auto';
-    const result = await runScan(mode, region);
+    const result = await runScan(mode, region, params.get('lang'));
     return Response.json(result);
   } catch {
     return Response.json({ error: scanError }, { status: 502 });

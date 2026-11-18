@@ -1,3 +1,4 @@
+import useTranslation from '../useTranslation.js';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { markets, normalizeTicker } from '../tickers.js';
@@ -13,6 +14,7 @@ const tickerExamples = [
 ];
 
 export default function SearchForm({ initialTicker = '', knownSymbols }) {
+  const { t } = useTranslation();
   const [ticker, setTicker] = useState(initialTicker);
   const [market, setMarket] = useState('auto');
   const navigate = useNavigate();
@@ -25,7 +27,7 @@ export default function SearchForm({ initialTicker = '', knownSymbols }) {
     <form
       className="search-form"
       role="search"
-      aria-label="Cari ticker saham"
+      aria-label={t("Cari ticker saham")}
       onSubmit={(event) => {
         event.preventDefault();
         go(normalizeTicker(ticker, market));
@@ -35,7 +37,7 @@ export default function SearchForm({ initialTicker = '', knownSymbols }) {
         <TickerField
           className="ticker-field"
           icon={<WorkspaceIcon name="search" size={20} />}
-          placeholder={market === 'crypto' ? 'Mis. BTC, ETH, atau SOL' : 'Mis. NVDA atau BBCA'}
+          placeholder={market === 'crypto' ? t("Mis. BTC, ETH, atau SOL") : t("Mis. NVDA atau BBCA")}
           value={ticker}
           onChange={setTicker}
           onSelect={go}
@@ -43,21 +45,19 @@ export default function SearchForm({ initialTicker = '', knownSymbols }) {
           market={market}
         />
         <div className="market-field">
-          <label htmlFor="market">Bursa</label>
+          <label htmlFor="market">{t("Bursa")}</label>
           <select id="market" value={market} onChange={(event) => setMarket(event.target.value)}>
             {Object.entries(markets).map(([value, { label }]) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>{t(label)}</option>
             ))}
           </select>
         </div>
-        <button type="submit" className="check-button">
-          Buka detail
-        </button>
+        <button type="submit" className="check-button">{t("Buka detail")}</button>
       </div>
       <div className="ticker-examples">
-        <p>Contoh format ticker</p>
+        <p>{t("Contoh format ticker")}</p>
         <ul>{tickerExamples.map(([symbol, label]) => (
-          <li key={symbol}><Link to={`/stock/${encodeURIComponent(symbol)}`} title={label}>{symbol}</Link></li>
+          <li key={symbol}><Link to={`/stock/${encodeURIComponent(symbol)}`} title={t(label)}>{symbol}</Link></li>
         ))}</ul>
       </div>
     </form>

@@ -1,8 +1,10 @@
+import useTranslation from '../useTranslation.js';
 import { useEffect, useId, useRef, useState } from 'react';
 import { downloadJournalScreenshot } from '../journalScreenshot.js';
 import { imageContentTypes, imageFileError, maxImageSizeLabel } from '../imageFile.js';
 
 export function JournalScreenshotField({ file, onChange, disabled }) {
+  const { t } = useTranslation();
   const input = useRef(null);
   const inputId = useId();
   const hintId = `${inputId}-hint`;
@@ -32,10 +34,10 @@ export function JournalScreenshotField({ file, onChange, disabled }) {
 
   return (
     <div className="journal-screenshot-field">
-      <label htmlFor={inputId}>Screenshot chart (opsional)</label>
+      <label htmlFor={inputId}>{t("Screenshot chart (opsional)")}</label>
       <div className="journal-screenshot-picker">
-        <span className="journal-secondary-button" aria-hidden="true">Pilih gambar</span>
-        <span className="journal-screenshot-filename" aria-hidden="true">{file?.name ?? 'Belum ada gambar'}</span>
+        <span className="journal-secondary-button" aria-hidden="true">{t("Pilih gambar")}</span>
+        <span className="journal-screenshot-filename" aria-hidden="true">{file?.name ?? t("Belum ada gambar")}</span>
         <input
           ref={input}
           id={inputId}
@@ -47,14 +49,12 @@ export function JournalScreenshotField({ file, onChange, disabled }) {
           disabled={disabled}
         />
       </div>
-      <p className="journal-help" id={hintId}>
-        PNG, JPG, atau WebP hingga {maxImageSizeLabel}. Unggahan disimpan sebagai WebP.
-      </p>
-      {error && <p className="journal-feedback journal-feedback--error" id={errorId} role="alert">{error}</p>}
+      <p className="journal-help" id={hintId}>{t("PNG, JPG, atau WebP hingga")} {maxImageSizeLabel}{t(". Unggahan disimpan sebagai WebP.")}</p>
+      {error && <p className="journal-feedback journal-feedback--error" id={errorId} role="alert">{t(error)}</p>}
       {file && (
         <>
           {preview && (
-            <img src={preview} alt="Pratinjau screenshot chart" className="journal-screenshot-preview"
+            <img src={preview} alt={t("Pratinjau screenshot chart")} className="journal-screenshot-preview"
               onError={() => {
                 setPreview('');
                 setError('Pratinjau gambar gagal ditampilkan.');
@@ -65,9 +65,7 @@ export function JournalScreenshotField({ file, onChange, disabled }) {
             setError('');
             onChange(null);
             input.current.focus();
-          }}>
-            Lepas gambar
-          </button>
+          }}>{t("Lepas gambar")}</button>
         </>
       )}
     </div>
@@ -75,6 +73,7 @@ export function JournalScreenshotField({ file, onChange, disabled }) {
 }
 
 export function JournalScreenshotDialog({ uid, trade, onClose }) {
+  const { t } = useTranslation();
   const dialog = useRef(null);
   const titleId = useId();
   const [result, setResult] = useState(null);
@@ -110,21 +109,19 @@ export function JournalScreenshotDialog({ uid, trade, onClose }) {
   return (
     <dialog ref={dialog} className="journal-screenshot-dialog" aria-labelledby={titleId} onClose={onClose}>
       <div className="journal-section-header">
-        <h2 id={titleId}>Screenshot chart {trade.pair}</h2>
-        <button type="button" className="journal-secondary-button" onClick={() => dialog.current.close()}>Tutup</button>
+        <h2 id={titleId}>{t("Screenshot chart")} {trade.pair}</h2>
+        <button type="button" className="journal-secondary-button" onClick={() => dialog.current.close()}>{t("Tutup")}</button>
       </div>
-      {result?.url && <img src={result.url} alt={`Screenshot chart ${trade.pair}`}
+      {result?.url && <img src={result.url} alt={t("Screenshot chart {0}", trade.pair)}
         onError={() => setResult({ message: 'Screenshot chart gagal ditampilkan.' })} />}
-      {!result && <p className="journal-help" role="status">Memuat screenshot chart…</p>}
+      {!result && <p className="journal-help" role="status">{t("Memuat screenshot chart…")}</p>}
       {result?.message && (
         <div className="journal-feedback journal-feedback--error">
-          <p role="alert">{result.message}</p>
+          <p role="alert">{t(result.message)}</p>
           <button className="text-button journal-screenshot-button" type="button" onClick={() => {
             setResult(null);
             setAttempt((value) => value + 1);
-          }}>
-            Coba lagi
-          </button>
+          }}>{t("Coba lagi")}</button>
         </div>
       )}
     </dialog>

@@ -1,3 +1,5 @@
+import { localizedNumberFormat } from './i18n.js';
+import useTranslation from './useTranslation.js';
 import { useEffect, useRef, useState } from 'react';
 import { defaultBreakoutParams } from '../netlify/functions/shared/breakoutLogic.js';
 import TableScroll from './components/TableScroll.jsx';
@@ -8,8 +10,8 @@ import { formatDateCompact, formatPct } from './format.js';
 
 const scanErrorMessage = 'Pemindaian breakout gagal. Coba lagi nanti.';
 const { volumeMinRatio, volumeLookback } = defaultBreakoutParams;
-const ratioFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
-const countFormat = new Intl.NumberFormat('id-ID');
+const ratioFormat = localizedNumberFormat({ maximumFractionDigits: 2 });
+const countFormat = localizedNumberFormat();
 
 const regions = [
   { value: 'auto', label: 'Semua bursa' },
@@ -38,21 +40,23 @@ function waitForNextPoll(signal) {
 }
 
 function WatchAction({ symbol, inWatchlist, disabled, onAdd }) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
       className={`research-watch${inWatchlist ? ' research-watch--added' : ''}`}
       disabled={disabled || inWatchlist}
       onClick={() => onAdd(symbol)}
-      aria-label={inWatchlist ? `${symbol} sudah dipantau` : `Pantau ${symbol}`}
+      aria-label={inWatchlist ? t("{0} sudah dipantau", symbol) : t("Pantau {0}", symbol)}
     >
-      {inWatchlist ? 'Dipantau' : 'Pantau'}
+      {inWatchlist ? t("Dipantau") : t("Pantau")}
     </button>
   );
 }
 
 function ScanVolume({ ratio, scale }) {
-  if (!Number.isFinite(ratio) || ratio < 0) return <span className="scan-volume-empty">Tidak tersedia</span>;
+  const { t } = useTranslation();
+  if (!Number.isFinite(ratio) || ratio < 0) return <span className="scan-volume-empty">{t("Tidak tersedia")}</span>;
 
   return (
     <span className="scan-volume-reading">
@@ -66,6 +70,7 @@ function ScanVolume({ ratio, scale }) {
 }
 
 function ScanChange({ value }) {
+  const { t } = useTranslation();
   return (
     <span className={value > 0 ? 'trend--up' : value < 0 ? 'trend--down' : undefined}>
       <UpdatedValue value={value} format={formatPct} />
@@ -74,27 +79,29 @@ function ScanChange({ value }) {
 }
 
 function ScanResistance({ pick, formatPrice }) {
+  const { t } = useTranslation();
   return (
     <>
       {formatPrice(pick.resistance, pick.currency)}
-      {Number.isFinite(pick.breakoutPct) && <span className="research-cell-note">{formatPct(pick.breakoutPct)} di atas level</span>}
+      {Number.isFinite(pick.breakoutPct) && <span className="research-cell-note">{formatPct(pick.breakoutPct)} {t("di atas level")}</span>}
     </>
   );
 }
 
 function ScanTable({ results, watched, disabled, onAdd, formatPrice, volumeScale }) {
+  const { t } = useTranslation();
   return (
-    <TableScroll className="research-table-scroll" label="Tabel hasil scan matematis">
+    <TableScroll className="research-table-scroll" label={t("Tabel hasil scan matematis")}>
       <table className="fund-table research-table scan-table">
         <thead>
           <tr>
-            <th scope="col">Saham</th>
-            <th scope="col" className="num">Harga tutup</th>
-            <th scope="col" className="num">Perubahan</th>
-            <th scope="col" className="num">Resistance</th>
-            <th scope="col" className="num scan-volume">Rasio volume</th>
-            <th scope="col">Sesi</th>
-            <th scope="col" className="num">Aksi</th>
+            <th scope="col">{t("Saham")}</th>
+            <th scope="col" className="num">{t("Harga tutup")}</th>
+            <th scope="col" className="num">{t("Perubahan")}</th>
+            <th scope="col" className="num">{t("Resistance")}</th>
+            <th scope="col" className="num scan-volume">{t("Rasio volume")}</th>
+            <th scope="col">{t("Sesi")}</th>
+            <th scope="col" className="num">{t("Aksi")}</th>
           </tr>
         </thead>
         <tbody>
@@ -103,10 +110,10 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice, volumeScale
               <th scope="row" className="research-instrument">
                 <TickerLink symbol={pick.symbol} />
                 {pick.name && <span className="research-cell-note research-table-company">{pick.name}</span>}
-                {pick.universe && <span className="research-cell-note">{pick.universe}</span>}
+                {pick.universe && <span className="research-cell-note">{t(pick.universe)}</span>}
                 {pick.aiNote && (
                   <details className="research-scan-details">
-                    <summary>Catatan AI</summary>
+                    <summary>{t("Catatan AI")}</summary>
                     <p className="research-scan-note">{pick.aiNote}</p>
                   </details>
                 )}
@@ -119,7 +126,7 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice, volumeScale
               <td className="num scan-volume">
                 <ScanVolume ratio={pick.volumeRatio} scale={volumeScale} />
               </td>
-              <td>{pick.date ? <time dateTime={pick.date}>{formatDateCompact(pick.date)}</time> : 'Tidak tersedia'}</td>
+              <td>{pick.date ? <time dateTime={pick.date}>{formatDateCompact(pick.date)}</time> : t("Tidak tersedia")}</td>
               <td className="num"><WatchAction symbol={pick.symbol} inWatchlist={watched.has(pick.symbol)} disabled={disabled} onAdd={onAdd} /></td>
             </tr>
           ))}
@@ -130,6 +137,7 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice, volumeScale
 }
 
 function ScanListItem({ pick, inWatchlist, disabled, onAdd, formatPrice, formatDate, volumeScale }) {
+  const { t } = useTranslation();
   return (
     <li className="scan-list-item">
       <div className="scan-item-heading">
@@ -138,34 +146,34 @@ function ScanListItem({ pick, inWatchlist, disabled, onAdd, formatPrice, formatD
           {pick.name && <p className="research-company">{pick.name}</p>}
         </div>
         <div className="scan-item-price">
-          <span>Harga tutup</span>
+          <span>{t("Harga tutup")}</span>
           <UpdatedValue as="strong" value={pick.close} format={(price) => formatPrice(price, pick.currency)} />
         </div>
       </div>
       <dl className="scan-item-metrics">
         <div>
-          <dt>Perubahan</dt>
+          <dt>{t("Perubahan")}</dt>
           <dd><ScanChange value={pick.changePct} /></dd>
         </div>
         <div>
-          <dt>Rasio volume</dt>
+          <dt>{t("Rasio volume")}</dt>
           <dd><ScanVolume ratio={pick.volumeRatio} scale={volumeScale} /></dd>
         </div>
       </dl>
       <details className="scan-item-details">
-        <summary>Rincian<span className="visually-hidden"> {pick.symbol}</span></summary>
+        <summary>{t("Rincian")}<span className="visually-hidden"> {pick.symbol}</span></summary>
         <dl className="scan-item-levels">
           <div>
-            <dt>Resistance</dt>
+            <dt>{t("Resistance")}</dt>
             <dd><ScanResistance pick={pick} formatPrice={formatPrice} /></dd>
           </div>
           <div>
-            <dt>Sesi</dt>
-            <dd>{pick.date ? <time dateTime={pick.date}>{formatDate(pick.date)}</time> : 'Tidak tersedia'}</dd>
+            <dt>{t("Sesi")}</dt>
+            <dd>{pick.date ? <time dateTime={pick.date}>{formatDate(pick.date)}</time> : t("Tidak tersedia")}</dd>
           </div>
-          {pick.universe && <div><dt>Cakupan</dt><dd>{pick.universe}</dd></div>}
+          {pick.universe && <div><dt>{t("Cakupan")}</dt><dd>{t(pick.universe)}</dd></div>}
         </dl>
-        {pick.aiNote && <p className="research-scan-note"><strong>Catatan AI</strong><br />{pick.aiNote}</p>}
+        {pick.aiNote && <p className="research-scan-note"><strong>{t("Catatan AI")}</strong><br />{pick.aiNote}</p>}
         <WatchAction symbol={pick.symbol} inWatchlist={inWatchlist} disabled={disabled} onAdd={onAdd} />
       </details>
     </li>
@@ -173,6 +181,7 @@ function ScanListItem({ pick, inWatchlist, disabled, onAdd, formatPrice, formatD
 }
 
 function ScanResults({ results, watched, disabled, onAdd, formatPrice, formatDate }) {
+  const { t } = useTranslation();
   const volumeScale = results.reduce((max, { volumeRatio }) => (
     Number.isFinite(volumeRatio) ? Math.max(max, volumeRatio) : max
   ), volumeMinRatio * 2);
@@ -181,7 +190,7 @@ function ScanResults({ results, watched, disabled, onAdd, formatPrice, formatDat
     <>
       <p className="scan-volume-legend">
         <span aria-hidden="true" />
-        <span>Ambang volume <strong>{ratioFormat.format(volumeMinRatio)}×</strong> rata-rata {volumeLookback} sesi</span>
+        <span>{t("Ambang volume")} <strong>{ratioFormat.format(volumeMinRatio)}×</strong> {t("rata-rata")} {volumeLookback} {t("sesi")}</span>
       </p>
       <div className="scan-table-layout">
         <ScanTable
@@ -193,7 +202,7 @@ function ScanResults({ results, watched, disabled, onAdd, formatPrice, formatDat
           volumeScale={volumeScale}
         />
       </div>
-      <ul className="scan-list" role="list" aria-label="Hasil scan matematis">
+      <ul className="scan-list" role="list" aria-label={t("Hasil scan matematis")}>
         {results.map((pick) => (
           <ScanListItem
             key={pick.symbol}
@@ -212,25 +221,26 @@ function ScanResults({ results, watched, disabled, onAdd, formatPrice, formatDat
 }
 
 function ScanResultHeading({ title, results, scope, formatDate }) {
+  const { t } = useTranslation();
   const sessions = new Set(results.map(({ date }) => date || null));
   const singleSession = sessions.size === 1 ? sessions.values().next().value : null;
 
   return (
     <div className="research-panel-heading scan-results-heading motion-enter motion-enter--after">
       <div className="section-accent">
-        <h2 id="research-results-title">{title}</h2>
+        <h2 id="research-results-title">{t(title)}</h2>
         {scope && <p>{scope}</p>}
       </div>
       <dl className="scan-overview">
         <div className="scan-overview-count">
-          <dt>Kandidat ditampilkan</dt>
+          <dt>{t("Kandidat ditampilkan")}</dt>
           <dd><UpdatedValue value={results.length} format={countFormat.format} /></dd>
         </div>
         <div>
-          <dt>Sesi acuan</dt>
+          <dt>{t("Sesi acuan")}</dt>
           <dd>
             {singleSession ? <time dateTime={singleSession}>{formatDate(singleSession)}</time>
-              : sessions.size > 1 ? 'Lihat sesi per saham' : 'Tidak tersedia'}
+              : sessions.size > 1 ? t("Lihat sesi per saham") : t("Tidak tersedia")}
           </dd>
         </div>
       </dl>
@@ -239,6 +249,7 @@ function ScanResultHeading({ title, results, scope, formatDate }) {
 }
 
 function ResearchBrief({ pick, inWatchlist, disabled, onAdd }) {
+  const { t } = useTranslation();
   return (
     <li className="research-brief">
       <div className="research-brief-heading">
@@ -249,15 +260,16 @@ function ResearchBrief({ pick, inWatchlist, disabled, onAdd }) {
         <WatchAction symbol={pick.symbol} inWatchlist={inWatchlist} disabled={disabled} onAdd={onAdd} />
       </div>
       <dl className="research-brief-details">
-        {pick.note && <div><dt>Analisis teknikal</dt><dd>{pick.note}</dd></div>}
-        {pick.level && <div><dt>Level pantauan</dt><dd>{pick.level}</dd></div>}
-        {pick.catalyst && <div><dt>Katalis</dt><dd>{pick.catalyst}</dd></div>}
+        {pick.note && <div><dt>{t("Analisis teknikal")}</dt><dd>{pick.note}</dd></div>}
+        {pick.level && <div><dt>{t("Level pantauan")}</dt><dd>{pick.level}</dd></div>}
+        {pick.catalyst && <div><dt>{t("Katalis")}</dt><dd>{pick.catalyst}</dd></div>}
       </dl>
     </li>
   );
 }
 
 export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPrice, formatDate }) {
+  const { t, language } = useTranslation();
   const [mode, setMode] = useState('scan');      // 'scan' | 'research'
   const [region, setRegion] = useState('auto');
   const [request, setRequest] = useState({ status: 'idle' });
@@ -280,7 +292,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
 
     try {
       // Mulai job di background untuk menghindari timeout function sinkron.
-      const query = new URLSearchParams({ mode: targetMode, region: targetRegion });
+      const query = new URLSearchParams({ mode: targetMode, region: targetRegion, lang: language });
       const startResponse = await fetch(`/.netlify/functions/breakout-start?${query}`, {
         method: 'POST',
         signal,
@@ -318,7 +330,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           if (error) {
             setRequest({ status: 'error', message: error });
           } else {
-            setLastResult({ mode: targetMode, data });
+            setLastResult({ mode: targetMode, data: { ...data, language: data.language ?? language } });
             setRequest({ status: 'success' });
           }
           return;
@@ -356,12 +368,12 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   const ai = result?.ai;
   const isResearch = mode === 'research';
   const resultIsResearch = lastResult?.mode === 'research';
-  const scanScope = [result?.universe,
-    Number.isFinite(result?.scanned) && `${countFormat.format(result.scanned)} saham dalam cakupan`,
+  const scanScope = [t(result?.universe),
+    Number.isFinite(result?.scanned) && t('{0} saham dalam cakupan', countFormat.format(result.scanned)),
   ].filter(Boolean).join(' · ');
   const resultSummary = result && (resultIsResearch
-    ? `${result.universe} · ${results.length} kandidat`
-    : `${scanScope ? `${scanScope} · ` : ''}${results.length} kandidat ditampilkan`);
+    ? t('{0} · {1} kandidat', t(result.universe), results.length)
+    : t('{0}{1} kandidat ditampilkan', scanScope ? `${scanScope} · ` : '', results.length));
   const finished = request.status === 'success';
   const resultTitle = resultIsResearch
     ? (finished ? 'Kandidat riset AI' : 'Hasil riset sebelumnya')
@@ -386,12 +398,12 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     <>
       <section className="research-panel recommend-panel research-config motion-enter" aria-labelledby="breakout-scanner-title">
         <header className="page-heading recommend-heading section-accent">
-          <h1 id="breakout-scanner-title">Rekomendasi</h1>
-          <p>{description}</p>
+          <h1 id="breakout-scanner-title">{t("Rekomendasi")}</h1>
+          <p>{t(description)}</p>
         </header>
         <form className="research-controls" onSubmit={(event) => { event.preventDefault(); run(); }}>
           <fieldset className="research-mode">
-            <legend>Metode</legend>
+            <legend>{t("Metode")}</legend>
             <div className="candle-timeframe">
               {[
                 { value: 'scan', label: 'Scan matematis' },
@@ -405,26 +417,24 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
                   onClick={() => changeMode(value)}
                   aria-pressed={mode === value}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
           </fieldset>
-          <label className="research-field">
-            Bursa
-            <select value={region} onChange={(event) => changeRegion(event.target.value)} disabled={loading}>
-              {regions.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+          <label className="research-field">{t("Bursa")}<select value={region} onChange={(event) => changeRegion(event.target.value)} disabled={loading}>
+              {regions.map(({ value, label }) => <option key={value} value={value}>{t(label)}</option>)}
             </select>
           </label>
           <button type="submit" className="scan-button" aria-disabled={loading}>
-            {action}
+            {t(action)}
             {loading && <ResearchProgress />}
           </button>
         </form>
-        <p className="visually-hidden" role="status">{statusLabel}</p>
+        <p className="visually-hidden" role="status">{t(statusLabel)}</p>
 
         {request.status === 'error' && (
-          <ResearchRequestStatus title={`${scanLabel} gagal`} message={request.message} />
+          <ResearchRequestStatus title={t("{0} gagal", t(scanLabel))} message={t(request.message)} />
         )}
       </section>
 
@@ -433,27 +443,29 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           {resultIsResearch ? (
             <div className="research-panel-heading motion-enter motion-enter--after">
               <div className="section-accent">
-                <h2 id="research-results-title">{resultTitle}</h2>
-                <p><span className="motion-status" key={resultSummary}>{resultSummary}</span></p>
+                <h2 id="research-results-title">{t(resultTitle)}</h2>
+                <p><span className="motion-status" key={resultSummary}>{t(resultSummary)}</span></p>
               </div>
               {result.date && (
-                <p className="research-result-date">
-                  Tanggal riset <time dateTime={result.date}>{formatDate(result.date)}</time>
+                <p className="research-result-date">{t("Tanggal riset")} <time dateTime={result.date}>{formatDate(result.date)}</time>
                 </p>
               )}
             </div>
           ) : (
-            <ScanResultHeading title={resultTitle} results={results} scope={scanScope} formatDate={formatDate} />
+            <ScanResultHeading title={t(resultTitle)} results={results} scope={scanScope} formatDate={formatDate} />
           )}
           {ai?.summary && (
             <div className="research-summary">
-              <h3>{resultIsResearch ? 'Ringkasan riset' : 'Catatan AI atas hasil scan'}</h3>
-              <p>{ai.summary}</p>
+              <h3>{resultIsResearch ? t("Ringkasan riset") : t("Catatan AI atas hasil scan")}</h3>
+              <p lang={result.language}>{t(ai.summary)}</p>
+              {result.language !== language && (
+                <p className="research-form-help">{t('Bahasa laporan {0}. Jalankan ulang untuk membuat laporan dalam bahasa pilihan.', result.language === 'en' ? 'English' : 'Bahasa Indonesia')}</p>
+              )}
             </div>
           )}
           {results.length === 0 ? (
             <p className="research-empty">
-              {resultIsResearch ? 'Belum ada kandidat dengan sumber yang cukup.' : 'Belum ada saham yang memenuhi kriteria scan pada sesi ini.'}
+              {resultIsResearch ? t("Belum ada kandidat dengan sumber yang cukup.") : t("Belum ada saham yang memenuhi kriteria scan pada sesi ini.")}
             </p>
           ) : resultIsResearch ? (
             <ul className="research-brief-list">
@@ -477,7 +489,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
               formatDate={formatDate}
             />
           )}
-          {ai?.error && !ai?.summary && <p className="research-empty" role="status">{ai.error}</p>}
+          {ai?.error && !ai?.summary && <p className="research-empty" role="status">{t(ai.error)}</p>}
         </section>
       )}
     </>

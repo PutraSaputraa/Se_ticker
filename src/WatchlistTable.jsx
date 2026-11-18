@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { getLocale } from './i18n.js';
+import useTranslation from './useTranslation.js';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import WorkspaceIcon from './components/WorkspaceIcon.jsx';
 import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
 import UpdatedValue from './components/UpdatedValue.jsx';
@@ -110,20 +113,22 @@ function useWatchlistData(symbolsKey) {
 }
 
 function TrendScoreBadge({ score }) {
-  if (score === undefined) return <span className="research-cell-note">Memuat…</span>;
-  if (score === null) return <span className="research-cell-note">Belum tersedia</span>;
+  const { t } = useTranslation();
+  if (score === undefined) return <span className="research-cell-note">{t("Memuat…")}</span>;
+  if (score === null) return <span className="research-cell-note">{t("Belum tersedia")}</span>;
   return (
     <span className={`research-badge${score.eligible ? ' research-badge--support' : ''}`}
-      title={`${score.passed} dari ${score.total} kriteria Stage 2 lolos`}>
+      title={t("{0} dari {1} kriteria Stage 2 lolos", score.passed, score.total)}>
       {score.passed}/{score.total}
     </span>
   );
 }
 
 function CheckBadgeMini({ passed }) {
+  const { t } = useTranslation();
   return (
     <span className={`research-cell-note${passed === true ? ' research-cell-note--support' : ''}`}>
-      {passed == null ? 'Ambang belum tersedia' : passed ? 'Memenuhi ambang' : 'Di bawah ambang'}
+      {passed == null ? t("Ambang belum tersedia") : passed ? t("Memenuhi ambang") : t("Di bawah ambang")}
     </span>
   );
 }
@@ -146,12 +151,14 @@ function breakoutStatus(quote, priceToWatch) {
 }
 
 function BreakoutBadge({ state }) {
-  if (state === 'breakout') return <span className="research-badge research-badge--support">Breakout</span>;
-  if (state === 'near') return <span className="research-badge research-badge--warning">Mendekati</span>;
-  return <span className="research-badge">Menunggu</span>;
+  const { t } = useTranslation();
+  if (state === 'breakout') return <span className="research-badge research-badge--support">{t("Breakout")}</span>;
+  if (state === 'near') return <span className="research-badge research-badge--warning">{t("Mendekati")}</span>;
+  return <span className="research-badge">{t("Menunggu")}</span>;
 }
 
 function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled }) {
+  const { t } = useTranslation();
   const [text, setText] = useState(value == null ? '' : String(value));
 
   useEffect(() => {
@@ -185,7 +192,7 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled 
       className="ptw-input"
       type="text"
       inputMode={decimals === 0 ? 'numeric' : 'decimal'}
-      placeholder="Isi harga"
+      placeholder={t("Isi harga")}
       value={text}
       disabled={disabled}
       onClick={(event) => event.stopPropagation()}
@@ -195,7 +202,7 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled 
         event.stopPropagation();
         if (event.key === 'Enter') event.currentTarget.blur();
       }}
-      aria-label={`Harga pantauan untuk ${symbol}`}
+      aria-label={t("Harga pantauan untuk {0}", symbol)}
     />
   );
 }
@@ -209,6 +216,7 @@ const priceDirections = {
 const starValues = [1, 2, 3, 4, 5];
 
 function WatchlistRating({ symbol, rating, onSetRating, disabled }) {
+  const { t } = useTranslation();
   const label = `Beri bintang untuk ${symbol}`;
   function selectRating(value) {
     if (!disabled && value !== rating) onSetRating(symbol, value);
@@ -216,15 +224,15 @@ function WatchlistRating({ symbol, rating, onSetRating, disabled }) {
 
   return (
     <div className="watchlist-rating">
-      <div className="watchlist-rating-stars" role="group" aria-label={label}>
+      <div className="watchlist-rating-stars" role="group" aria-label={t(label)}>
         {starValues.map((value) => (
           <button
             key={value}
             type="button"
-            aria-label={`${value} bintang`}
+            aria-label={t("{0} bintang", value)}
             aria-pressed={value === rating}
             aria-disabled={disabled}
-            title={`Beri ${value} bintang`}
+            title={t("Beri {0} bintang", value)}
             onClick={() => selectRating(value)}
           >
             <span aria-hidden="true" className={value <= rating ? 'watchlist-star-filled' : undefined}>
@@ -235,18 +243,66 @@ function WatchlistRating({ symbol, rating, onSetRating, disabled }) {
       </div>
       <div className="watchlist-rating-picker">
         <span aria-hidden="true">{rating ? '★' : '☆'}</span>
-        <select aria-label={label} value={rating ?? ''} disabled={disabled}
+        <select aria-label={t(label)} value={rating ?? ''} disabled={disabled}
           onChange={(event) => selectRating(Number(event.target.value))}>
-          <option value="" disabled>Bintang</option>
-          {starValues.map((value) => <option value={value} key={value}>{value} bintang</option>)}
+          <option value="" disabled>{t("Bintang")}</option>
+          {starValues.map((value) => <option value={value} key={value}>{value} {t("bintang")}</option>)}
         </select>
       </div>
     </div>
   );
 }
 
+function WatchlistNotes({ entry, onEdit, disabled }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const [overflow, setOverflow] = useState(false);
+  const preview = useRef(null);
+  const { symbol, notes } = entry;
+
+  useLayoutEffect(() => {
+    const element = preview.current;
+    if (!element || expanded) return;
+    const measure = () => setOverflow(element.scrollHeight > element.clientHeight + 1);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    return () => observer.disconnect();
+  }, [notes, expanded]);
+
+  if (!notes) {
+    return (
+      <button type="button" className="watchlist-note-add" disabled={disabled} aria-haspopup="dialog"
+        aria-label={`${t('Tambah catatan')} ${symbol}`} onClick={(event) => onEdit(entry, 'notes', event.currentTarget)}>
+        + {t('Tambah catatan')}
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <p ref={preview} className={`watchlist-note-preview${expanded ? ' watchlist-note-preview--expanded' : ''}`}>{notes}</p>
+      <div className="watchlist-note-actions">
+        {overflow && (
+          <button type="button" className="watchlist-note-expand" aria-expanded={expanded}
+            aria-label={t(expanded ? 'Ringkas catatan {0}' : 'Baca seluruh catatan {0}', symbol)}
+            onClick={() => setExpanded((value) => !value)}>
+            {t(expanded ? 'Ringkas' : 'Selengkapnya')}
+          </button>
+        )}
+        <button type="button" className="watchlist-note-edit" disabled={disabled} aria-haspopup="dialog"
+          aria-label={`${t('Ubah catatan')} ${symbol}`} title={t('Ubah catatan')}
+          onClick={(event) => onEdit(entry, 'notes', event.currentTarget)}>
+          <WorkspaceIcon name="edit" size={16} />
+        </button>
+      </div>
+    </>
+  );
+}
+
 function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled, trendScore }) {
-  const { symbol, priceToWatch, rating, notes, imageId } = entry;
+  const { t } = useTranslation();
+  const { symbol, priceToWatch, rating, imageId } = entry;
   const quote = row?.quote;
   const instrument = (
     <th scope="row" className="research-instrument">
@@ -260,28 +316,21 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
       type="button"
       className="research-remove"
       disabled={disabled}
-      title={`Hapus ${symbol}`}
-      aria-label={`Hapus ${symbol} dari daftar`}
+      title={t("Hapus {0}", symbol)}
+      aria-label={t("Hapus {0} dari daftar", symbol)}
       onClick={(event) => { event.stopPropagation(); onRemove(symbol); }}
-    >
-      Hapus
-    </button>
+    >{t("Hapus")}</button>
   );
-  const notesAction = notes ? 'Ubah catatan' : 'Tambah catatan';
   const imageAction = imageId ? 'Lihat gambar' : 'Unggah gambar';
   const details = (
     <>
       <td className="watchlist-notes">
-        {notes && <p className="watchlist-note-preview">{notes}</p>}
-        <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
-          aria-label={`${notesAction} ${symbol}`} onClick={(event) => onEditEntry(entry, 'notes', event.currentTarget)}>
-          {notesAction}
-        </button>
+        <WatchlistNotes entry={entry} onEdit={onEditEntry} disabled={disabled} />
       </td>
       <td className="watchlist-image">
         <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
-          aria-label={`${imageAction} ${symbol}`} onClick={(event) => onEditEntry(entry, 'image', event.currentTarget)}>
-          {imageAction}
+          aria-label={`${t(imageAction)} ${symbol}`} onClick={(event) => onEditEntry(entry, 'image', event.currentTarget)}>
+          {t(imageAction)}
         </button>
       </td>
     </>
@@ -294,7 +343,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
         {instrument}
         <td colSpan={3} className="watchlist-quote-state">
           <span className={error ? 'research-quote-error' : 'research-cell-note'}>
-            {error ? row.message : 'Memuat harga dan volume…'}
+            {error ? t(row.message) : t("Memuat harga dan volume…")}
           </span>
         </td>
         <td className="watchlist-stage"><TrendScoreBadge score={trendScore} /></td>
@@ -317,7 +366,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
       {instrument}
       <td className="num">
         <span className={`watchlist-close ${direction?.className ?? ''}`}>
-          {direction && <span role="img" aria-label={direction.label} title={direction.label}>{direction.icon}</span>}
+          {direction && <span role="img" aria-label={t(direction.label)} title={t(direction.label)}>{direction.icon}</span>}
           <UpdatedValue value={quote.close} format={(price) => formatPrice(price, quote.currency)} />
         </span>
         {quote.date && <time className="research-cell-note" dateTime={quote.date}>{formatDateCompact(quote.date)}</time>}
@@ -334,7 +383,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
       </td>
       <td className="watchlist-stage"><TrendScoreBadge score={trendScore} /></td>
       <td className="num">
-        {Number.isFinite(quote.volume) ? quote.volume.toLocaleString('id-ID') : 'Belum tersedia'}
+        {Number.isFinite(quote.volume) ? quote.volume.toLocaleString(getLocale()) : t("Belum tersedia")}
         <CheckBadgeMini passed={volumePass} />
       </td>
       <td className="num">{formatVolume(quote.buyTrigger?.averageVolume, { includeUnit: false })}</td>
@@ -347,6 +396,7 @@ function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPri
 const stateRank = { breakout: 0, near: 1, none: 2 };
 
 export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled }) {
+  const { t } = useTranslation();
   const symbolsKey = entries.map((entry) => entry.symbol).join('\n');
   const rows = useWatchlistData(symbolsKey);
   const trendScores = useTrendScores(symbolsKey);
@@ -362,22 +412,21 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
   });
 
   return (
-    <TableScroll className="research-table-scroll" label="Tabel daftar pantauan">
+    <TableScroll className="research-table-scroll" label={t("Tabel daftar pantauan")}>
       <table className="fund-table research-table watchlist-table">
         <thead>
           <tr>
-            <th scope="col">Saham</th>
-            <th scope="col" className="num">Harga tutup</th>
-            <th scope="col">Status</th>
-            <th scope="col" className="num">Harga pantauan</th>
-            <th scope="col" className="watchlist-stage" title="Jumlah kriteria Trend Template Minervini yang lolos">Stage 2</th>
-            <th scope="col" className="num">Volume (lembar)</th>
-            <th scope="col" className="num watchlist-average-volume" title="Rata-rata volume yang dipakai untuk menghitung ambang breakout">
-              Rata-rata volume <span className="watchlist-header-note">50 sesi (lembar)</span>
+            <th scope="col">{t("Saham")}</th>
+            <th scope="col" className="num">{t("Harga tutup")}</th>
+            <th scope="col">{t("Status")}</th>
+            <th scope="col" className="num">{t("Harga pantauan")}</th>
+            <th scope="col" className="watchlist-stage" title={t("Jumlah kriteria Trend Template Minervini yang lolos")}>{t("Stage 2")}</th>
+            <th scope="col" className="num">{t("Volume (lembar)")}</th>
+            <th scope="col" className="num watchlist-average-volume" title={t("Rata-rata volume yang dipakai untuk menghitung ambang breakout")}>{t("Rata-rata volume")} <span className="watchlist-header-note">{t("50 sesi (lembar)")}</span>
             </th>
-            <th scope="col">Catatan</th>
-            <th scope="col">Gambar</th>
-            <th scope="col" className="num">Aksi</th>
+            <th scope="col">{t("Catatan")}</th>
+            <th scope="col">{t("Gambar")}</th>
+            <th scope="col" className="num">{t("Aksi")}</th>
           </tr>
         </thead>
         <tbody>

@@ -1,3 +1,5 @@
+import { t, localizedDateFormat } from '../i18n.js';
+import useTranslation from '../useTranslation.js';
 import { useState } from 'react';
 import { formatCompactNumber, formatDate, formatPnl, formatPrice, priceDecimals } from '../format.js';
 import { walletMovementLabels } from '../wallet.js';
@@ -10,15 +12,16 @@ const sources = {
   equityCents: { label: 'Ekuitas wallet', detail: 'Saldo tersedia ditambah dana yang dipakai posisi, berdasarkan PnL terealisasi.' },
 };
 const chartTypes = { bar: 'Batang', line: 'Garis waktu', area: 'Area' };
-const axisDateFormat = new Intl.DateTimeFormat('id-ID', {
+const axisDateFormat = localizedDateFormat({
   day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC',
 });
-const walletAxisFormat = new Intl.DateTimeFormat('id-ID', {
+const walletAxisFormat = localizedDateFormat({
   day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit',
 });
-const walletDateFormat = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'medium' });
+const walletDateFormat = localizedDateFormat({ dateStyle: 'medium', timeStyle: 'medium' });
 
 function ChartPlot({ points, currency, source, type, isWallet }) {
+  const { t } = useTranslation();
   const values = points.map(({ value }) => value);
   const min = Math.min(0, ...values);
   const max = Math.max(0, ...values);
@@ -51,7 +54,7 @@ function ChartPlot({ points, currency, source, type, isWallet }) {
         {ticks.map((tick) => <span key={tick}>{formatCompactNumber(tick)}</span>)}
       </div>
       <svg className="journal-pnl-bars" viewBox="0 0 100 100" preserveAspectRatio="none" role="img"
-        aria-label={`Grafik ${chartTypes[type].toLowerCase()} ${sources[source].label.toLowerCase()} ${currency}`}>
+        aria-label={t("Grafik {0} {1} {2}", t(chartTypes[type]).toLowerCase(), t(sources[source].label).toLowerCase(), currency)}>
         {ticks.filter((tick) => tick !== 0).map((tick) => (
           <line key={tick} className="journal-pnl-gridline" x1="0" x2="100" y1={y(tick)} y2={y(tick)} vectorEffect="non-scaling-stroke" />
         ))}
@@ -93,7 +96,7 @@ function chartPoints(days, history, source, currency, isWallet) {
       const label = walletDateFormat.format(movement.at);
       return {
         key: movement.id, date: new Date(movement.at).toISOString(), time: movement.at, value, label,
-        activity: walletMovementLabels[movement.kind] + (movement.symbol ? ` ${movement.symbol}` : ''),
+        activity: t(walletMovementLabels[movement.kind]) + (movement.symbol ? ` ${movement.symbol}` : ''),
         title: `${label} · ${formatPrice(value, currency)}`,
       };
     });
@@ -109,6 +112,7 @@ function chartPoints(days, history, source, currency, isWallet) {
 }
 
 export default function JournalCharts({ series, preferredCurrency, walletHistory }) {
+  const { t } = useTranslation();
   const [selectedSource, setSource] = useState(null);
   const [selectedType, setType] = useState(null);
   const [selectedCurrency, setCurrency] = useState(null);
@@ -121,31 +125,25 @@ export default function JournalCharts({ series, preferredCurrency, walletHistory
     ?? series[0];
   const currency = isWallet ? 'USD' : selected?.currency;
   const points = chartPoints(selected?.daily ?? [], walletHistory, source, currency, isWallet);
-  const detailsLabel = `Rincian ${sources[source].label.toLowerCase()} ${currency}`;
+  const detailsLabel = t('Rincian {0} {1}', t(sources[source].label), currency);
 
   return (
     <section id="journal-charts" className="journal-section journal-charts" aria-labelledby="journal-chart-title">
       <div>
-        <h3 id="journal-chart-title">Grafik jurnal{currency ? ` (${currency})` : ''}</h3>
-        <p className="journal-help">{sources[source].detail}</p>
+        <h3 id="journal-chart-title">{t("Grafik jurnal")}{currency ? ` (${currency})` : ''}</h3>
+        <p className="journal-help">{t(sources[source].detail)}</p>
       </div>
       <div className="journal-chart-controls">
-        <label>
-          Data grafik
-          <select value={source} onChange={(event) => { setSource(event.target.value); setType(null); }}>
-            {Object.entries(sources).map(([key, { label }]) => <option key={key} value={key}>{label}</option>)}
+        <label>{t("Data grafik")}<select value={source} onChange={(event) => { setSource(event.target.value); setType(null); }}>
+            {Object.entries(sources).map(([key, { label }]) => <option key={key} value={key}>{t(label)}</option>)}
           </select>
         </label>
-        <label>
-          Tipe grafik
-          <select value={type} onChange={(event) => setType(event.target.value)}>
-            {Object.entries(chartTypes).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        <label>{t("Tipe grafik")}<select value={type} onChange={(event) => setType(event.target.value)}>
+            {Object.entries(chartTypes).map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}
           </select>
         </label>
         {!isWallet && series.length > 1 && (
-          <label>
-            Mata uang grafik
-            <select value={currency} onChange={(event) => setCurrency(event.target.value)}>
+          <label>{t("Mata uang grafik")}<select value={currency} onChange={(event) => setCurrency(event.target.value)}>
               {series.map((item) => <option key={item.currency} value={item.currency}>{item.currency}</option>)}
             </select>
           </label>
@@ -155,16 +153,16 @@ export default function JournalCharts({ series, preferredCurrency, walletHistory
         <>
           <ChartPlot points={points} currency={currency} source={source} type={type} isWallet={isWallet} />
           <details className="journal-pnl-days">
-            <summary>{isWallet ? 'Lihat nilai per aktivitas' : 'Lihat nilai per tanggal'}</summary>
+            <summary>{isWallet ? t("Lihat nilai per aktivitas") : t("Lihat nilai per tanggal")}</summary>
             <TableScroll className="journal-table-wrap" label={detailsLabel}>
               <table className="fund-table" aria-label={detailsLabel}>
                 <thead>
-                  <tr><th scope="col">{isWallet ? 'Waktu' : 'Tanggal'}</th><th scope="col">{isWallet ? 'Aktivitas' : 'Posisi'}</th><th scope="col" className="num">{sources[source].label}</th></tr>
+                  <tr><th scope="col">{isWallet ? t("Waktu") : t("Tanggal")}</th><th scope="col">{isWallet ? t("Aktivitas") : t("Posisi")}</th><th scope="col" className="num">{t(sources[source].label)}</th></tr>
                 </thead>
                 <tbody>
                   {[...points].reverse().map(({ key, date, label, activity, value }) => (
                     <tr key={key}>
-                      <th scope="row"><time dateTime={date}>{label}</time></th>
+                      <th scope="row"><time dateTime={date}>{t(label)}</time></th>
                       <td>{activity}</td>
                       <td className="num">{isWallet ? formatPrice(value, currency) : formatPnl(value, currency)}</td>
                     </tr>
@@ -174,9 +172,9 @@ export default function JournalCharts({ series, preferredCurrency, walletHistory
             </TableScroll>
           </details>
         </>
-      ) : <p className="journal-help">{isWallet ? 'Belum ada aktivitas wallet.' : 'Belum ada PnL bertanggal untuk ditampilkan.'}</p>}
+      ) : <p className="journal-help">{isWallet ? t("Belum ada aktivitas wallet.") : t("Belum ada PnL bertanggal untuk ditampilkan.")}</p>}
       {!isWallet && selected?.undatedCount > 0 && (
-        <p className="journal-help">Tanggal penutupan belum tersedia untuk {selected.undatedCount} posisi dengan PnL {currency}.</p>
+        <p className="journal-help">{t("Tanggal penutupan belum tersedia untuk")} {selected.undatedCount} {t("posisi dengan PnL")} {currency}.</p>
       )}
     </section>
   );

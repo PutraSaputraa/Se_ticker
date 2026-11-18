@@ -15,6 +15,9 @@
         const systemTheme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.dataset.theme =
           preference === 'light' || preference === 'dark' ? preference : systemTheme;
+        try {
+          document.documentElement.lang = localStorage.getItem('cek-saham:language') === 'en' ? 'en' : 'id';
+        } catch {}
       })();
     </script>
   </head>

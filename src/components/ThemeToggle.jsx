@@ -1,6 +1,8 @@
+import useTranslation from '../useTranslation.js';
 import { useState } from 'react';
 
 export default function ThemeToggle() {
+  const { t } = useTranslation();
   const [isDark, setIsDark] = useState(() => document.documentElement.dataset.theme === 'dark');
 
   function toggleTheme() {
@@ -16,9 +18,9 @@ export default function ThemeToggle() {
     <button
       type="button"
       className="theme-toggle"
-      aria-label="Tema gelap"
+      aria-label={t("Tema gelap")}
       aria-pressed={isDark}
-      title={isDark ? 'Aktifkan tema terang' : 'Aktifkan tema gelap'}
+      title={isDark ? t("Aktifkan tema terang") : t("Aktifkan tema gelap")}
       onClick={toggleTheme}
     >
       <svg className="theme-toggle-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"
