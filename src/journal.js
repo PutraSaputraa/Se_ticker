@@ -152,6 +152,23 @@ export function quoteDateForTrade(trade, quote) {
   return quote.date;
 }
 
+export function holdingPeriodDays(trade, now = new Date()) {
+  const endDate = trade.status === 'open'
+    ? quoteDateForTrade(trade, {
+      date: now.toLocaleDateString('sv-SE'),
+      timestamp: Math.floor(now.getTime() / 1000),
+    })
+    : trade.exitDate;
+  // Compare calendar dates at UTC midnight so DST and hours do not change the day count.
+  const [start, end] = [trade.date, endDate].map((date) => {
+    const timestamp = typeof date === 'string' ? Date.parse(`${date}T00:00:00Z`) : NaN;
+    return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === date
+      ? timestamp : null;
+  });
+  if (start == null || end == null || end < start) return null;
+  return (end - start) / 86_400_000;
+}
+
 export function tradeQuoteError(trade, quote) {
   if (quote.currency !== trade.quoteCurrency) {
     return 'Mata uang harga terakhir berbeda dari harga masuk.';

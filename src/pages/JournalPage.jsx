@@ -10,6 +10,7 @@ import UpdatedValue from '../components/UpdatedValue.jsx';
 import { accountTickerSymbols, normalizeTicker } from '../tickers.js';
 import {
   calculateTradePnl,
+  holdingPeriodDays,
   interpretProfitFactor,
   journalCurrencies,
   journalSetupOptions,
@@ -252,6 +253,7 @@ function TradeTable({
           <tr>
             <th scope="col" className="journal-ticker">Ticker</th>
             <th scope="col">Posisi</th>
+            <th scope="col" className="num">Holding period<small className="journal-trade-note">Hari kalender</small></th>
             {closed ? (
               <>
                 <th scope="col" className="num">PnL posisi</th>
@@ -288,6 +290,7 @@ function TradeTable({
             const currency = trade.quoteCurrency ?? manualCurrency;
             const realized = closed ? realizedTradePnl(trade, manualCurrency) : null;
             const entryPrecision = trade.stopLoss != null ? levelPrecision : undefined;
+            const holdingDays = holdingPeriodDays(trade);
             const actions = (
               <td className="num">
                 <div className="journal-row-actions">
@@ -322,6 +325,9 @@ function TradeTable({
                 <td>
                   <Badge meta={side} />
                   <small className="journal-trade-note">{journalTypes[trade.type]}</small>
+                </td>
+                <td className="num journal-holding-period">
+                  {holdingDays == null ? <span className="journal-trade-note">Belum tersedia</span> : `${holdingDays.toLocaleString('id-ID')} hari`}
                 </td>
                 {closed ? (
                   <>

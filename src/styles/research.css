@@ -18,6 +18,7 @@
 
 .watchlist-heading { align-items: center; }
 .watchlist-heading > div { flex: 1 1 18rem; min-width: 0; }
+.watchlist-page { max-width: none; }
 .research-workspace .page-heading p { font-size: 0.9375rem; }
 
 .research-panel {
@@ -35,7 +36,10 @@
   border-radius: var(--workspace-card-radius);
 }
 
-.research-panel.watchlist-panel { --research-symbol-width: clamp(8.75rem, 13.5cqi, 11rem); }
+.research-panel.watchlist-panel {
+  --research-symbol-width: clamp(8rem, 11cqi, 10rem);
+  padding-inline: clamp(0.625rem, 1cqi, 1rem);
+}
 .research-panel-heading {
   align-items: center;
   padding: 1rem clamp(0.875rem, 2vw, 1.375rem);
@@ -269,15 +273,22 @@
 }
 
 .watchlist-table .research-badge { border-radius: 999px; }
-.watchlist-table :is(th, td) { padding-inline: 0.5rem; }
+.watchlist-table :is(th, td) { padding-inline: 0.4rem; }
+.watchlist-table thead th { white-space: normal; }
 .watchlist-table .watchlist-stage { text-align: center; }
 .watchlist-table .watchlist-stage .research-cell-note { min-width: 3.75rem; white-space: normal; }
 .watchlist-table .watchlist-average-volume { min-width: 6.25rem; white-space: normal; }
 .watchlist-header-note { display: block; font-weight: 400; white-space: nowrap; }
 
 .watchlist-table .watchlist-notes {
-  min-width: 9.25rem;
-  max-width: 16rem;
+  min-width: 7rem;
+  max-width: 12rem;
+  white-space: normal;
+}
+
+.watchlist-table :is(.watchlist-notes, .watchlist-image) .research-watch {
+  min-width: 0;
+  padding-inline: 0.45rem;
   white-space: normal;
 }
 
@@ -403,7 +414,7 @@
 }
 
 .watchlist-table .ptw-input {
-  width: 6rem;
+  width: 5.5rem;
   min-height: 2.75rem;
   padding: 0.4rem 0.55rem;
   border: 1px solid var(--field-border);

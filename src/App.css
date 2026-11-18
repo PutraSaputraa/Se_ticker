@@ -173,7 +173,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .skip-link:focus { transform: translateY(0); }
 
 .workspace-shell {
-  --workspace-gutter: clamp(1rem, 2.7vw, 2.6rem);
+  --workspace-gutter: clamp(0.75rem, 1.2vw, 1.25rem);
   min-height: 100dvh;
 }
 
@@ -248,13 +248,13 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 }
 
 .workspace {
-  width: min(100%, 100rem);
+  width: 100%;
   margin-inline: auto;
   padding-inline: var(--workspace-gutter);
 }
 
 .workspace-bar-inner {
-  width: min(var(--workspace-content-width), calc(100% - 2 * var(--workspace-gutter)));
+  width: calc(100% - 2 * var(--workspace-gutter));
   min-height: 4.2rem;
   margin-inline: auto;
   display: flex;
