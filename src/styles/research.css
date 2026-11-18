@@ -233,6 +233,16 @@
   color: var(--warning);
 }
 
+.research-badge--positive {
+  background: var(--positive-soft);
+  color: var(--positive);
+}
+
+.research-badge--negative {
+  background: var(--negative-soft);
+  color: var(--negative);
+}
+
 :is(.watchlist-panel, .recommend-panel, .backtest-panel) > .table-scroll-hint { margin-top: 0.75rem; padding: 0; border: 0; }
 
 :is(.watchlist-panel, .recommend-panel, .backtest-panel) .research-table-scroll {

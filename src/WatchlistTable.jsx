@@ -6,6 +6,7 @@ import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
 import UpdatedValue from './components/UpdatedValue.jsx';
 import { formatDateCompact, formatVolume } from './format.js';
+import { getStage2Score } from './stage2Score.js';
 
 // Skor Trend Template Minervini per simbol (analyze.js tanpa RS agar cepat).
 function useTrendScores(symbolsKey) {
@@ -25,9 +26,10 @@ function useTrendScores(symbolsKey) {
         const payload = await response.json().catch(() => null);
         if (gen !== generation.current) return;
         if (response.ok && payload?.trendTemplate) {
+          const { passed, total } = payload.trendTemplate;
           setScores((s) => ({
             ...s,
-            [symbol]: { passed: payload.trendTemplate.passed, total: payload.trendTemplate.total, eligible: payload.trendTemplate.eligible },
+            [symbol]: { passed, total },
           }));
         } else {
           setScores((s) => ({ ...s, [symbol]: null }));
@@ -115,9 +117,11 @@ function useWatchlistData(symbolsKey) {
 function TrendScoreBadge({ score }) {
   const { t } = useTranslation();
   if (score === undefined) return <span className="research-cell-note">{t("Memuat…")}</span>;
-  if (score === null) return <span className="research-cell-note">{t("Belum tersedia")}</span>;
+  const display = getStage2Score(score?.passed, score?.total);
+  if (!display) return <span className="research-cell-note">{t("Belum tersedia")}</span>;
+
   return (
-    <span className={`research-badge${score.eligible ? ' research-badge--support' : ''}`}
+    <span className={`research-badge research-badge--${display.tone}`}
       title={t("{0} dari {1} kriteria Stage 2 lolos", score.passed, score.total)}>
       {score.passed}/{score.total}
     </span>

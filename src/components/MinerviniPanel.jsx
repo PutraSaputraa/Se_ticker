@@ -2,6 +2,7 @@ import { getLocale } from '../i18n.js';
 import useTranslation from '../useTranslation.js';
 import { useState } from 'react';
 import { formatPct, formatPrice } from '../format.js';
+import { getStage2Score } from '../stage2Score.js';
 
 const statusMeta = {
   NOT_ELIGIBLE: { label: 'Belum memenuhi syarat', className: 'status--wait' },
@@ -39,12 +40,10 @@ function formatTrendValue(field, value, currency) {
 
 function TrendCriteriaMeter({ passed, total }) {
   const { t } = useTranslation();
-  const available = Number.isSafeInteger(passed) && Number.isSafeInteger(total)
-    && total > 0 && passed >= 0 && passed <= total;
-  if (!available) return <span className="stock-rule-status">{t('Belum tersedia')}</span>;
+  const score = getStage2Score(passed, total);
+  if (!score) return <span className="stock-rule-status">{t('Belum tersedia')}</span>;
 
-  const ratio = passed / total;
-  const tone = ratio >= 0.75 ? 'high' : ratio >= 0.5 ? 'medium' : 'low';
+  const { ratio, tone } = score;
   return (
     <div className={`stock-criteria-score stock-criteria-score--${tone}`}>
       <span className="stock-criteria-count">{passed}/{total} {t('kriteria lolos')}</span>

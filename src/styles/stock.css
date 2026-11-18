@@ -500,11 +500,11 @@
   text-align: end;
 }
 
-.stock-criteria-score--high { --criteria-color: var(--positive); }
-.stock-criteria-score--medium { --criteria-color: #c59b10; }
-.stock-criteria-score--low { --criteria-color: var(--negative); }
+.stock-criteria-score--positive { --criteria-color: var(--positive); }
+.stock-criteria-score--warning { --criteria-color: #c59b10; }
+.stock-criteria-score--negative { --criteria-color: var(--negative); }
 
-:root[data-theme="dark"] .stock-criteria-score--medium { --criteria-color: var(--warning); }
+:root[data-theme="dark"] .stock-criteria-score--warning { --criteria-color: var(--warning); }
 
 .stock-criteria-track {
   height: 0.4375rem;
