@@ -1,5 +1,5 @@
 import { getStore } from '@netlify/blobs';
-import { scanWaitMs } from './shared/scanCore.js';
+import { scanMode, scanWaitMs } from './shared/scanCore.js';
 
 const dispatchError = 'Pekerja pemindaian belum bisa dimulai. Coba lagi.';
 
@@ -15,7 +15,7 @@ export default async function breakoutStart(request) {
 
   try {
     const params = new URL(request.url).searchParams;
-    const mode = params.get('mode') === 'research' ? 'research' : 'scan';
+    const mode = scanMode(params.get('mode'));
     const region = params.get('region') ?? 'auto';
     const language = params.get('lang') === 'en' ? 'en' : 'id';
 

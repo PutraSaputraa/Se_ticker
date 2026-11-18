@@ -8,7 +8,7 @@ import ResearchRequestStatus, { ResearchProgress } from './components/ResearchRe
 import UpdatedValue from './components/UpdatedValue.jsx';
 import { formatDateCompact, formatPct } from './format.js';
 
-const scanErrorMessage = 'Pemindaian breakout gagal. Coba lagi nanti.';
+import { requestScanResult } from './scanRequest.js';
 const { volumeMinRatio, volumeLookback } = defaultBreakoutParams;
 const ratioFormat = localizedNumberFormat({ maximumFractionDigits: 2 });
 const countFormat = localizedNumberFormat();
@@ -23,21 +23,6 @@ const regions = [
   { value: 'ss', label: 'Shanghai' },
   { value: 'sz', label: 'Shenzhen' },
 ];
-
-function waitForNextPoll(signal) {
-  signal.throwIfAborted();
-  return new Promise((resolve, reject) => {
-    function abort() {
-      window.clearTimeout(pollTimer);
-      reject(signal.reason);
-    }
-    const pollTimer = window.setTimeout(() => {
-      signal.removeEventListener('abort', abort);
-      resolve();
-    }, 2000);
-    signal.addEventListener('abort', abort, { once: true });
-  });
-}
 
 function WatchAction({ symbol, inWatchlist, disabled, onAdd }) {
   const { t } = useTranslation();
@@ -288,64 +273,22 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     const { signal } = controller;
     activeScan.current = controller;
     setRequest({ status: 'starting' });
-    let deadline;
-
     try {
-      // Mulai job di background untuk menghindari timeout function sinkron.
-      const query = new URLSearchParams({ mode: targetMode, region: targetRegion, lang: language });
-      const startResponse = await fetch(`/.netlify/functions/breakout-start?${query}`, {
-        method: 'POST',
-        signal,
+      const data = await requestScanResult(targetMode, targetRegion, language, controller, (status) => {
+        setRequest(current => current.status === status ? current : { status });
       });
-      const startPayload = await startResponse.json().catch(() => null);
-      signal.throwIfAborted();
-      if (!startResponse.ok || !startPayload?.jobId) {
-        setRequest({ status: 'error', message: startPayload?.error || scanErrorMessage });
-        return;
+      if (targetMode === 'research' && data.ai?.error) {
+        setRequest({ status: 'error', message: data.ai.error });
+      } else {
+        setLastResult({ mode: targetMode, data: { ...data, language: data.language ?? language } });
+        setRequest({ status: 'success' });
       }
-
-      const jobId = startPayload.jobId;
-      const statusUrl = `/.netlify/functions/breakout-status?${new URLSearchParams({ jobId })}`;
-      deadline = window.setTimeout(
-        () => controller.abort(new DOMException('Pemindaian terlalu lama. Coba lagi.', 'TimeoutError')),
-        startPayload.waitMs ?? 150_000,
-      );
-
-      while (true) {
-        await waitForNextPoll(signal);
-        signal.throwIfAborted();
-
-        const statusResponse = await fetch(statusUrl, { signal, cache: 'no-store' });
-        const statusPayload = await statusResponse.json().catch(() => null);
-        signal.throwIfAborted();
-
-        const status = statusPayload?.status;
-        if (!statusResponse.ok || status === 'error') {
-          setRequest({ status: 'error', message: statusPayload?.error || scanErrorMessage });
-          return;
-        }
-        if (status === 'done') {
-          const data = statusPayload.result;
-          const error = !data ? scanErrorMessage : targetMode === 'research' && data.ai?.error;
-          if (error) {
-            setRequest({ status: 'error', message: error });
-          } else {
-            setLastResult({ mode: targetMode, data: { ...data, language: data.language ?? language } });
-            setRequest({ status: 'success' });
-          }
-          return;
-        }
-        if (status === 'pending' || status === 'running') {
-          setRequest((current) => current.status === status ? current : { status });
-        }
-      }
-    } catch {
+    } catch (error) {
       if (activeScan.current === controller) {
-        const message = signal.reason?.name === 'TimeoutError' ? signal.reason.message : scanErrorMessage;
+        const message = signal.reason?.name === 'TimeoutError' ? signal.reason.message : error.message;
         setRequest({ status: 'error', message });
       }
     } finally {
-      window.clearTimeout(deadline);
       if (activeScan.current === controller) activeScan.current = null;
     }
   }

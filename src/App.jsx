@@ -1,5 +1,5 @@
 import useTranslation from './useTranslation.js';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Route, Routes, useLocation, useMatch, useNavigationType } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from './firebase.js';
@@ -16,10 +16,13 @@ import RecommendPage from './pages/RecommendPage.jsx';
 import BacktestPage from './pages/BacktestPage.jsx';
 import JournalPage from './pages/JournalPage.jsx';
 
+const ScreenerPage = lazy(() => import('./pages/ScreenerPage.jsx'));
+
 const navigation = [
   { to: '/', name: 'Cari saham', mobile: 'Cari', icon: 'search' },
   { to: '/watchlist', name: 'Pantauan', icon: 'watch' },
   { to: '/rekomendasi', name: 'Rekomendasi', mobile: 'Riset', icon: 'scan' },
+  { to: '/screener', name: 'Screener', mobile: 'Filter', icon: 'filter' },
   { to: '/uji-strategi', name: 'Uji strategi', mobile: 'Uji strategi', icon: 'test' },
   { to: '/jurnal', name: 'Jurnal', icon: 'journal' },
 ];
@@ -184,6 +187,7 @@ export default function App({ user }) {
             <Route path="/stock/:symbol" element={<StockDetailPage account={account} />} />
             <Route path="/watchlist" element={<WatchlistPage account={account} uid={user.uid} />} />
             <Route path="/rekomendasi" element={<RecommendPage account={account} />} />
+            <Route path="/screener" element={<Suspense fallback={<p role="status">{t('Memuat…')}</p>}><ScreenerPage userId={user.uid} /></Suspense>} />
             <Route path="/uji-strategi" element={<BacktestPage />} />
             <Route path="/jurnal" element={<JournalPage account={account} uid={user.uid} />} />
             <Route path="*" element={<HomePage account={account} />} />

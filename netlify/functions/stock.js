@@ -1,3 +1,4 @@
+import { fetchFundamentals } from './shared/fundamentals.js';
 import {
   calculateBuyTrigger,
   dayMilliseconds,
@@ -65,42 +66,6 @@ function findPreviousWeekClose(sessions, marketDay) {
     date >= lastMonday && date < thisMonday && Number.isFinite(close));
 
   return lastSession ? { date: lastSession.date, close: lastSession.close } : null;
-}
-
-// Fundamental: EPS & Revenue tahunan + kuartalan (best effort dari Yahoo).
-async function fetchFundamentals(symbol) {
-  const url = `https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(symbol)}?lang=en-US&region=US&padTimeSeries=true&type=quarterlyDilutedEPS,quarterlyTotalRevenue,annualDilutedEPS,annualTotalRevenue&merge=false&period1=1609459200&period2=4102444800`;
-  try {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!response.ok) return null;
-    const data = await response.json().catch(() => null);
-    const series = data?.timeseries?.result;
-    if (!Array.isArray(series)) return null;
-
-    const collect = (key) => {
-      const entry = series.find((item) => Array.isArray(item?.[key]) && item[key].length > 0);
-      if (!entry) return [];
-      return entry[key]
-        .map((point) => ({
-          date: point?.asOfDate ?? null,
-          value: Number.isFinite(point?.reportedValue?.raw) ? point.reportedValue.raw : null,
-        }))
-        .filter((point) => point.date && point.value !== null);
-    };
-
-    const quarterlyEps = collect('quarterlyDilutedEPS');
-    const quarterlyRevenue = collect('quarterlyTotalRevenue');
-    const annualEps = collect('annualDilutedEPS');
-    const annualRevenue = collect('annualTotalRevenue');
-    if (!quarterlyEps.length && !annualRevenue.length) return null;
-
-    return { quarterlyEps, quarterlyRevenue, annualEps, annualRevenue };
-  } catch {
-    return null;
-  }
 }
 
 // Analisis turunan: status breakout, target, risiko, potensi.

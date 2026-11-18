@@ -8,6 +8,8 @@ import {
 } from './sessionLogic.js';
 import { analyzeBaseBreakout } from './breakoutLogic.js';
 import { getUniverse, universeRegions } from './universe.js';
+import { fetchFundamentals } from './fundamentals.js';
+import { screenerRow } from './screener.js';
 
 const fetchConcurrency = 4;
 const fetchTimeoutMs = 8_000;
@@ -46,7 +48,11 @@ export function scanWaitMs(mode, region) {
     const batches = Math.ceil(getUniverse(market).symbols.length / fetchConcurrency);
     return total + batches * fetchTimeoutMs;
   }, 0);
-  return yahooWaitMs + aiTimeoutMs + 30_000;
+  return mode === 'screener' ? 2 * yahooWaitMs + 30_000 : yahooWaitMs + aiTimeoutMs + 30_000;
+}
+
+export function scanMode(value) {
+  return value === 'research' || value === 'screener' ? value : 'scan';
 }
 
 const kenariHeaders = (apiKey) => ({
@@ -54,8 +60,8 @@ const kenariHeaders = (apiKey) => ({
   'Content-Type': 'application/json',
 });
 
-async function fetchDailySessions(symbol) {
-  const query = new URLSearchParams({ range: '9mo', interval: '1d' });
+async function fetchDailySessions(symbol, range) {
+  const query = new URLSearchParams({ range, interval: '1d' });
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`;
 
   const response = await fetch(url, {
@@ -76,7 +82,7 @@ async function fetchDailySessions(symbol) {
   });
   const sessions = readSessions(timestamps, quote, marketDate);
   const index = latestCompletedIndex(sessions, result.meta, marketDate);
-  if (index < 1) return null;
+  if (index < 0) return null;
 
   const name = [result.meta?.longName, result.meta?.shortName].find(
     (value) => typeof value === 'string' && value.trim(),
@@ -114,7 +120,7 @@ function toPick(evaluated, analysis) {
   };
 }
 
-async function scanRegion(region) {
+async function scanRegion(region, mode) {
   const { name, symbols } = getUniverse(region);
   let cursor = 0;
   const picks = [];
@@ -124,8 +130,14 @@ async function scanRegion(region) {
       const symbol = symbols[cursor];
       cursor += 1;
       try {
-        const evaluated = await fetchDailySessions(symbol);
+        const evaluated = await fetchDailySessions(symbol, mode === 'screener' ? '1y' : '9mo');
         if (!evaluated) continue;
+        if (mode === 'screener') {
+          const statements = await fetchFundamentals(symbol, true);
+          picks.push({ ...screenerRow(evaluated, statements), region, universe: name });
+          continue;
+        }
+        if (evaluated.index < 1) continue;
         const analysis = analyzeBaseBreakout(evaluated.sessions, evaluated.index);
         if (analysis.qualifies) {
           picks.push({ ...toPick(evaluated, analysis), region, universe: name });
@@ -140,16 +152,16 @@ async function scanRegion(region) {
   return { picks, scanned: symbols.length, universeName: name };
 }
 
-async function scanMath(regions) {
+async function scanMath(regions, mode) {
   const results = [];
   for (const region of regions) {
     // eslint-disable-next-line no-await-in-loop
-    results.push(await scanRegion(region));
+    results.push(await scanRegion(region, mode));
   }
-  const picks = results
-    .flatMap((result) => result.picks)
-    .sort((a, b) => (b.volumeRatio ?? 0) - (a.volumeRatio ?? 0))
-    .slice(0, maxScanResults);
+  const rows = results.flatMap(result => result.picks);
+  const picks = mode === 'screener'
+    ? rows.sort((a, b) => a.symbol.localeCompare(b.symbol))
+    : rows.sort((a, b) => (b.volumeRatio ?? 0) - (a.volumeRatio ?? 0)).slice(0, maxScanResults);
   const scanned = results.reduce((sum, result) => sum + result.scanned, 0);
   const universeName = regions.length === 1 ? results[0].universeName : `${regions.length} bursa`;
   return { picks, scanned, universeName };
@@ -335,7 +347,11 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
     };
   }
 
-  const { picks, scanned, universeName } = await scanMath(regions);
+  const { picks, scanned, universeName } = await scanMath(regions, mode);
+  if (mode === 'screener') {
+    if (!picks.length) throw new Error('Data harga screener belum tersedia.');
+    return { mode, language, region: regionParam, universe: universeName, scanned, results: picks };
+  }
   const referenceDate = picks[0]?.date ?? new Date().toISOString().slice(0, 10);
 
   let ai = { summary: '', notes: [], configured: Boolean(apiKey) };

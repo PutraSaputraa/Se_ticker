@@ -1001,7 +1001,7 @@ a.symbol-badge:hover { text-decoration: underline; }
     position: fixed;
     inset: auto 0 0;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0.18rem;
     padding: 0.32rem 0.4rem calc(0.32rem + env(safe-area-inset-bottom));
     background: var(--nav-surface);

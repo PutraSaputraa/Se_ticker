@@ -30,7 +30,7 @@ export const minerviniDefaults = {
   rvolMin: 1.5,              // konfirmasi volume breakout
 };
 
-function sma(values, end, period) {
+export function sma(values, end, period) {
   const start = end - period + 1;
   if (start < 0) return null;
   let sum = 0;
