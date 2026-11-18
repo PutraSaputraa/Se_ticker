@@ -42,7 +42,7 @@ Gunakan `--workspace-on-action` di tombol biru. Pasangkan `--support-text` denga
 
 ## Komposisi halaman
 
-- **Shell.** Sidebar navy, indikator tepi, dan ikon teal menunjukkan lokasi aktif. Topbar memuat konteks halaman, tema, dan akun. Navigasi bawah dipakai hingga lebar viewport 58 rem.
+- **Shell.** Navbar navy di atas memuat brand, menu utama, pengaturan tema, dan akun. Ikon teal dan garis bawah menandai menu aktif. Hingga lebar viewport 58 rem, menu tampil di bawah dan kontrol akun tetap di atas.
 - **Cari saham.** Judul, form, dan contoh ticker berada di panel utama. Riwayat berfungsi sebagai daftar pindai cepat di samping atau di bawahnya. Pintasan Pantauan dan Rekomendasi memakai tautan yang sudah tersedia.
 - **Detail saham.** Identitas dan penutupan berada di header. Candlestick memakai kolom utama. Di ruang konten mulai 52 rem, Rencana trading dan rincian sesi memakai kolom samping. Di lebar yang lebih sempit, bagian itu mengikuti grafik. Buy Trigger, Stop loss, Target, dan Resistance memakai label dan aksen semantik. Baca nilai sesi lewat pointer, sentuhan, atau tombol panah.
 - **Pantauan.** Pertahankan ticker semat, isian harga, catatan, gambar, dan aksi baris. Bintang tampil sebagai tombol di desktop dan pemilih besar di layar sempit atau perangkat sentuh. Status penyimpanan berada di toolbar tabel.

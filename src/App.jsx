@@ -31,27 +31,24 @@ function Brand() {
   );
 }
 
-function Sidebar() {
+function WorkspaceNav() {
   const stock = useMatch('/stock/:symbol');
   return (
-    <aside className="workspace-sidebar">
-      <Brand />
-      <nav className="workspace-nav" aria-label="Menu utama">
-        {navigation.map(({ to, name, mobile, icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            aria-label={name}
-            className={({ isActive }) => `workspace-nav-link${isActive || (stock && to === '/') ? ' workspace-nav-link--active' : ''}`}
-          >
-            <WorkspaceIcon name={icon} />
-            <span className="workspace-nav-name">{name}</span>
-            <span className="workspace-nav-mobile" aria-hidden="true">{mobile ?? name}</span>
-          </NavLink>
-        ))}
-      </nav>
-    </aside>
+    <nav className="workspace-nav" aria-label="Menu utama">
+      {navigation.map(({ to, name, mobile, icon }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={to === '/'}
+          aria-label={name}
+          className={({ isActive }) => `workspace-nav-link${isActive || (stock && to === '/') ? ' workspace-nav-link--active' : ''}`}
+        >
+          <WorkspaceIcon name={icon} />
+          <span className="workspace-nav-name">{name}</span>
+          <span className="workspace-nav-mobile" aria-hidden="true">{mobile ?? name}</span>
+        </NavLink>
+      ))}
+    </nav>
   );
 }
 
@@ -61,8 +58,6 @@ function TopBar({ user }) {
   const accountMenu = useRef(null);
   const header = useRef(null);
   const { pathname } = useLocation();
-  const stock = useMatch('/stock/:symbol');
-  const section = navigation.find(({ to }) => to === pathname) ?? navigation[0];
 
   // Topbar menempel di atas konten, jadi tinggi aslinya menentukan jarak aman
   // untuk scroll ke anchor. Tinggi berubah mengikuti breakpoint dan ukuran teks.
@@ -104,10 +99,7 @@ function TopBar({ user }) {
       <header className="workspace-bar" ref={header}>
         <div className="workspace-bar-inner">
           <Brand />
-          <div className="workspace-location">
-            <span className="workspace-location-icon"><WorkspaceIcon name={stock ? 'test' : section.icon} size={17} /></span>
-            <strong>{stock ? 'Detail saham' : section.name}</strong>
-          </div>
+          <WorkspaceNav />
           <div className="account-controls">
             <ThemeToggle />
             <details className="account-menu" key={pathname} ref={accountMenu}
@@ -166,38 +158,35 @@ export default function App({ user }) {
   return (
     <div className="workspace-shell">
       <a className="skip-link" href="#workspace-content">Lewati ke konten</a>
-      <Sidebar />
-      <div className="workspace-body">
-        <TopBar user={user} />
-        <main className="workspace" id="workspace-content" tabIndex={-1}>
-          {account.error && (
-            <div className="account-message account-message--error" role="alert">
-              <p>{account.error}</p>
-              {account.readError && <button type="button" className="text-button" onClick={account.retry}>Coba lagi</button>}
-            </div>
-          )}
-          {(legacy.watchlist.length > 0 || legacy.history.length > 0) && (
-            <div className="legacy-import">
-              <p>Data lama di browser ini tersedia. Impor {legacy.watchlist.length} saham pantauan dan {legacy.history.length} riwayat pencarian ke akun {user.email}.</p>
-              <button type="button" className="account-signout" disabled={!account.ready || account.pending} onClick={importLegacy}>Impor ke akun</button>
-            </div>
-          )}
-
-          <div className="workspace-route">
-            <Routes>
-              <Route path="/" element={<HomePage account={account} />} />
-              <Route path="/stock/:symbol" element={<StockDetailPage account={account} />} />
-              <Route path="/watchlist" element={<WatchlistPage account={account} uid={user.uid} />} />
-              <Route path="/rekomendasi" element={<RecommendPage account={account} />} />
-              <Route path="/uji-strategi" element={<BacktestPage />} />
-              <Route path="/jurnal" element={<JournalPage account={account} uid={user.uid} />} />
-              <Route path="*" element={<HomePage account={account} />} />
-            </Routes>
+      <TopBar user={user} />
+      <main className="workspace" id="workspace-content" tabIndex={-1}>
+        {account.error && (
+          <div className="account-message account-message--error" role="alert">
+            <p>{account.error}</p>
+            {account.readError && <button type="button" className="text-button" onClick={account.retry}>Coba lagi</button>}
           </div>
+        )}
+        {(legacy.watchlist.length > 0 || legacy.history.length > 0) && (
+          <div className="legacy-import">
+            <p>Data lama di browser ini tersedia. Impor {legacy.watchlist.length} saham pantauan dan {legacy.history.length} riwayat pencarian ke akun {user.email}.</p>
+            <button type="button" className="account-signout" disabled={!account.ready || account.pending} onClick={importLegacy}>Impor ke akun</button>
+          </div>
+        )}
 
-          <footer className="source">Data historis dari Yahoo Finance.</footer>
-        </main>
-      </div>
+        <div className="workspace-route">
+          <Routes>
+            <Route path="/" element={<HomePage account={account} />} />
+            <Route path="/stock/:symbol" element={<StockDetailPage account={account} />} />
+            <Route path="/watchlist" element={<WatchlistPage account={account} uid={user.uid} />} />
+            <Route path="/rekomendasi" element={<RecommendPage account={account} />} />
+            <Route path="/uji-strategi" element={<BacktestPage />} />
+            <Route path="/jurnal" element={<JournalPage account={account} uid={user.uid} />} />
+            <Route path="*" element={<HomePage account={account} />} />
+          </Routes>
+        </div>
+
+        <footer className="source">Data historis dari Yahoo Finance.</footer>
+      </main>
     </div>
   );
 }
