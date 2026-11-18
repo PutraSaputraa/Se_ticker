@@ -61,6 +61,47 @@ test('tabel harian memakai penutupan sesi sebelumnya di luar tujuh baris dan saa
   assert.deepEqual(recentBars.map(({ previousClose }) => previousClose), [107, 101, 101, 99, null, 102, 100]);
 });
 
+test('tutup minggu lalu memakai sesi terakhir minggu bursa dan menangani data yang belum tersedia', async (t) => {
+  let now;
+  t.mock.method(Date, 'now', () => now);
+  const dates = [
+    '2024-03-22', '2024-03-26', '2024-03-28', '2024-03-29',
+    '2024-04-01', '2024-04-02', '2024-04-04', '2024-04-12',
+  ];
+  const close = [100, 101, 104, null, 105, 107, 108, null];
+  t.mock.method(globalThis, 'fetch', async (input) => {
+    if (!new URL(input).pathname.includes('/chart/')) return new Response(null, { status: 503 });
+    return Response.json({ chart: { result: [{
+      meta: { symbol: 'NVDA', currency: 'USD', exchangeTimezoneName: 'America/New_York' },
+      timestamp: dates.map((date) => Date.parse(`${date}T14:30:00Z`) / 1000),
+      indicators: { quote: [{
+        open: close.map(() => 103),
+        high: close.map(() => 109),
+        low: close.map(() => 99),
+        close,
+        volume: close.map(() => 1_000),
+      }] },
+    }] } });
+  });
+
+  const thursdayClose = { date: '2024-03-28', close: 104 };
+  const cases = [
+    ['2024-04-01T01:00:00Z', '2024-03-28', { date: '2024-03-22', close: 100 }],
+    ['2024-04-01T12:00:00Z', '2024-03-28', thursdayClose],
+    ['2024-04-03T12:00:00Z', '2024-04-02', thursdayClose],
+    ['2024-04-16T12:00:00Z', '2024-04-04', null],
+    ['2024-04-23T12:00:00Z', '2024-04-04', null],
+  ];
+  for (const [time, latestDate, expected] of cases) {
+    now = Date.parse(time);
+    const response = await stock(new Request('http://localhost/stock?symbol=NVDA'));
+    assert.equal(response.status, 200, time);
+    const detail = await response.json();
+    assert.equal(detail.date, latestDate, time);
+    assert.deepEqual(detail.previousWeekClose, expected, time);
+  }
+});
+
 test('ticker yang tidak ditemukan memakai kode yang bisa dibedakan dari sesi tidak lengkap', async (t) => {
   const fetchChart = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 404 }));
   const response = await stock(new Request('http://localhost/stock?symbol=HUMA.JK'));

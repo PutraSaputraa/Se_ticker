@@ -9,6 +9,7 @@ import UpdatedValue from '../components/UpdatedValue.jsx';
 import {
   formatCompactNumber,
   formatDate,
+  formatDateCompact,
   formatPct,
   formatPrice,
   formatVolume,
@@ -73,6 +74,39 @@ function CloseChange({ close, previousClose }) {
       <span className="visually-hidden">{t(direction.label)} </span>
       {percent}
     </span>
+  );
+}
+
+function WeeklyCloseSummary({ quote }) {
+  const { t } = useTranslation();
+  const reference = quote.previousWeekClose;
+
+  return (
+    <dl className="stock-week-close">
+      <div>
+        <dt>{t("Tutup minggu lalu")}</dt>
+        <dd>
+          {reference ? (
+            <>
+              <strong>{formatPrice(reference.close, quote.currency)}</strong>
+              <time className="stock-muted" dateTime={reference.date} title={formatDate(reference.date)}>
+                {formatDateCompact(reference.date)}
+              </time>
+            </>
+          ) : <span className="stock-muted">{t("Tidak tersedia")}</span>}
+        </dd>
+      </div>
+      {reference && (
+        <div>
+          <dt>{t("Perubahan minggu ini")}</dt>
+          <dd>
+            {quote.date > reference.date
+              ? <CloseChange close={quote.close} previousClose={reference.close} />
+              : <span className="stock-muted">{t("Belum ada sesi yang tutup")}</span>}
+          </dd>
+        </div>
+      )}
+    </dl>
   );
 }
 
@@ -488,7 +522,10 @@ function StockDetail({ symbol, account }) {
           )}
 
           <section className="stock-data-section" aria-labelledby="daily-title">
-            <h2 id="daily-title">{t("Harga harian (OHLCV)")}</h2>
+            <div className="stock-section-heading">
+              <h2 id="daily-title">{t("Harga harian (OHLCV)")}</h2>
+              {quote.recentBars?.length > 0 && <WeeklyCloseSummary quote={quote} />}
+            </div>
             {quote.recentBars?.length ? (
               <TableScroll className="stock-table-scroll" label={t("Tabel harga harian")}>
                 <table className="fund-table stock-ohlcv-table">

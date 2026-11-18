@@ -1,5 +1,6 @@
 import {
   calculateBuyTrigger,
+  dayMilliseconds,
   latestCompletedIndex,
   readSessions,
 } from './shared/sessionLogic.js';
@@ -51,7 +52,19 @@ async function fetchSessions(symbol, range, interval) {
   const index = latestCompletedIndex(sessions, result.meta, marketDate);
   if (index < 0) return { noData: true };
 
-  return { result, sessions, index };
+  return { result, sessions, index, marketDay: marketDate.format(Date.now()) };
+}
+
+function findPreviousWeekClose(sessions, marketDay) {
+  const day = new Date(`${marketDay}T00:00:00Z`);
+  const daysSinceMonday = (day.getUTCDay() + 6) % 7;
+  const weekStart = day.getTime() - daysSinceMonday * dayMilliseconds;
+  const thisMonday = new Date(weekStart).toISOString().slice(0, 10);
+  const lastMonday = new Date(weekStart - 7 * dayMilliseconds).toISOString().slice(0, 10);
+  const lastSession = sessions.findLast(({ date, close }) =>
+    date >= lastMonday && date < thisMonday && Number.isFinite(close));
+
+  return lastSession ? { date: lastSession.date, close: lastSession.close } : null;
 }
 
 // Fundamental: EPS & Revenue tahunan + kuartalan (best effort dari Yahoo).
@@ -163,7 +176,7 @@ export default async function stock(request) {
     if (daily.failed) return errorResponse('Yahoo Finance gagal menyediakan data. Coba lagi nanti.', 502);
     if (daily.noData) return errorResponse(noData, 404);
 
-    const { result, sessions, index } = daily;
+    const { result, sessions, index, marketDay } = daily;
     const meta = result.meta;
     const session = sessions[index];
     if (typeof meta?.currency !== 'string' || !meta.currency.trim()) {
@@ -220,6 +233,7 @@ export default async function stock(request) {
       analysis,
       priceHistory,
       recentBars,
+      previousWeekClose: findPreviousWeekClose(sessions, marketDay),
       range: rangeKey,
       rangeLabel: rangeCfg.label,
       availableRanges: Object.entries(chartRanges).map(([value, cfg]) => ({ value, label: cfg.label })),
