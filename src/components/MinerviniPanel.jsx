@@ -37,14 +37,34 @@ function formatTrendValue(field, value, currency) {
   return formatPrice(value, currency);
 }
 
+function TrendCriteriaMeter({ passed, total }) {
+  const { t } = useTranslation();
+  const available = Number.isSafeInteger(passed) && Number.isSafeInteger(total)
+    && total > 0 && passed >= 0 && passed <= total;
+  if (!available) return <span className="stock-rule-status">{t('Belum tersedia')}</span>;
+
+  const ratio = passed / total;
+  const tone = ratio >= 0.75 ? 'high' : ratio >= 0.5 ? 'medium' : 'low';
+  return (
+    <div className={`stock-criteria-score stock-criteria-score--${tone}`}>
+      <span className="stock-criteria-count">{passed}/{total} {t('kriteria lolos')}</span>
+      <div className="stock-criteria-track" role="meter" aria-labelledby="stock-stage-title"
+        aria-valuemin={0} aria-valuemax={total} aria-valuenow={passed}
+        aria-valuetext={t('{0} dari {1} kriteria Stage 2 lolos', passed, total)}>
+        <span className="stock-criteria-fill" style={{ transform: `scaleX(${ratio})` }} />
+      </div>
+    </div>
+  );
+}
+
 function TrendRules({ trendTemplate, currency }) {
   const { t } = useTranslation();
-  const { passed, total, eligible, rules = [], values = {} } = trendTemplate;
+  const { passed, total, rules = [], values = {} } = trendTemplate;
   return (
     <section className="stock-trend-module" aria-labelledby="stock-stage-title">
       <div className="stock-section-heading">
         <h3 id="stock-stage-title">{t("Tren Stage 2")}</h3>
-        <span className={`stock-rule-status${eligible ? ' stock-rule-status--pass' : ''}`}>{passed}/{total} {t("kriteria lolos")}</span>
+        <TrendCriteriaMeter passed={passed} total={total} />
       </div>
       {rules.length > 0 ? (
         <ul className="stock-trend-rules">
