@@ -1,4 +1,4 @@
-import { getLocale } from '../i18n.js';
+import { getLocale, localizedNumberFormat } from '../i18n.js';
 import useTranslation from '../useTranslation.js';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -19,6 +19,12 @@ import '../styles/stock.css';
 
 const serviceError = 'Layanan harga tidak dapat diakses. Coba lagi.';
 const defaultRange = '3m';
+const closeChangeFormat = localizedNumberFormat({
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  signDisplay: 'exceptZero',
+});
+const smallCloseChangeFormat = localizedNumberFormat({ maximumFractionDigits: 2 });
 
 const breakoutStatusMeta = {
   breakout: { label: 'Sedang breakout', className: 'status--breakout' },
@@ -37,6 +43,37 @@ function percentFromReference(value, reference) {
   return Number.isFinite(value) && Number.isFinite(reference) && reference > 0
     ? ((value - reference) / reference) * 100
     : null;
+}
+
+function CloseChange({ close, previousClose }) {
+  const { t } = useTranslation();
+  const change = percentFromReference(close, previousClose);
+  if (!Number.isFinite(change)) {
+    return (
+      <span className="stock-close-change stock-muted" title={t("Tidak tersedia")}>
+        <span aria-hidden="true">–</span>
+        <span className="visually-hidden">{t("Tidak tersedia")}</span>
+      </span>
+    );
+  }
+
+  const direction = change > 0
+    ? { tone: 'trend--up', arrow: '↑', label: 'Naik' }
+    : change < 0
+      ? { tone: 'trend--down', arrow: '↓', label: 'Turun' }
+      : { tone: 'stock-muted', arrow: '→', label: 'Tidak berubah' };
+  const isSmallChange = change !== 0 && Math.abs(change) < 0.01;
+  const percent = isSmallChange
+    ? `<${smallCloseChangeFormat.format(0.01)}%`
+    : `${closeChangeFormat.format(change)}%`;
+
+  return (
+    <span className={`stock-close-change ${direction.tone}`}>
+      <span aria-hidden="true">{direction.arrow} </span>
+      <span className="visually-hidden">{t(direction.label)} </span>
+      {percent}
+    </span>
+  );
 }
 
 function entryContext(distance) {
@@ -458,20 +495,31 @@ function StockDetail({ symbol, account }) {
                   <thead>
                     <tr>
                       <th>{t("Tanggal")}</th><th className="num">{t("Buka")}</th><th className="num">{t("Tertinggi")}</th>
-                      <th className="num">{t("Terendah")}</th><th className="num">{t("Tutup")}</th><th className="num">{t("Volume")}</th>
+                      <th className="num">{t("Terendah")}</th>
+                      <th className="num">
+                        {t("Tutup")}
+                        <small className="stock-close-comparison">{t("vs. tutup sesi sebelumnya")}</small>
+                      </th>
+                      <th className="num">{t("Volume")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {quote.recentBars.map((bar) => (
-                      <tr key={bar.date}>
-                        <td><time dateTime={bar.date}>{formatDate(bar.date)}</time></td>
-                        <td className="num">{formatPrice(bar.open, currency)}</td>
-                        <td className="num">{formatPrice(bar.high, currency)}</td>
-                        <td className="num">{formatPrice(bar.low, currency)}</td>
-                        <td className="num">{formatPrice(bar.close, currency)}</td>
-                        <td className="num" title={formatVolume(bar.volume)}>{formatCompactNumber(bar.volume)}</td>
-                      </tr>
-                    ))}
+                    {quote.recentBars.map((bar, index, bars) => {
+                      const { previousClose = bars[index + 1]?.close } = bar;
+                      return (
+                        <tr key={bar.date}>
+                          <td><time dateTime={bar.date}>{formatDate(bar.date)}</time></td>
+                          <td className="num">{formatPrice(bar.open, currency)}</td>
+                          <td className="num">{formatPrice(bar.high, currency)}</td>
+                          <td className="num">{formatPrice(bar.low, currency)}</td>
+                          <td className="num">
+                            {formatPrice(bar.close, currency)}
+                            <CloseChange close={bar.close} previousClose={previousClose} />
+                          </td>
+                          <td className="num" title={formatVolume(bar.volume)}>{formatCompactNumber(bar.volume)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </TableScroll>

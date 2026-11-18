@@ -192,10 +192,14 @@ export default async function stock(request) {
       .map(({ date, open, high, low, close, volume }) => ({ date, open, high, low, close, volume }));
 
     // OHLCV beberapa sesi terakhir untuk tabel harian.
+    const recentStart = Math.max(0, index - 6);
     const recentBars = sessions
-      .slice(Math.max(0, index - 6), index + 1)
-      .reverse()
-      .map(({ date, open, high, low, close, volume }) => ({ date, open, high, low, close, volume }));
+      .slice(recentStart, index + 1)
+      .map((bar, offset) => ({
+        ...bar,
+        previousClose: sessions[recentStart + offset - 1]?.close ?? null,
+      }))
+      .reverse();
 
     const fundamentals = await fetchFundamentals(symbol);
 
