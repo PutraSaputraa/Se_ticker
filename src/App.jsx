@@ -8,6 +8,7 @@ import { clearLegacyData, mergeLegacyData, readLegacyData } from './accountData.
 import BrandMark from './components/BrandMark.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
 import LanguageSwitcher from './components/LanguageSwitcher.jsx';
+import SupportButton from './components/SupportButton.jsx';
 import WorkspaceIcon from './components/WorkspaceIcon.jsx';
 import HomePage from './pages/HomePage.jsx';
 import StockDetailPage from './pages/StockDetailPage.jsx';
@@ -194,7 +195,10 @@ export default function App({ user }) {
           </Routes>
         </div>
 
-        <footer className="source">{t("Data historis dari Yahoo Finance.")}</footer>
+        <footer className="source">
+          <span>{t("Data historis dari Yahoo Finance.")}</span>
+          <SupportButton />
+        </footer>
       </main>
     </div>
   );

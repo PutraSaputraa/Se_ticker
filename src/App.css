@@ -445,6 +445,11 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 }
 
 .source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 1rem;
   margin-top: 2rem;
   padding-top: 0.8rem;
   border-top: 1px solid var(--border);

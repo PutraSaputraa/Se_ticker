@@ -1,0 +1,86 @@
+.support-trigger,
+.support-dialog-header button {
+  min-height: var(--touch-size);
+  min-width: var(--touch-size);
+}
+
+.support-dialog {
+  width: min(30rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  padding: clamp(1rem, 4vw, 1.5rem);
+  border: 1px solid var(--border);
+  border-radius: var(--workspace-card-radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-raised);
+  font-size: 0.9375rem;
+}
+
+.support-dialog::backdrop { background: var(--backdrop); }
+
+.support-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-block-end: 0.75rem;
+}
+
+.support-dialog-header h2 { font-size: 1.375rem; }
+
+.support-transfer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.support-transfer h3 {
+  color: var(--support-text);
+  font-size: 1rem;
+}
+
+.support-transfer p {
+  margin-block-start: 0.35rem;
+  color: var(--muted);
+}
+
+.support-qr {
+  display: block;
+  justify-self: center;
+}
+
+.support-address {
+  display: grid;
+  gap: 0.35rem;
+  margin-block: 1rem 0.75rem;
+  font-weight: 600;
+}
+
+.support-address textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--field);
+  font: 400 0.875rem/1.45 ui-monospace, Consolas, monospace;
+  overflow-wrap: anywhere;
+  resize: none;
+}
+
+.support-copy { width: 100%; }
+
+.support-copy-status {
+  min-height: 1.5em;
+  margin-block-start: 0.35rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 28rem) {
+  .support-transfer { grid-template-columns: minmax(0, 1fr); }
+}

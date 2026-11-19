@@ -86,6 +86,10 @@ git push -u origin main
 
 Impor repo GitHub di Netlify, pilih branch `main`, lalu jalankan deploy. Netlify membaca perintah build, direktori `dist`, dan direktori Functions dari `netlify.toml`. Isi variabel login `VITE_FIREBASE_*` dari `.env.example` pada environment Netlify sebelum build. Tambahkan domain aplikasi di **Authentication → Settings → Authorized domains**. Konfigurasi Vite dimasukkan saat build, sehingga perubahan variabel memerlukan deploy ulang.
 
+### Dukungan USDC
+
+Isi `VITE_SUPPORT_WALLET_ADDRESS` dengan alamat publik penerima USDC di jaringan Base. Saat alamat valid, tombol **Dukung SETicker** tampil di footer ruang kerja. QR dan tombol salin memakai alamat yang sama. Gunakan `.env.local` untuk pengembangan lokal atau scope **Builds** di Netlify untuk menayangkan tombol ke pengguna.
+
 ## Cara kerja
 
 - Pilih **AS** untuk ticker seperti `NVDA`, `MSFT`, dan `AAPL`. Pilih **Indonesia** untuk `BBCA` atau **Jepang** untuk `7203`. Mode **Otomatis** mengarahkan kode 3–4 digit ke Tokyo dan kode 2–5 huruf ke Indonesia, dengan `AAPL` sebagai pengecualian. Ticker yang sudah bersufiks dikirim langsung.
