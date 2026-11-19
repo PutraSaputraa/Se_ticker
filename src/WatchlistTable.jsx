@@ -116,7 +116,7 @@ function useWatchlistData(symbolsKey) {
 
 function TrendScoreBadge({ score }) {
   const { t } = useTranslation();
-  if (score === undefined) return <span className="research-cell-note">{t("Memuat…")}</span>;
+  if (score === undefined) return <span className="research-cell-note">{t("Memuatâ€¦")}</span>;
   const display = getStage2Score(score?.passed, score?.total);
   if (!display) return <span className="research-cell-note">{t("Belum tersedia")}</span>;
 
@@ -212,9 +212,9 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled 
 }
 
 const priceDirections = {
-  1: { icon: '↑', label: 'Naik dibanding harga buka', className: 'trend--up' },
+  1: { icon: 'â†‘', label: 'Naik dibanding harga buka', className: 'trend--up' },
   0: { icon: '=', label: 'Sama dengan harga buka', className: '' },
-  '-1': { icon: '↓', label: 'Turun dibanding harga buka', className: 'trend--down' },
+  '-1': { icon: 'â†“', label: 'Turun dibanding harga buka', className: 'trend--down' },
 };
 
 const starValues = [1, 2, 3, 4, 5];
@@ -240,13 +240,13 @@ function WatchlistRating({ symbol, rating, onSetRating, disabled }) {
             onClick={() => selectRating(value)}
           >
             <span aria-hidden="true" className={value <= rating ? 'watchlist-star-filled' : undefined}>
-              {value <= rating ? '★' : '☆'}
+              {value <= rating ? 'â˜…' : 'â˜†'}
             </span>
           </button>
         ))}
       </div>
       <div className="watchlist-rating-picker">
-        <span aria-hidden="true">{rating ? '★' : '☆'}</span>
+        <span aria-hidden="true">{rating ? 'â˜…' : 'â˜†'}</span>
         <select aria-label={t(label)} value={rating ?? ''} disabled={disabled}
           onChange={(event) => selectRating(Number(event.target.value))}>
           <option value="" disabled>{t("Bintang")}</option>
@@ -330,30 +330,29 @@ function WatchlistRow({ entry, row, formatPrice, onRemove, onSetWatchPrice, onSe
             </span>
             {quote.date && <time className="research-cell-note" dateTime={quote.date}>{formatDateCompact(quote.date)}</time>}
           </> : <span className={row?.status === 'error' ? 'research-quote-error' : 'research-cell-note'}>
-            {row?.status === 'error' ? t(row.message) : t('Memuat harga dan volume…')}
+            {row?.status === 'error' ? t(row.message) : t('Memuat harga dan volumeâ€¦')}
           </span>}
         </td>
         <td className="num"><PriceToWatchInput symbol={symbol} value={priceToWatch} decimals={decimals}
           onSetWatchPrice={onSetWatchPrice} disabled={disabled || !quote} /></td>
         <td>{quote ? <BreakoutBadge state={breakoutStatus(quote, priceToWatch).state} /> : <span className="research-cell-note">{t('Belum tersedia')}</span>}</td>
+        <td><WatchlistRating symbol={symbol} rating={rating} onSetRating={onSetRating} disabled={disabled} /></td>
+        <td className="watchlist-stage"><TrendScoreBadge score={trendScore} /></td>
+        <td className="num">
+          <span>{Number.isFinite(quote?.volume) ? quote.volume.toLocaleString(getLocale()) : t('Belum tersedia')}</span>
+          <CheckBadgeMini passed={volumePass} />
+        </td>
+        <td className="num watchlist-average-volume">
+          {quote ? formatVolume(quote.buyTrigger?.averageVolume, { includeUnit: false }) : t('Belum tersedia')}
+        </td>
         <td><button type="button" className="research-watch watchlist-disclosure" aria-expanded={expanded}
           aria-controls={detailsId} aria-label={`${t('Rincian')} ${symbol}`} onClick={() => setExpanded((value) => !value)}>
           <WorkspaceIcon name="chevron" size={14} /> <span>{t('Rincian')}</span>
         </button></td>
       </tr>
       <tr id={detailsId} hidden={!expanded} className="watchlist-detail-row">
-        <td colSpan={5}>
+        <td colSpan={9}>
           <div className="watchlist-details">
-            <section><h3>{t('Bintang')}</h3><WatchlistRating symbol={symbol} rating={rating} onSetRating={onSetRating} disabled={disabled} /></section>
-            <section><h3>{t('Stage 2')}</h3><TrendScoreBadge score={trendScore} /></section>
-            <section><h3>{t('Volume (lembar)')}</h3>
-              <span>{Number.isFinite(quote?.volume) ? quote.volume.toLocaleString(getLocale()) : t('Belum tersedia')}</span>
-              <CheckBadgeMini passed={volumePass} />
-            </section>
-            <section><h3>{t('Rata-rata volume')}</h3>
-              <span>{quote ? formatVolume(quote.buyTrigger?.averageVolume, { includeUnit: false }) : t('Belum tersedia')}</span>
-              <span className="research-cell-note">{t('50 sesi (lembar)')}</span>
-            </section>
             <section className="watchlist-notes"><h3>{t('Catatan')}</h3><WatchlistNotes entry={entry} onEdit={onEditEntry} disabled={disabled} /></section>
             <section className="watchlist-detail-actions watchlist-image">
               <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
@@ -395,6 +394,10 @@ export default function WatchlistTable({ entries, formatPrice, onRemove, onSetWa
             <th scope="col" className="num">{t("Harga tutup")}</th>
             <th scope="col" className="num">{t("Harga pantauan")}</th>
             <th scope="col">{t("Status")}</th>
+            <th scope="col">{t("Bintang")}</th>
+            <th scope="col">{t("Stage 2")}</th>
+            <th scope="col" className="num">{t("Volume (lembar)")}</th>
+            <th scope="col" className="num">{t("Rata-rata volume")}<span className="watchlist-header-note">{t('50 sesi (lembar)')}</span></th>
             <th scope="col">{t("Rincian")}</th>
           </tr>
         </thead>
