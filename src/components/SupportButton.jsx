@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import useTranslation from '../useTranslation.js';
+import WorkspaceIcon from './WorkspaceIcon.jsx';
 import '../styles/support.css';
 
 const walletAddress = import.meta.env.VITE_SUPPORT_WALLET_ADDRESS?.trim() ?? '';
@@ -59,10 +60,12 @@ export default function SupportButton() {
 
   if (!hasWalletAddress) return null;
 
+  const label = t("Dukung Dev");
   return (
     <>
-      <button type="button" className="support-trigger" aria-haspopup="dialog" onClick={() => setOpen(true)}>
-        {t("Dukung Dev")}
+      <button type="button" className="support-trigger" aria-label={label} title={label}
+        aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        <WorkspaceIcon name="coffee" size={20} />
       </button>
       {open && <SupportDialog address={walletAddress} onClose={() => setOpen(false)} />}
     </>
