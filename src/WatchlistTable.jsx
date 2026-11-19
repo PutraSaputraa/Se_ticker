@@ -116,7 +116,7 @@ function useWatchlistData(symbolsKey) {
 
 function TrendScoreBadge({ score }) {
   const { t } = useTranslation();
-  if (score === undefined) return <span className="research-cell-note">{t("Memuatâ€¦")}</span>;
+  if (score === undefined) return <span className="research-cell-note">{t("Memuat…")}</span>;
   const display = getStage2Score(score?.passed, score?.total);
   if (!display) return <span className="research-cell-note">{t("Belum tersedia")}</span>;
 
@@ -212,9 +212,9 @@ function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled 
 }
 
 const priceDirections = {
-  1: { icon: 'â†‘', label: 'Naik dibanding harga buka', className: 'trend--up' },
+  1: { icon: '↑', label: 'Naik dibanding harga buka', className: 'trend--up' },
   0: { icon: '=', label: 'Sama dengan harga buka', className: '' },
-  '-1': { icon: 'â†“', label: 'Turun dibanding harga buka', className: 'trend--down' },
+  '-1': { icon: '↓', label: 'Turun dibanding harga buka', className: 'trend--down' },
 };
 
 const starValues = [1, 2, 3, 4, 5];
@@ -240,13 +240,13 @@ function WatchlistRating({ symbol, rating, onSetRating, disabled }) {
             onClick={() => selectRating(value)}
           >
             <span aria-hidden="true" className={value <= rating ? 'watchlist-star-filled' : undefined}>
-              {value <= rating ? 'â˜…' : 'â˜†'}
+              {value <= rating ? '★' : '☆'}
             </span>
           </button>
         ))}
       </div>
       <div className="watchlist-rating-picker">
-        <span aria-hidden="true">{rating ? 'â˜…' : 'â˜†'}</span>
+        <span aria-hidden="true">{rating ? '★' : '☆'}</span>
         <select aria-label={t(label)} value={rating ?? ''} disabled={disabled}
           onChange={(event) => selectRating(Number(event.target.value))}>
           <option value="" disabled>{t("Bintang")}</option>
@@ -330,7 +330,7 @@ function WatchlistRow({ entry, row, formatPrice, onRemove, onSetWatchPrice, onSe
             </span>
             {quote.date && <time className="research-cell-note" dateTime={quote.date}>{formatDateCompact(quote.date)}</time>}
           </> : <span className={row?.status === 'error' ? 'research-quote-error' : 'research-cell-note'}>
-            {row?.status === 'error' ? t(row.message) : t('Memuat harga dan volumeâ€¦')}
+            {row?.status === 'error' ? t(row.message) : t('Memuat harga dan volume…')}
           </span>}
         </td>
         <td className="num"><PriceToWatchInput symbol={symbol} value={priceToWatch} decimals={decimals}
