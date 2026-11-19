@@ -33,7 +33,7 @@ function SupportDialog({ address, onClose }) {
   return (
     <dialog ref={dialog} className="support-dialog" aria-labelledby={titleId} aria-describedby={instructionsId} onClose={onClose}>
       <div className="support-dialog-header">
-        <h2 id={titleId}>{t("Dukung SETicker")}</h2>
+        <h2 id={titleId}>{t("Dukung Dev")}</h2>
         <button type="button" className="text-button" onClick={() => dialog.current.close()}>{t("Tutup")}</button>
       </div>
       <div className="support-transfer">
@@ -61,8 +61,8 @@ export default function SupportButton() {
 
   return (
     <>
-      <button type="button" className="text-button support-trigger" aria-haspopup="dialog" onClick={() => setOpen(true)}>
-        {t("Dukung SETicker")}
+      <button type="button" className="support-trigger" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        {t("Dukung Dev")}
       </button>
       {open && <SupportDialog address={walletAddress} onClose={() => setOpen(false)} />}
     </>

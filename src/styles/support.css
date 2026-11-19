@@ -4,6 +4,32 @@
   min-width: var(--touch-size);
 }
 
+.support-trigger {
+  flex: none;
+  padding: 0.35rem 0.625rem;
+  border: 1px solid var(--support-border);
+  border-radius: var(--field-radius);
+  background: var(--support-soft);
+  color: var(--support-text);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.support-trigger:is(:hover, :active) { border-color: var(--support); }
+
+@media (width > 58rem) {
+  .support-trigger {
+    --focus: var(--nav-focus);
+    border-color: var(--nav-edge);
+    background: var(--nav-current);
+    color: var(--nav-accent);
+  }
+
+  .support-trigger:is(:hover, :active) { border-color: var(--nav-accent); }
+}
+
 .support-dialog {
   width: min(30rem, calc(100% - 2rem));
   max-height: calc(100% - 2rem);
@@ -82,5 +108,6 @@
 }
 
 @media (max-width: 28rem) {
+  .support-trigger { padding-inline: 0.3rem; }
   .support-transfer { grid-template-columns: minmax(0, 1fr); }
 }

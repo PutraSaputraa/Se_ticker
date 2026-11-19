@@ -14,7 +14,6 @@ import HomePage from './pages/HomePage.jsx';
 import StockDetailPage from './pages/StockDetailPage.jsx';
 import WatchlistPage from './pages/WatchlistPage.jsx';
 import RecommendPage from './pages/RecommendPage.jsx';
-import BacktestPage from './pages/BacktestPage.jsx';
 import JournalPage from './pages/JournalPage.jsx';
 
 const ScreenerPage = lazy(() => import('./pages/ScreenerPage.jsx'));
@@ -24,15 +23,17 @@ const navigation = [
   { to: '/watchlist', name: 'Pantauan', icon: 'watch' },
   { to: '/rekomendasi', name: 'Rekomendasi', mobile: 'Riset', icon: 'scan' },
   { to: '/screener', name: 'Screener', mobile: 'Filter', icon: 'filter' },
-  { to: '/uji-strategi', name: 'Uji strategi', mobile: 'Uji strategi', icon: 'test' },
   { to: '/jurnal', name: 'Jurnal', icon: 'journal' },
 ];
 
 function Brand() {
   const { t } = useTranslation();
+  const name = t("Cek Saham");
   return (
-    <Link to="/" className="brand">
-      <BrandMark />{t("Cek Saham")}</Link>
+    <Link to="/" className="brand" aria-label={name}>
+      <BrandMark />
+      <span className="workspace-brand-name">{name}</span>
+    </Link>
   );
 }
 
@@ -109,6 +110,7 @@ function TopBar({ user }) {
           <WorkspaceNav />
           <div className="account-controls">
             <LanguageSwitcher />
+            <SupportButton />
             <ThemeToggle />
             <details className="account-menu" key={pathname} ref={accountMenu}
               onBlur={(event) => {
@@ -120,7 +122,7 @@ function TopBar({ user }) {
                   event.currentTarget.querySelector('summary').focus();
                 }
               }}>
-              <summary>
+              <summary aria-label={t("Akun")}>
                 <WorkspaceIcon name="account" size={17} />
                 <span>{t("Akun")}</span>
                 <span className="account-chevron"><WorkspaceIcon name="chevron" size={14} /></span>
@@ -189,16 +191,12 @@ export default function App({ user }) {
             <Route path="/watchlist" element={<WatchlistPage account={account} uid={user.uid} />} />
             <Route path="/rekomendasi" element={<RecommendPage account={account} />} />
             <Route path="/screener" element={<Suspense fallback={<p role="status">{t('Memuat…')}</p>}><ScreenerPage userId={user.uid} /></Suspense>} />
-            <Route path="/uji-strategi" element={<BacktestPage />} />
             <Route path="/jurnal" element={<JournalPage account={account} uid={user.uid} />} />
             <Route path="*" element={<HomePage account={account} />} />
           </Routes>
         </div>
 
-        <footer className="source">
-          <span>{t("Data historis dari Yahoo Finance.")}</span>
-          <SupportButton />
-        </footer>
+        <footer className="source">{t("Data historis dari Yahoo Finance.")}</footer>
       </main>
     </div>
   );

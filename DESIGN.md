@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: Cek Saham
-description: Workspace riset saham, uji strategi, dan jurnal trading.
+description: Workspace riset saham dan jurnal trading.
 ---
 
 # Cek Saham
@@ -47,7 +47,6 @@ Gunakan `--workspace-on-action` di tombol biru. Pasangkan `--support-text` denga
 - **Detail saham.** Identitas dan penutupan berada di header. Candlestick memakai kolom utama. Di ruang konten mulai 52 rem, Rencana trading dan rincian sesi memakai kolom samping. Di lebar yang lebih sempit, bagian itu mengikuti grafik. Buy Trigger, Stop loss, Target, dan Resistance memakai label dan aksen semantik. Baca nilai sesi lewat pointer, sentuhan, atau tombol panah.
 - **Pantauan.** Pertahankan ticker semat, isian harga, catatan, gambar, dan aksi baris. Bintang tampil sebagai tombol di desktop dan pemilih besar di layar sempit atau perangkat sentuh. Status penyimpanan berada di toolbar tabel.
 - **Rekomendasi.** Metode dan bursa berada dalam panel konfigurasi. Saat permintaan berjalan, indikator indeterminate mengikuti status asli. Hasil menampilkan jumlah kandidat, sesi, tabel scan, atau rincian riset AI.
-- **Uji strategi.** Panel hasil mendahulukan return dan drawdown, diikuti win rate dan expectancy. Kurva menampilkan basis awal 100 dan nilai yang dapat diperiksa lewat pointer atau keyboard. Asumsi eksekusi tersedia bersama hasil simulasi.
 - **Jurnal.** Saldo tersedia memimpin ringkasan wallet. Rincian posisi dan rencana keluar memakai kelompok inset. PnL berjalan berada di atas posisi terbuka. PnL terealisasi, statistik, dan grafik berada di bagian posisi ditutup.
 - **Autentikasi.** Brand band navy membingkai satu form fokus. Pilihan masuk dan daftar memakai kontrol segmented. Pesan login, pendaftaran, dan reset tampil di dekat form.
 
