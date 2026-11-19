@@ -9,6 +9,7 @@ import {
 import { analyzeBaseBreakout } from './breakoutLogic.js';
 import { getUniverse, universeRegions } from './universe.js';
 import { fetchFundamentals } from './fundamentals.js';
+import { fetchGrowthInputs, fillSalesComparisons, growthValues } from './growth.js';
 import { screenerRow } from './screener.js';
 
 const fetchConcurrency = 4;
@@ -48,11 +49,12 @@ export function scanWaitMs(mode, region) {
     const batches = Math.ceil(getUniverse(market).symbols.length / fetchConcurrency);
     return total + batches * fetchTimeoutMs;
   }, 0);
+  if (mode === 'growth') return yahooWaitMs + regionsFor(region).length * fetchTimeoutMs + 30_000;
   return mode === 'screener' ? 2 * yahooWaitMs + 30_000 : yahooWaitMs + aiTimeoutMs + 30_000;
 }
 
 export function scanMode(value) {
-  return value === 'research' || value === 'screener' ? value : 'scan';
+  return ['research', 'screener', 'growth'].includes(value) ? value : 'scan';
 }
 
 const kenariHeaders = (apiKey) => ({
@@ -130,6 +132,12 @@ async function scanRegion(region, mode) {
       const symbol = symbols[cursor];
       cursor += 1;
       try {
+        if (mode === 'growth') {
+          const historyStart = Math.floor(Date.now() / 1000) - 7 * 366 * 86400;
+          const [statements, inputs] = await Promise.all([fetchFundamentals(symbol, false, historyStart), fetchGrowthInputs(symbol)]);
+          picks.push({ symbol, name: inputs.name ?? null, ...growthValues(statements, inputs) });
+          continue;
+        }
         const evaluated = await fetchDailySessions(symbol, mode === 'screener' ? '1y' : '9mo');
         if (!evaluated) continue;
         if (mode === 'screener') {
@@ -149,6 +157,7 @@ async function scanRegion(region, mode) {
   }
 
   await Promise.all(Array.from({ length: Math.min(fetchConcurrency, symbols.length) }, worker));
+  if (mode === 'growth') await fillSalesComparisons(picks);
   return { picks, scanned: symbols.length, universeName: name };
 }
 
@@ -159,7 +168,7 @@ async function scanMath(regions, mode) {
     results.push(await scanRegion(region, mode));
   }
   const rows = results.flatMap(result => result.picks);
-  const picks = mode === 'screener'
+  const picks = mode === 'screener' || mode === 'growth'
     ? rows.sort((a, b) => a.symbol.localeCompare(b.symbol))
     : rows.sort((a, b) => (b.volumeRatio ?? 0) - (a.volumeRatio ?? 0)).slice(0, maxScanResults);
   const scanned = results.reduce((sum, result) => sum + result.scanned, 0);
@@ -348,6 +357,10 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
   }
 
   const { picks, scanned, universeName } = await scanMath(regions, mode);
+  if (mode === 'growth') {
+    if (!picks.some(row => row.salesTTMComparison || Object.values(row).some(Number.isFinite))) throw new Error('Data Growth belum tersedia. Coba lagi.');
+    return { mode, region: regionParam, universe: universeName, scanned, results: picks };
+  }
   if (mode === 'screener') {
     if (!picks.length) throw new Error('Data harga screener belum tersedia.');
     return { mode, language, region: regionParam, universe: universeName, scanned, results: picks };

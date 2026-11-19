@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import TickerLink from '../components/TickerLink.jsx';
 import TableScroll from '../components/TableScroll.jsx';
+import GrowthScreen from '../components/GrowthScreen.jsx';
 import { formatDateCompact, formatPct, formatPrice } from '../format.js';
 import { localizedNumberFormat } from '../i18n.js';
 import { requestScanResult } from '../scanRequest.js';
@@ -192,11 +193,14 @@ export default function ScreenerPage({ userId }) {
   const [source, setSource] = useState('finviz');
   return <div className="research-workspace screener-page">
     <header className="page-heading section-accent"><h1>Screener</h1></header>
+    <GrowthScreen markets={markets} />
+    <details className="screen-advanced"><summary>{t('Filter lainnya dan preset tersimpan')}</summary>
     <div className="screen-tabs screen-source" role="group" aria-label={t('Sumber screener')}>
       <button aria-pressed={source === 'finviz'} onClick={() => setSource('finviz')}>{t('Katalog Finviz')}</button>
       <button aria-pressed={source === 'local'} onClick={() => setSource('local')}>{t('Data SETicker')}</button>
     </div>
     <div hidden={source !== 'finviz'}><FinvizPanel userId={userId} /></div>
     <div hidden={source !== 'local'}><LocalPanel /></div>
+    </details>
   </div>;
 }

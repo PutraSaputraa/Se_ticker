@@ -5,11 +5,11 @@ const statementFields = {
   annualRevenue: 'annualTotalRevenue',
 };
 
-export async function fetchFundamentals(symbol, includeIncome = false) {
+export async function fetchFundamentals(symbol, includeIncome = false, period1 = 1609459200) {
   const fields = includeIncome ? { ...statementFields, annualIncome: 'annualNetIncome' } : statementFields;
   const params = new URLSearchParams({
     type: Object.values(fields).join(','),
-    period1: '1609459200',
+    period1: String(period1),
     period2: String(Math.ceil(Date.now() / 1000)),
   });
   try {
