@@ -1,6 +1,6 @@
 import useTranslation from '../useTranslation.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import WatchlistTable from '../WatchlistTable.jsx';
 import WatchlistEntryDialog from '../components/WatchlistEntryDialog.jsx';
 import WorkspaceIcon from '../components/WorkspaceIcon.jsx';
@@ -10,9 +10,9 @@ import '../styles/research.css';
 
 export default function WatchlistPage({ account, uid }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [editor, setEditor] = useState(null);
   const editorTrigger = useRef(null);
+  const editorSymbol = useRef(null);
   const [confirmation, setConfirmation] = useState(null);
   const { watchlist } = account;
   const watchlistDisabled = !account.ready || account.pending;
@@ -28,9 +28,12 @@ export default function WatchlistPage({ account, uid }) {
   useLayoutEffect(() => {
     if (editor || watchlistDisabled) return;
     const trigger = editorTrigger.current;
+    const fallback = [...document.querySelectorAll('[data-watchlist-symbol]')].find((node) => node.dataset.watchlistSymbol === editorSymbol.current)?.querySelector('.watchlist-disclosure');
     editorTrigger.current = null;
-    if (trigger?.isConnected && document.activeElement === document.body) {
-      trigger.focus({ preventScroll: true });
+    editorSymbol.current = null;
+    if (document.activeElement === document.body) {
+      const target = trigger?.isConnected && !trigger.disabled ? trigger : fallback;
+      target?.focus({ preventScroll: true });
     }
   }, [editor, watchlistDisabled]);
 
@@ -74,7 +77,6 @@ export default function WatchlistPage({ account, uid }) {
             entries={watchlist}
             formatPrice={formatPrice}
             disabled={watchlistDisabled}
-            onOpen={(symbol) => navigate(`/stock/${encodeURIComponent(symbol)}`)}
             onRemove={account.removeWatchlistSymbol}
             onSetWatchPrice={(symbol, price) =>
               saveWatchlistChange(
@@ -90,6 +92,7 @@ export default function WatchlistPage({ account, uid }) {
             }
             onEditEntry={(entry, mode, trigger) => {
               editorTrigger.current = trigger;
+              editorSymbol.current = entry.symbol;
               setEditor({ entry, mode });
             }}
           />

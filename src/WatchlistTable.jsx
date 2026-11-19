@@ -1,6 +1,6 @@
 import { getLocale } from './i18n.js';
 import useTranslation from './useTranslation.js';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import WorkspaceIcon from './components/WorkspaceIcon.jsx';
 import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
@@ -304,102 +304,73 @@ function WatchlistNotes({ entry, onEdit, disabled }) {
   );
 }
 
-function WatchlistRow({ entry, row, formatPrice, onOpen, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled, trendScore }) {
+function WatchlistRow({ entry, row, formatPrice, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled, trendScore }) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
   const { symbol, priceToWatch, rating, imageId } = entry;
-  const quote = row?.quote;
-  const instrument = (
-    <th scope="row" className="research-instrument">
-      <TickerLink symbol={symbol} />
-      {quote?.name && quote.name !== symbol && <span className="research-cell-note research-table-company">{quote.name}</span>}
-      <WatchlistRating symbol={symbol} rating={rating} onSetRating={onSetRating} disabled={disabled} />
-    </th>
-  );
-  const removeButton = (
-    <button
-      type="button"
-      className="research-remove"
-      disabled={disabled}
-      title={t("Hapus {0}", symbol)}
-      aria-label={t("Hapus {0} dari daftar", symbol)}
-      onClick={(event) => { event.stopPropagation(); onRemove(symbol); }}
-    >{t("Hapus")}</button>
-  );
+  const quote = row?.status === 'success' ? row.quote : null;
+  const direction = quote ? priceDirections[Math.sign(quote.close - quote.open)] : null;
+  const decimals = quote ? (['JPY', 'IDR'].includes(quote.currency) ? 0 : 2) : (symbol.endsWith('.JK') ? 0 : 2);
+  const volumePass = quote?.buyTrigger?.volumeChecks?.[0]?.meetsThreshold ?? null;
   const imageAction = imageId ? 'Lihat gambar' : 'Unggah gambar';
-  const details = (
-    <>
-      <td className="watchlist-notes">
-        <WatchlistNotes entry={entry} onEdit={onEditEntry} disabled={disabled} />
-      </td>
-      <td className="watchlist-image">
-        <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
-          aria-label={`${t(imageAction)} ${symbol}`} onClick={(event) => onEditEntry(entry, 'image', event.currentTarget)}>
-          {t(imageAction)}
-        </button>
-      </td>
-    </>
-  );
-
-  if (row?.status !== 'success') {
-    const error = row?.status === 'error';
-    return (
-      <tr>
-        {instrument}
-        <td colSpan={3} className="watchlist-quote-state">
-          <span className={error ? 'research-quote-error' : 'research-cell-note'}>
-            {error ? t(row.message) : t("Memuat harga dan volume…")}
-          </span>
-        </td>
-        <td className="watchlist-stage"><TrendScoreBadge score={trendScore} /></td>
-        <td colSpan={2} />
-        {details}
-        <td className="num">{removeButton}</td>
-      </tr>
-    );
-  }
-
-  const direction = priceDirections[Math.sign(quote.close - quote.open)];
-  const volumePass = quote.buyTrigger?.volumeChecks?.[0]?.meetsThreshold ?? null;
-  const decimals = quote.currency === 'JPY' || quote.currency === 'IDR' ? 0 : 2;
-  const breakout = breakoutStatus(quote, priceToWatch);
 
   return (
-    <tr className="watchlist-row" onClick={(event) => {
-      if (!event.target.closest('a, button, input, .watchlist-rating, .watchlist-notes, .watchlist-image')) onOpen(symbol);
-    }}>
-      {instrument}
-      <td className="num">
-        <span className={`watchlist-close ${direction?.className ?? ''}`}>
-          {direction && <span role="img" aria-label={t(direction.label)} title={t(direction.label)}>{direction.icon}</span>}
-          <UpdatedValue value={quote.close} format={(price) => formatPrice(price, quote.currency)} />
-        </span>
-        {quote.date && <time className="research-cell-note" dateTime={quote.date}>{formatDateCompact(quote.date)}</time>}
-      </td>
-      <td><BreakoutBadge state={breakout.state} /></td>
-      <td className="num">
-        <PriceToWatchInput
-          symbol={symbol}
-          value={priceToWatch}
-          decimals={decimals}
-          onSetWatchPrice={onSetWatchPrice}
-          disabled={disabled}
-        />
-      </td>
-      <td className="watchlist-stage"><TrendScoreBadge score={trendScore} /></td>
-      <td className="num">
-        {Number.isFinite(quote.volume) ? quote.volume.toLocaleString(getLocale()) : t("Belum tersedia")}
-        <CheckBadgeMini passed={volumePass} />
-      </td>
-      <td className="num">{formatVolume(quote.buyTrigger?.averageVolume, { includeUnit: false })}</td>
-      {details}
-      <td className="num">{removeButton}</td>
-    </tr>
+    <tbody className="watchlist-entry" data-watchlist-symbol={symbol}>
+      <tr className="watchlist-row">
+        <th scope="row" className="research-instrument">
+          <TickerLink symbol={symbol} />
+          {quote?.name && quote.name !== symbol && <span className="research-cell-note research-table-company">{quote.name}</span>}
+        </th>
+        <td className="num watchlist-quote-state">
+          {quote ? <>
+            <span className={`watchlist-close ${direction?.className ?? ''}`}>
+              {direction && <span role="img" aria-label={t(direction.label)} title={t(direction.label)}>{direction.icon}</span>}
+              <UpdatedValue value={quote.close} format={(price) => formatPrice(price, quote.currency)} />
+            </span>
+            {quote.date && <time className="research-cell-note" dateTime={quote.date}>{formatDateCompact(quote.date)}</time>}
+          </> : <span className={row?.status === 'error' ? 'research-quote-error' : 'research-cell-note'}>
+            {row?.status === 'error' ? t(row.message) : t('Memuat harga dan volume…')}
+          </span>}
+        </td>
+        <td className="num"><PriceToWatchInput symbol={symbol} value={priceToWatch} decimals={decimals}
+          onSetWatchPrice={onSetWatchPrice} disabled={disabled || !quote} /></td>
+        <td>{quote ? <BreakoutBadge state={breakoutStatus(quote, priceToWatch).state} /> : <span className="research-cell-note">{t('Belum tersedia')}</span>}</td>
+        <td><button type="button" className="research-watch watchlist-disclosure" aria-expanded={expanded}
+          aria-controls={detailsId} aria-label={`${t('Rincian')} ${symbol}`} onClick={() => setExpanded((value) => !value)}>
+          <WorkspaceIcon name="chevron" size={14} /> <span>{t('Rincian')}</span>
+        </button></td>
+      </tr>
+      <tr id={detailsId} hidden={!expanded} className="watchlist-detail-row">
+        <td colSpan={5}>
+          <div className="watchlist-details">
+            <section><h3>{t('Bintang')}</h3><WatchlistRating symbol={symbol} rating={rating} onSetRating={onSetRating} disabled={disabled} /></section>
+            <section><h3>{t('Stage 2')}</h3><TrendScoreBadge score={trendScore} /></section>
+            <section><h3>{t('Volume (lembar)')}</h3>
+              <span>{Number.isFinite(quote?.volume) ? quote.volume.toLocaleString(getLocale()) : t('Belum tersedia')}</span>
+              <CheckBadgeMini passed={volumePass} />
+            </section>
+            <section><h3>{t('Rata-rata volume')}</h3>
+              <span>{quote ? formatVolume(quote.buyTrigger?.averageVolume, { includeUnit: false }) : t('Belum tersedia')}</span>
+              <span className="research-cell-note">{t('50 sesi (lembar)')}</span>
+            </section>
+            <section className="watchlist-notes"><h3>{t('Catatan')}</h3><WatchlistNotes entry={entry} onEdit={onEditEntry} disabled={disabled} /></section>
+            <section className="watchlist-detail-actions watchlist-image">
+              <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
+                aria-label={`${t(imageAction)} ${symbol}`} onClick={(event) => onEditEntry(entry, 'image', event.currentTarget)}>{t(imageAction)}</button>
+              <button type="button" className="research-remove" disabled={disabled}
+                aria-label={t('Hapus {0} dari daftar', symbol)} onClick={() => onRemove(symbol)}>{t('Hapus')}</button>
+            </section>
+          </div>
+        </td>
+      </tr>
+    </tbody>
   );
 }
 
 const stateRank = { breakout: 0, near: 1, none: 2 };
 
-export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled }) {
+export default function WatchlistTable({ entries, formatPrice, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled }) {
   const { t } = useTranslation();
   const symbolsKey = entries.map((entry) => entry.symbol).join('\n');
   const rows = useWatchlistData(symbolsKey);
@@ -422,25 +393,17 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
           <tr>
             <th scope="col">{t("Saham")}</th>
             <th scope="col" className="num">{t("Harga tutup")}</th>
-            <th scope="col">{t("Status")}</th>
             <th scope="col" className="num">{t("Harga pantauan")}</th>
-            <th scope="col" className="watchlist-stage" title={t("Jumlah kriteria Trend Template Minervini yang lolos")}>{t("Stage 2")}</th>
-            <th scope="col" className="num">{t("Volume (lembar)")}</th>
-            <th scope="col" className="num watchlist-average-volume" title={t("Rata-rata volume yang dipakai untuk menghitung ambang breakout")}>{t("Rata-rata volume")} <span className="watchlist-header-note">{t("50 sesi (lembar)")}</span>
-            </th>
-            <th scope="col">{t("Catatan")}</th>
-            <th scope="col">{t("Gambar")}</th>
-            <th scope="col" className="num">{t("Aksi")}</th>
+            <th scope="col">{t("Status")}</th>
+            <th scope="col">{t("Rincian")}</th>
           </tr>
         </thead>
-        <tbody>
           {ordered.map((entry) => (
             <WatchlistRow
               key={entry.symbol}
               entry={entry}
               row={rows[entry.symbol]}
               formatPrice={formatPrice}
-              onOpen={onOpen}
               onRemove={onRemove}
               onSetWatchPrice={onSetWatchPrice}
               onSetRating={onSetRating}
@@ -449,7 +412,6 @@ export default function WatchlistTable({ entries, formatPrice, onOpen, onRemove,
               trendScore={trendScores[entry.symbol]}
             />
           ))}
-        </tbody>
       </table>
     </TableScroll>
   );

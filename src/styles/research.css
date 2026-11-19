@@ -438,8 +438,27 @@
   overflow-wrap: anywhere;
 }
 
-.watchlist-table .watchlist-row {
-  cursor: pointer;
+.watchlist-table .watchlist-row { cursor: default; }
+.watchlist-table .watchlist-entry:nth-of-type(even) .watchlist-row { --research-row-background: var(--surface-muted); }
+.watchlist-table .watchlist-detail-row[hidden] { display: none; }
+.watchlist-table .watchlist-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 0.5rem;
+  white-space: normal;
+}
+.watchlist-details section { min-width: 0; }
+.watchlist-details h3 { margin: 0 0 0.4rem; font-size: 0.8125rem; color: var(--muted); }
+.watchlist-table .watchlist-details .watchlist-notes { grid-column: 1 / -1; width: auto; min-width: 0; }
+.watchlist-detail-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.watchlist-disclosure { display: inline-flex; align-items: center; gap: 0.25rem; }
+.watchlist-disclosure[aria-expanded="true"] svg { transform: rotate(180deg); }
+@container (width < 44rem) {
+  .watchlist-table .watchlist-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .watchlist-table .research-table-company { display: none; }
+  .watchlist-table .watchlist-disclosure { min-width: 2.75rem; }
+  .watchlist-table .watchlist-disclosure span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 
 :is(.watchlist-table, .scan-table, .backtest-table) tbody tr:is(:hover, :focus-within) {
