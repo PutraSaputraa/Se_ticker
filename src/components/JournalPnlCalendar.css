@@ -1,0 +1,73 @@
+.journal-calendar { min-width: 0; }
+
+.journal-calendar-toolbar,
+.journal-calendar-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.journal-calendar-toolbar { justify-content: space-between; }
+.journal-calendar-nav button {
+  min-inline-size: 2.5rem;
+  min-block-size: 2.5rem;
+  padding-inline: 0.5rem;
+  border: 1px solid var(--field-border);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.journal-calendar-grid {
+  width: 100%;
+  table-layout: fixed;
+  border-spacing: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.journal-calendar-grid th {
+  padding-block: 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.journal-calendar-grid td {
+  padding: 0;
+  border-radius: 0.3rem;
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.journal-calendar-grid .journal-calendar-pad { background: transparent; }
+.journal-calendar [data-tone="gain"] { color: var(--positive); }
+.journal-calendar [data-tone="loss"] { color: var(--negative); }
+.journal-calendar [data-tone="flat"] { color: var(--text); }
+.journal-calendar-grid [data-tone="gain"] { background: color-mix(in srgb, var(--positive) 12%, var(--surface)); }
+.journal-calendar-grid [data-tone="loss"] { background: color-mix(in srgb, var(--negative) 12%, var(--surface)); }
+
+.journal-calendar-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  inline-size: 100%;
+  min-block-size: 3.15rem;
+  padding: 0.15rem 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: clamp(0.63rem, 2.5vw, 0.85rem);
+  overflow-wrap: anywhere;
+}
+
+button.journal-calendar-day { cursor: pointer; font-weight: 650; }
+.journal-calendar-day time { color: var(--text); }
+.journal-calendar button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--focus); }
+.journal-calendar button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.journal-calendar button:hover { background-color: color-mix(in srgb, currentColor 8%, transparent); }

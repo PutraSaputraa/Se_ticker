@@ -2,6 +2,7 @@ import { getLocale, localizedDateFormat } from '../i18n.js';
 import useTranslation from '../useTranslation.js';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import JournalCharts from '../components/JournalCharts.jsx';
+import JournalPnlCalendar from '../components/JournalPnlCalendar.jsx';
 import { ExitPlanFields, LeverageFields, PriceField } from '../components/JournalOrderFields.jsx';
 import { JournalScreenshotDialog, JournalScreenshotField } from '../components/JournalScreenshot.jsx';
 import JournalTradeSetups from '../components/JournalTradeSetups.jsx';
@@ -847,7 +848,10 @@ export default function JournalPage({ account, uid }) {
           </div>
           <p className="journal-help">{t("PnL posisi USD adalah nilai posisi dikali PnL %. Perhitungan memakai kurs tetap untuk ticker non-USD. Profit Factor membagi total untung dengan nilai absolut total rugi.")}</p>
         </div>}
-        {(ready || closedTrades.length > 0) && <JournalCharts series={realizedPnl} preferredCurrency={currency} walletHistory={wallet.history} />}
+        {(ready || closedTrades.length > 0) && <>
+          <JournalCharts series={realizedPnl} preferredCurrency={currency} walletHistory={wallet.history} />
+          <JournalPnlCalendar series={realizedPnl} preferredCurrency={currency} />
+        </>}
         <TradeTable
           trades={closedTrades}
           closed
