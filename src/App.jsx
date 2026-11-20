@@ -1,6 +1,6 @@
 import useTranslation from './useTranslation.js';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from './firebase.js';
 import useAccountData from './useAccountData.js';
@@ -17,13 +17,11 @@ import WatchlistPage from './pages/WatchlistPage.jsx';
 import RecommendPage from './pages/RecommendPage.jsx';
 import JournalPage from './pages/JournalPage.jsx';
 
-const ScreenerPage = lazy(() => import('./pages/ScreenerPage.jsx'));
-
 const navigation = [
   { to: '/', name: 'Dashboard', icon: 'dashboard' },
   { to: '/watchlist', name: 'Pantauan', icon: 'watch' },
+  { action: 'search' },
   { to: '/rekomendasi', name: 'Rekomendasi', mobile: 'Riset', icon: 'scan' },
-  { to: '/screener', name: 'Screener', mobile: 'Filter', icon: 'filter' },
   { to: '/jurnal', name: 'Jurnal', icon: 'journal' },
 ];
 
@@ -38,11 +36,13 @@ function Brand() {
   );
 }
 
-function WorkspaceNav() {
+function WorkspaceNav({ account, initialTicker, searchKey }) {
   const { t } = useTranslation();
   return (
     <nav className="workspace-nav" aria-label={t("Menu utama")}>
-      {navigation.map(({ to, name, mobile, icon }) => (
+      {navigation.map(({ to, name, mobile, icon, action }) => action === 'search' ? (
+        <NavbarSearch key={`search-${searchKey}`} initialTicker={initialTicker} account={account} />
+      ) : (
         <NavLink
           key={to}
           to={to}
@@ -108,7 +108,7 @@ function TopBar({ user, account }) {
       <header className="workspace-bar" ref={header}>
         <div className="workspace-bar-inner">
           <Brand />
-          <NavbarSearch key={key} initialTicker={initialTicker} account={account} />
+          <WorkspaceNav searchKey={key} initialTicker={initialTicker} account={account} />
           <div className="account-controls">
             <LanguageSwitcher />
             <SupportButton />
@@ -136,7 +136,6 @@ function TopBar({ user, account }) {
               </div>
             </details>
           </div>
-          <WorkspaceNav />
         </div>
       </header>
       {signOutError && (
@@ -192,7 +191,7 @@ export default function App({ user }) {
             <Route path="/stock/:symbol" element={<StockDetailPage account={account} />} />
             <Route path="/watchlist" element={<WatchlistPage account={account} uid={user.uid} />} />
             <Route path="/rekomendasi" element={<RecommendPage account={account} />} />
-            <Route path="/screener" element={<Suspense fallback={<p role="status">{t('Memuat…')}</p>}><ScreenerPage userId={user.uid} /></Suspense>} />
+            <Route path="/screener" element={<Navigate to="/" replace />} />
             <Route path="/jurnal" element={<JournalPage account={account} uid={user.uid} />} />
             <Route path="*" element={<DashboardPage account={account} uid={user.uid} />} />
           </Routes>

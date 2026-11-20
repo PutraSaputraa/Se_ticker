@@ -106,7 +106,6 @@ export const english = {
   "Bahasa": "Language",
   "Cek OHLCV saham, level Buy Trigger, dan volume per sesi perdagangan.": "Check stock OHLCV, buy trigger levels, and volume for each trading session.",
   "Cari saham": "Search stocks",
-  "Cari saham…": "Search stocks…",
   "Cari": "Search",
   "Pantauan": "Watchlist",
   "Rekomendasi": "Scanner",

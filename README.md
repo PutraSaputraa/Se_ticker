@@ -2,11 +2,7 @@
 
 Aplikasi React dan Vite untuk melihat level Buy dan Sell Trigger, OHLCV, serta cek volume dan harga pantauan. Netlify Function mengambil data dari Yahoo Finance.
 
-Halaman **Screener** membuka enam kriteria Growth. Estimasi EPS tahun fiskal berjalan dan berikutnya berasal dari konsensus Yahoo Finance. Untuk EPS historis, SETicker menghitung CAGR dari EPS dilusian tahunan. Pertumbuhan penjualan membandingkan kuartal atau 12 bulan terakhir dengan periode yang sama tahun sebelumnya. Seluruh ambang menggunakan perbandingan ketat `>`.
-
-Riwayat Yahoo sering terbatas pada empat laporan tahunan dan lima kuartal. Untuk memperluas cakupan, isi `FINNHUB_API_KEY` pada environment **server** Netlify. Jika tersedia untuk simbol tersebut, Screener menggunakan persentase historis dari endpoint [Basic Financials Finnhub](https://finnhub.io/docs/api/company-basic-financials). Saat sumber belum memberikan angka yang diperlukan, saham masuk kelompok **Data belum cukup**, kecuali sudah ada kriteria lain yang terbukti gagal.
-
-Jika laporan kuartalan belum cukup untuk menghitung penjualan 12 bulan, SETicker mengecek ambang 15% pada screener Yahoo. Hasil konfirmasi ditampilkan sebagai `> 15%` atau `≤ 15%`. Simbol yang tidak muncul pada kedua hasil tetap berstatus data belum cukup untuk kriteria ini.
+Dashboard merangkum Pantauan, Trade Setup aktif, dan pencarian terakhir. Tombol **Cari saham** di menu utama membuka panel pilihan bursa dan ticker.
 
 ## Jalankan lokal
 
