@@ -74,7 +74,7 @@
 }
 
 .journal-section h2[tabindex="-1"]:focus-visible {
-  outline: 2px solid var(--workspace-action);
+  outline: 2px solid var(--support);
   outline-offset: 5px;
 }
 
@@ -410,7 +410,7 @@
   gap: 1rem;
   padding: 0.85rem 1rem;
   border: 1px solid var(--border);
-  border-inline-start: 3px solid var(--workspace-action);
+  border-inline-start: 3px solid var(--support);
   border-radius: var(--radius);
   background: var(--surface-identity);
 }
@@ -562,10 +562,10 @@
 .journal-pnl-flat { stroke-width: 3; }
 .journal-pnl-up { fill: var(--positive); }
 .journal-pnl-down { fill: var(--negative); }
-.journal-pnl-value { fill: var(--workspace-action); }
-.journal-pnl-area { fill: var(--workspace-action); fill-opacity: 0.14; }
-.journal-pnl-line { fill: none; stroke: var(--workspace-action); stroke-width: 2; }
-.journal-pnl-point { stroke: var(--workspace-action); stroke-width: 4; stroke-linecap: round; }
+.journal-pnl-value { fill: var(--support); }
+.journal-pnl-area { fill: var(--support); fill-opacity: 0.14; }
+.journal-pnl-line { fill: none; stroke: var(--support); stroke-width: 2; }
+.journal-pnl-point { stroke: var(--support); stroke-width: 4; stroke-linecap: round; }
 
 .journal-pnl-axis-x {
   grid-column: 2;

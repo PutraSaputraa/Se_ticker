@@ -31,12 +31,12 @@
   --border: #e1e1dc;
   --field: #ffffff;
   --field-border: #827f75;
-  --workspace-action: #c79400;
+  --workspace-action: #f0be1a;
   --action-text: #8a6800;
-  --workspace-action-hover: #a87e00;
-  --workspace-action-active: #8a6800;
+  --workspace-action-hover: #ffce2e;
+  --workspace-action-active: #d9a90e;
   --workspace-action-soft: #fdf3d3;
-  --workspace-on-action: #0c0e11;
+  --workspace-on-action: #14161a;
   --support: #c79400;
   --support-text: #8a6800;
   --support-soft: #fdf3d3;
@@ -64,6 +64,9 @@
   --shadow-panel: 0 1px 2px rgb(20 22 26 / 0.06), 0 7px 18px rgb(20 22 26 / 0.035);
   --shadow-raised: 0 0.9rem 2.5rem rgb(20 22 26 / 0.19);
   --shadow-control: 0 2px 5px rgb(20 22 26 / 0.12);
+  --action-highlight: rgb(255 255 255 / 0.35);
+  --action-shadow-color: rgb(0 0 0 / 0.14);
+  --action-shadow-blur: 2px;
   --workspace-title-size: clamp(1.875rem, 3.5cqi, 2.625rem);
   --section-title-size: clamp(1.125rem, 2.15cqi, 1.375rem);
   --workspace-card-radius: 1rem;
@@ -74,6 +77,7 @@
   --field-radius: 0.5625rem;
   --touch-size: 2.75rem;
   --motion-fast: 150ms;
+  --motion-action-lift: -1px;
   --motion-standard: 180ms;
   --motion-page: 220ms;
   --motion-stagger: 35ms;
@@ -120,6 +124,9 @@
   --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.28), 0 6px 16px rgb(0 0 0 / 0.14);
   --shadow-raised: 0 0.9rem 2.5rem rgb(0 0 0 / 0.5);
   --shadow-control: 0 2px 5px rgb(0 0 0 / 0.3);
+  --action-highlight: rgb(255 255 255 / 0.18);
+  --action-shadow-color: rgb(0 0 0 / 0.5);
+  --action-shadow-blur: 3px;
 }
 
 * { box-sizing: border-box; }
@@ -470,30 +477,16 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   gap: 0.5rem;
   min-height: var(--touch-size);
   padding: 0.45rem 0.86rem;
-  border: 1px solid var(--action-text);
+  border: 1px solid var(--field-border);
   border-radius: var(--field-radius);
-  background: var(--workspace-action);
-  color: var(--workspace-on-action);
   font-size: 0.94rem;
   font-weight: 600;
   line-height: 1.25;
   text-decoration: none;
 }
 
-@media (hover: hover) {
-  :is(.scan-button, .check-button):hover:not(:disabled, [aria-disabled="true"]) {
-    background: var(--workspace-action-hover);
-    box-shadow: var(--shadow-control);
-  }
-}
-
-:is(.scan-button, .check-button):active:not(:disabled, [aria-disabled="true"]) {
-  background: color-mix(in srgb, var(--workspace-action-active) 60%, var(--workspace-action));
-}
-
 .account-signout, .watch-toggle {
   background: var(--surface);
-  border-color: var(--field-border);
   color: var(--action-text);
 }
 
@@ -502,6 +495,35 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 }
 :is(.account-signout, .watch-toggle):active:not(:disabled) { background: var(--workspace-action-soft); }
 .watch-toggle--active { background: var(--workspace-action-soft); border-color: var(--action-text); }
+
+:is(.scan-button, .check-button, .stock-identity .watch-toggle:not(.watch-toggle--active)) {
+  --action-drop-shadow: 0 1px var(--action-shadow-blur) var(--action-shadow-color);
+  border-color: color-mix(in srgb, var(--workspace-action-active) 58%, var(--workspace-on-action));
+  /* Shift between thirds of the gradient to animate the button colors. */
+  background: var(--workspace-action) linear-gradient(180deg,
+    color-mix(in srgb, var(--workspace-action-hover) 84%, white),
+    var(--workspace-action-hover) 33.333%,
+    var(--workspace-action) 66.667%,
+    var(--workspace-action-active)
+  ) center / 100% 300%;
+  color: var(--workspace-on-action);
+  box-shadow: inset 0 1px 0 var(--action-highlight), var(--action-drop-shadow);
+  transition-property: background-position, box-shadow, transform;
+}
+
+@media (hover: hover) {
+  :is(.scan-button, .check-button, .stock-identity .watch-toggle:not(.watch-toggle--active)):hover:not(:disabled, [aria-disabled="true"]) {
+    --action-drop-shadow: 0 2px 6px var(--action-shadow-color);
+    background-position: top;
+    transform: translateY(var(--motion-action-lift));
+  }
+}
+
+:is(.scan-button, .check-button, .stock-identity .watch-toggle:not(.watch-toggle--active)):active:not(:disabled, [aria-disabled="true"]) {
+  --action-drop-shadow: 0 1px 1px var(--action-shadow-color);
+  background-position: bottom;
+  transform: translateY(0);
+}
 
 .text-button {
   background: transparent;
@@ -566,7 +588,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   width: 1.2rem;
   height: 1.2rem;
   border: 2px solid var(--border);
-  border-top-color: var(--workspace-action);
+  border-top-color: var(--support);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -638,7 +660,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --motion-fast: 0ms; --motion-standard: 0ms; --motion-page: 0ms; }
+  :root { --motion-fast: 0ms; --motion-standard: 0ms; --motion-page: 0ms; --motion-action-lift: 0px; }
   .spinner { animation: none; }
 }
 

@@ -23,8 +23,8 @@ Token semantik didefinisikan di `src/App.css`. Palet gelap memakai beberapa ting
 | Metadata | `--muted` | `#5C6470` | `#9AA3AF` |
 | Pembatas panel | `--border` | `#E1E1DC` | `#2A303A` |
 | Batas isian | `--field-border` | `#827F75` | `#757C86` |
-| Aksi utama | `--workspace-action` | `#C79400` | `#F5C518` |
-| Teks aksi utama | `--workspace-on-action` | `#0C0E11` | `#0C0E11` |
+| Aksi utama | `--workspace-action` | `#F0BE1A` | `#F5C518` |
+| Teks aksi utama | `--workspace-on-action` | `#14161A` | `#0C0E11` |
 | Tautan dan teks aksi | `--action-text` | `#8A6800` | `#F5C518` |
 | Aksen pendukung | `--support` | `#C79400` | `#F5C518` |
 | Cincin fokus | `--focus` | `#8A6800` | `#F5C518` |
