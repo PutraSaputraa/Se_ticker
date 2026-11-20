@@ -220,12 +220,12 @@
 
 .research-badge--warning {
   background: var(--warning-soft);
-  color: var(--warning);
+  color: color-mix(in srgb, var(--warning) 90%, var(--text));
 }
 
 .research-badge--positive {
   background: var(--positive-soft);
-  color: var(--positive);
+  color: color-mix(in srgb, var(--positive) 92%, var(--text));
 }
 
 .research-badge--negative {
@@ -471,7 +471,7 @@
 .research-watch {
   min-height: 2.75rem;
   padding: 0.4rem 0.65rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   border-radius: var(--field-radius);
   background: var(--surface);
   font-weight: 600;
@@ -498,13 +498,13 @@
 
 @media (hover: hover) {
   .research-watch:hover:not(:disabled) {
-    border-color: var(--workspace-action);
+    border-color: var(--action-text);
     background: var(--workspace-action-soft);
   }
 }
 
 .research-watch:active:not(:disabled) {
-  border-color: var(--workspace-action);
+  border-color: var(--action-text);
   background: var(--workspace-action-soft);
 }
 

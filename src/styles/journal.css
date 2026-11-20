@@ -41,7 +41,7 @@
   justify-content: center;
   min-height: var(--touch-size);
   padding: 0.45rem 0.875rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   border-radius: var(--field-radius);
   background: var(--surface);
   color: var(--text);
@@ -55,16 +55,16 @@
 .journal-jump-links a:hover,
 .journal-secondary-button:hover:not(:disabled),
 .journal-secondary-button:active:not(:disabled) {
-  border-color: var(--workspace-action);
+  border-color: var(--action-text);
   background: var(--workspace-action-soft);
   color: var(--action-text);
 }
 
 .journal-jump-links a[aria-current="location"] {
-  border-color: var(--workspace-action);
+  border-color: var(--action-text);
   background: var(--workspace-action-soft);
   color: var(--action-text);
-  box-shadow: inset 0 -2px 0 var(--workspace-action);
+  box-shadow: inset 0 -2px 0 var(--action-text);
 }
 
 .journal-section {
@@ -112,7 +112,7 @@
   padding: clamp(0.75rem, 1.65cqi, 1.1rem);
   background: var(--surface-muted);
 }
-.journal-wallet-totals > :first-child { background: var(--workspace-action-soft); }
+.journal-wallet-totals > :first-child { box-shadow: inset 0 3px 0 var(--support); }
 
 .journal-wallet-totals dt { color: var(--muted); font-size: 0.875rem; }
 .journal-wallet-totals dd {
@@ -710,7 +710,7 @@
   font-weight: 650;
 }
 
-.journal-badge--win { background: var(--positive-soft); color: var(--positive); }
+.journal-badge--win { background: var(--positive-soft); color: color-mix(in srgb, var(--positive) 92%, var(--text)); }
 .journal-badge--loss { background: var(--negative-soft); color: var(--negative); }
 .journal-badge--be { background: var(--surface-tint); color: var(--muted); }
 .journal-badge--long { background: var(--workspace-action-soft); color: var(--action-text); }

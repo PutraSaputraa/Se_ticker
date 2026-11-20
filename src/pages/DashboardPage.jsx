@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import useTranslation from '../useTranslation.js';
 import useJournalSetups from '../useJournalSetups.js';
 import { formatPrice } from '../format.js';
+import { journalSides } from '../journal.js';
 import { levelPrecision } from '../journalLevels.js';
 import WorkspaceIcon from '../components/WorkspaceIcon.jsx';
 import '../styles/dashboard.css';
@@ -16,10 +17,13 @@ function DashboardCard({ id, title, icon, rows, message, to, action }) {
       </header>
       {rows.length > 0 ? (
         <ul className="dashboard-list">
-          {rows.map(({ key, symbol, limit }) => (
+          {rows.map(({ key, symbol, direction, limit }) => (
             <li key={key}>
               <Link to={`/stock/${encodeURIComponent(symbol)}`}>
-                <strong>{symbol}</strong>
+                <span className="dashboard-list-ticker">
+                  <strong>{symbol}</strong>
+                  {direction && <span className="dashboard-setup-direction">{t(direction)}</span>}
+                </span>
                 {limit && <span className="dashboard-setup-limit">{limit}</span>}
                 <WorkspaceIcon name="arrow" size={16} />
               </Link>
@@ -35,11 +39,12 @@ export default function DashboardPage({ account, uid }) {
   const { t } = useTranslation();
   const { watchlist, history, ready, readError } = account;
   const { setups, loading, failed } = useJournalSetups(uid);
-  const watched = watchlist.slice(0, 5).map(({ symbol }) => ({ key: symbol, symbol }));
+  const watched = watchlist.slice(0, 8).map(({ symbol }) => ({ key: symbol, symbol }));
   const recent = history.map(symbol => ({ key: symbol, symbol }));
-  const pending = setups.slice(0, 5).map(({ id, pair, limitPrice, quoteCurrency, triggerAbove }) => ({
+  const pending = setups.slice(0, 3).map(({ id, pair, side, limitPrice, quoteCurrency, triggerAbove }) => ({
     key: id,
     symbol: pair,
+    direction: journalSides[side]?.label,
     limit: Number.isFinite(limitPrice) && quoteCurrency
       ? `${triggerAbove ? '≥' : '≤'} ${formatPrice(limitPrice, quoteCurrency, levelPrecision)}`
       : null,

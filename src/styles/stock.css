@@ -121,9 +121,9 @@
   gap: 0.5rem;
   min-width: 0;
   padding: clamp(0.75rem, 1.7cqi, 1.125rem);
-  border: 1px solid var(--support-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--surface) 75%, var(--support-soft));
+  background: var(--surface-muted);
 }
 
 .stock-quote-heading, .stock-quote-readout {
@@ -166,7 +166,7 @@
 .stock-identity .watch-toggle {
   min-height: var(--touch-size);
   padding-inline: 1rem;
-  border-color: var(--workspace-action);
+  border-color: var(--action-text);
   border-radius: var(--field-radius);
   background: var(--workspace-action);
   color: var(--workspace-on-action);
@@ -178,7 +178,9 @@
   .stock-identity .watch-toggle:hover:not(:disabled) { background: var(--workspace-action-hover); }
   .stock-identity .watch-toggle--active:hover:not(:disabled) { background: var(--surface); }
 }
-.stock-identity .watch-toggle:active:not(:disabled) { background: var(--workspace-action-active); }
+.stock-identity .watch-toggle:active:not(:disabled) {
+  background: color-mix(in srgb, var(--workspace-action-active) 60%, var(--workspace-action));
+}
 .stock-identity .watch-toggle--active:active:not(:disabled) { background: var(--workspace-action-soft); }
 
 .stock-detail .detail-status { padding: 0.25rem 0.62rem; border-radius: 999px; }
@@ -529,7 +531,7 @@
 }
 
 .stock-rule-status--pass { color: var(--support-text); background: var(--support-soft); }
-.stock-rule-status--fail { color: var(--warning); background: var(--warning-soft); }
+.stock-rule-status--fail { color: color-mix(in srgb, var(--warning) 90%, var(--text)); background: var(--warning-soft); }
 .stock-rule-status--missing { color: var(--muted); background: var(--surface-tint); }
 
 .stock-criteria-score {
@@ -547,10 +549,8 @@
 }
 
 .stock-criteria-score--positive { --criteria-color: var(--positive); }
-.stock-criteria-score--warning { --criteria-color: #c59b10; }
+.stock-criteria-score--warning { --criteria-color: var(--warning); }
 .stock-criteria-score--negative { --criteria-color: var(--negative); }
-
-:root[data-theme="dark"] .stock-criteria-score--warning { --criteria-color: var(--warning); }
 
 .stock-criteria-track {
   height: 0.4375rem;
@@ -645,7 +645,7 @@
 
 .stock-risk-currency {
   margin: 0.45rem 0;
-  color: var(--warning);
+  color: color-mix(in srgb, var(--warning) 90%, var(--text));
   font-size: 0.875rem;
 }
 

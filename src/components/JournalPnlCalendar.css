@@ -42,7 +42,7 @@
 }
 
 .journal-calendar-grid .journal-calendar-pad { background: transparent; }
-.journal-calendar [data-tone="gain"] { color: var(--positive); }
+.journal-calendar [data-tone="gain"] { color: color-mix(in srgb, var(--positive) 84%, var(--text)); }
 .journal-calendar [data-tone="loss"] { color: var(--negative); }
 .journal-calendar [data-tone="flat"] { color: var(--text); }
 .journal-calendar-grid [data-tone="gain"] { background: color-mix(in srgb, var(--positive) 12%, var(--surface)); }
