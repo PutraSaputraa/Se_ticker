@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import WatchlistTable from '../WatchlistTable.jsx';
 import WatchlistEntryDialog from '../components/WatchlistEntryDialog.jsx';
 import WorkspaceIcon from '../components/WorkspaceIcon.jsx';
+import { AccountChangeError } from '../accountData.js';
 import { formatPrice } from '../format.js';
 import { setPriceToWatch, setWatchlistRating } from '../watchlist.js';
 import '../styles/research.css';
@@ -23,7 +24,7 @@ export default function WatchlistPage({ account, uid }) {
     ready: 'Tersinkron dengan akun',
     loading: 'Memuat data akun…',
   }[sync];
-  const justSaved = sync === 'ready' && confirmation;
+  const result = sync === 'ready' && confirmation;
 
   useLayoutEffect(() => {
     if (editor || watchlistDisabled) return;
@@ -43,10 +44,21 @@ export default function WatchlistPage({ account, uid }) {
     return () => window.clearTimeout(timeout);
   }, [confirmation]);
 
-  async function saveWatchlistChange(change, message) {
-    const saved = await account.update((current) => ({ ...current, watchlist: change(current.watchlist) }));
-    if (saved) setConfirmation({ message });
-    return saved;
+  async function saveWatchlistChange(symbol, change, message) {
+    setConfirmation(null);
+    try {
+      const saved = await account.update((current) => {
+        if (!current.watchlist.some((entry) => entry.symbol === symbol)) {
+          throw new AccountChangeError('Saham ini sudah dihapus dari pantauan.');
+        }
+        return { ...current, watchlist: change(current.watchlist) };
+      });
+      if (saved) setConfirmation({ message });
+      return saved;
+    } catch (error) {
+      setConfirmation({ message: error instanceof AccountChangeError ? error.message : 'Gagal menyimpan perubahan', error: true });
+      return false;
+    }
   }
 
   return (
@@ -61,15 +73,10 @@ export default function WatchlistPage({ account, uid }) {
 
       <section className="research-panel watchlist-panel" aria-label={t("Daftar pantauan")}>
         <div className="research-panel-heading watchlist-toolbar motion-enter motion-enter--after">
-          {watchlist.length > 0 && (
-            <div>
-              <strong>{watchlist.length} {t("saham")}</strong>
-              <p>{t("Bintang tertinggi di atas")}</p>
-            </div>
-          )}
-          <span className="research-sync" data-state={justSaved ? 'saved' : sync} role="status">
-            {sync === 'ready' && <WorkspaceIcon name="check" size={15} />}
-            {justSaved ? t(confirmation.message) : t(syncLabel)}
+          <h2>{t("Daftar pantauan")}</h2>
+          <span className="research-sync" data-state={result ? result.error ? 'error' : 'saved' : sync} role="status">
+            {sync === 'ready' && !result?.error && <WorkspaceIcon name="check" size={15} />}
+            {result ? t(result.message) : t(syncLabel)}
           </span>
         </div>
         {watchlist.length > 0 ? (
@@ -80,12 +87,14 @@ export default function WatchlistPage({ account, uid }) {
             onRemove={account.removeWatchlistSymbol}
             onSetWatchPrice={(symbol, price) =>
               saveWatchlistChange(
+                symbol,
                 (list) => setPriceToWatch(list, symbol, price),
                 `Harga pantauan ${symbol} tersimpan`,
               )
             }
             onSetRating={(symbol, rating) =>
               saveWatchlistChange(
+                symbol,
                 (list) => setWatchlistRating(list, symbol, rating),
                 `${symbol} · ${rating} bintang tersimpan`,
               )

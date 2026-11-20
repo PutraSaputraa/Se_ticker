@@ -18,7 +18,7 @@
 
 .watchlist-heading { align-items: center; }
 .watchlist-heading > div { flex: 1 1 18rem; min-width: 0; }
-.watchlist-page { max-width: none; }
+.watchlist-page { max-width: var(--workspace-table-width); }
 .research-workspace .page-heading p { font-size: 0.9375rem; }
 
 .research-panel {
@@ -37,8 +37,7 @@
 }
 
 .research-panel.watchlist-panel {
-  --research-symbol-width: clamp(8rem, 11cqi, 10rem);
-  padding-inline: clamp(0.625rem, 1cqi, 1rem);
+  --research-symbol-width: clamp(7rem, 12cqi, 11rem);
 }
 .research-panel-heading {
   align-items: center;
@@ -74,9 +73,73 @@
   color: var(--text);
 }
 
-.watchlist-panel .watchlist-toolbar { padding: 0; column-gap: 0.75rem; }
-.watchlist-toolbar strong { display: block; font-size: 1.125rem; font-weight: 650; }
-.watchlist-panel .watchlist-toolbar p { margin-top: 0.1rem; }
+.watchlist-panel .watchlist-toolbar { padding: 0; gap: 0.45rem 0.75rem; }
+.watchlist-toolbar h2 { font-size: var(--section-title-size); }
+.watchlist-toolbar .research-sync[data-state="ready"] { border-color: var(--border); background: var(--surface-muted); color: var(--muted); }
+.watchlist-toolbar .research-sync[data-state="saved"] {
+  border-color: var(--border);
+  background: var(--positive-soft);
+  color: color-mix(in srgb, var(--positive) 88%, var(--text));
+}
+
+.watchlist-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.55rem 1rem;
+  margin-block-start: 0.8rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+.watchlist-selects,
+.watchlist-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.watchlist-filter-options button,
+.watchlist-selects select {
+  min-width: 0;
+  min-height: var(--touch-size);
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--field);
+  color: var(--text);
+  font-size: 0.875rem;
+  transition: background-color var(--motion-nav) var(--motion-ease),
+    color var(--motion-standard) var(--motion-ease), border-color var(--motion-standard) var(--motion-ease);
+}
+.watchlist-filter-options button { border-radius: 999px; font-weight: 600; }
+.watchlist-filter-options button:hover { background: var(--surface-hover); }
+.watchlist-filter-options button[aria-pressed="true"] {
+  border-color: var(--action-text);
+  background: var(--workspace-action-soft);
+  color: var(--action-text);
+}
+.watchlist-selects label {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.watchlist-selects select { width: 100%; }
+.watchlist-filter-summary {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.15rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+.watchlist-filter-summary button { min-height: var(--touch-size); color: var(--action-text); }
 
 :is(.watchlist-panel, .recommend-panel) .research-empty {
   margin-top: 0.75rem;
@@ -273,12 +336,39 @@
 }
 
 .watchlist-table .research-badge { border-radius: 999px; }
-.watchlist-table :is(th, td) { padding-inline: 0.4rem; }
+.watchlist-table :is(.research-badge--positive, .research-cell-note--support, .trend--up) {
+  color: color-mix(in srgb, var(--positive) 88%, var(--text));
+}
+.watchlist-table :is(th, td) { padding: 0.5rem clamp(0.4rem, 0.85cqi, 0.875rem); }
 .watchlist-table thead th { white-space: normal; }
+.watchlist-table thead th:first-child { z-index: 2; }
+.watchlist-table-scroll { position: relative; container-type: inline-size; }
 .watchlist-table .watchlist-stage { text-align: center; }
 .watchlist-table .watchlist-stage .research-cell-note { min-width: 3.75rem; white-space: normal; }
 .watchlist-table .watchlist-average-volume { min-width: 6.25rem; white-space: normal; }
 .watchlist-header-note { display: block; font-weight: 400; white-space: nowrap; }
+.watchlist-symbol { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.watchlist-symbol .research-ticker { font-size: 0.9375rem; }
+.watchlist-match { display: inline-flex; color: var(--positive); }
+.watchlist-table .watchlist-row[data-match="true"] .research-instrument {
+  box-shadow: inset 3px 0 0 var(--positive);
+}
+.watchlist-skeleton {
+  display: inline-block;
+  width: 3.5rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: var(--surface-tint);
+}
+.watchlist-quote-state > .watchlist-skeleton { display: inline-block; }
+.watchlist-table .watchlist-price-editor { display: grid; justify-items: end; gap: 0.25rem; }
+.watchlist-price-editor p {
+  max-width: 8.5rem;
+  color: var(--danger);
+  font-size: 0.75rem;
+  white-space: normal;
+}
+.watchlist-table .ptw-input[aria-invalid="true"] { border-color: var(--danger); }
 
 .watchlist-table .watchlist-notes {
   width: 24%;
@@ -428,25 +518,53 @@
   overflow-wrap: anywhere;
 }
 
+.watchlist-quote-state > .watchlist-close {
+  display: inline-flex;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 .watchlist-table .watchlist-row { cursor: default; }
 .watchlist-table .watchlist-entry:nth-of-type(even) .watchlist-row { --research-row-background: var(--surface-muted); }
-.watchlist-table .watchlist-detail-row[hidden] { display: none; }
+.watchlist-table .watchlist-detail-row td { padding: 0; border: 0; }
+.watchlist-detail-reveal {
+  position: sticky;
+  inset-inline-start: 0;
+  width: 100cqi;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows var(--motion-nav) var(--motion-ease), opacity var(--motion-standard) var(--motion-ease);
+}
+.watchlist-detail-reveal[data-expanded="true"] { grid-template-rows: 1fr; opacity: 1; }
+@starting-style {
+  .watchlist-detail-reveal[data-expanded="true"] { grid-template-rows: 0fr; opacity: 0; }
+}
+.watchlist-detail-clip { min-height: 0; overflow: clip; }
 .watchlist-table .watchlist-details {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-  padding: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem 1.2rem;
+  padding: clamp(0.7rem, 1.4cqi, 1rem);
+  border-block-end: 1px solid var(--border);
+  background: var(--surface-muted);
   white-space: normal;
 }
 .watchlist-details section { min-width: 0; }
 .watchlist-details h3 { margin: 0 0 0.4rem; font-size: 0.8125rem; color: var(--muted); }
-.watchlist-table .watchlist-details .watchlist-notes { grid-column: 1 / -1; width: auto; min-width: 0; }
+.watchlist-table .watchlist-details .watchlist-notes { width: auto; min-width: 0; }
+.watchlist-volume-details ul { display: grid; gap: 0.4rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
+.watchlist-volume-details li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.7rem; }
+.watchlist-volume-details li span { font-variant-numeric: tabular-nums; }
 .watchlist-detail-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.watchlist-disclosure { display: inline-flex; align-items: center; gap: 0.25rem; }
+.watchlist-disclosure { position: relative; display: inline-flex; align-items: center; gap: 0.25rem; }
+.watchlist-disclosure svg { transition: transform var(--motion-standard) var(--motion-ease); }
 .watchlist-disclosure[aria-expanded="true"] svg { transform: rotate(180deg); }
 @container (width < 44rem) {
-  .watchlist-table .watchlist-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .watchlist-table .research-table-company { display: none; }
+  .watchlist-filters,
+  .watchlist-table .watchlist-details { grid-template-columns: minmax(0, 1fr); }
+  .watchlist-selects label { flex: 1 1 8rem; }
   .watchlist-table .watchlist-disclosure { min-width: 2.75rem; }
   .watchlist-table .watchlist-disclosure span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
@@ -465,6 +583,7 @@
   color: var(--text);
   font-variant-numeric: tabular-nums;
   text-align: right;
+  transition: border-color var(--motion-standard) var(--motion-ease);
 }
 
 .research-remove,

@@ -86,6 +86,7 @@ html {
   --workspace-card-padding: clamp(0.875rem, 1.75vw, 1.5rem);
   --workspace-card-gap: clamp(0.875rem, 1.6vw, 1.25rem);
   --workspace-content-width: 79rem;
+  --workspace-table-width: 96rem;
   --radius: 0.75rem;
   --field-radius: 0.5625rem;
   --touch-size: 2.75rem;

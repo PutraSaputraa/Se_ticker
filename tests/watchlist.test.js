@@ -8,6 +8,7 @@ import {
   setWatchlistNotes,
   setWatchlistRating,
 } from '../src/watchlist.js';
+import { strongWatchStage2, watchPriceStatus, watchVolumePass } from '../src/watchlistSignals.js';
 
 test('watchlist lama tetap tanpa rating dan hanya bintang bulat 1 sampai 5 dipertahankan', () => {
   const invalidRatings = [0, 6, '3', 3.5, null];
@@ -58,4 +59,27 @@ test('catatan dan gambar tetap tersimpan saat harga atau bintang ticker berubah'
   const removed = removeSymbol(updated, 'BBCA.JK');
   assert.deepEqual(setWatchlistNotes(removed, 'BBCA.JK', 'Catatan terlambat'), removed);
   assert.deepEqual(setWatchlistImage(removed, 'BBCA.JK', 'image-2'), removed);
+});
+
+test('watchlist volume uses either verified session and leaves unavailable data unclassified', () => {
+  const quote = (first, previous) => ({ close: 120, buyTrigger: { volumeChecks: [
+    { meetsThreshold: first }, { meetsThreshold: previous },
+  ] } });
+  assert.equal(watchVolumePass(quote(false, true)), true);
+  assert.equal(watchVolumePass(quote(false, false)), false);
+  assert.equal(watchVolumePass(quote(false, null)), null);
+  assert.equal(watchVolumePass({ close: 120 }), null);
+  assert.equal(watchPriceStatus(quote(false, true), null, true), 'none');
+  assert.equal(watchPriceStatus(quote(false, true), 120, true), 'near');
+  assert.equal(watchPriceStatus(quote(false, true), 119, true), 'breakout');
+  assert.equal(watchPriceStatus(quote(false, false), 119, false), 'near');
+});
+
+test('the strong Stage 2 filter requires seven or eight verified criteria out of eight', () => {
+  assert.equal(strongWatchStage2({ passed: 7, total: 8 }), true);
+  assert.equal(strongWatchStage2({ passed: 8, total: 8 }), true);
+  assert.equal(strongWatchStage2({ passed: 6, total: 8 }), false);
+  assert.equal(strongWatchStage2({ passed: 7, total: 7 }), false);
+  assert.equal(strongWatchStage2({ passed: 9, total: 8 }), false);
+  assert.equal(strongWatchStage2(undefined), false);
 });

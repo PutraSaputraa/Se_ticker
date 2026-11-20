@@ -1,6 +1,6 @@
 import { getLocale, localizedDateFormat } from '../i18n.js';
 import useTranslation from '../useTranslation.js';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import JournalCharts from '../components/JournalCharts.jsx';
 import JournalPnlCalendar from '../components/JournalPnlCalendar.jsx';
 import { ExitPlanFields, LeverageFields, PriceField } from '../components/JournalOrderFields.jsx';
@@ -9,7 +9,9 @@ import JournalTradeSetups from '../components/JournalTradeSetups.jsx';
 import TickerField from '../components/TickerField.jsx';
 import JournalWallet from '../components/JournalWallet.jsx';
 import TableScroll from '../components/TableScroll.jsx';
+import TradeRiskPreview from '../components/TradeRiskPreview.jsx';
 import UpdatedValue from '../components/UpdatedValue.jsx';
+import WorkspaceIcon from '../components/WorkspaceIcon.jsx';
 import { accountTickerSymbols, normalizeTicker } from '../tickers.js';
 import {
   calculateTradePnl,
@@ -32,6 +34,7 @@ import { formatDate, formatPct, formatPnl, formatPrice, priceDecimals } from '..
 import { calculateLevels, levelPrecision, validateLevels } from '../journalLevels.js';
 import { journalSetupMarkets } from '../journalSetups.js';
 import { deleteJournalScreenshot, uploadJournalScreenshot } from '../journalScreenshot.js';
+import { estimateTradeRisk, summarizeOpenPositions } from '../journalValuation.js';
 import useJournalQuotes, { fetchJournalInstrument, fetchJournalQuote } from '../useJournalQuotes.js';
 import useSectionNavigation from '../useSectionNavigation.js';
 import {
@@ -55,11 +58,18 @@ const journalSections = [
   { id: 'journal-closed', label: 'Posisi ditutup' },
 ];
 const journalSectionIds = journalSections.map(({ id }) => id);
+const journalAnchorIds = [...journalSectionIds, 'journal-charts'];
 
 const quoteTimeFormat = localizedDateFormat({
   day: 'numeric', month: 'short', year: 'numeric',
   hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
 });
+const tradeDateFormat = localizedDateFormat({ day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+function compactTradeDate(date) {
+  const time = Date.parse(date + 'T00:00:00Z');
+  return Number.isFinite(time) ? tradeDateFormat.format(time) : date;
+}
 
 function emptyForm() {
   return {
@@ -118,7 +128,8 @@ function valueOpenTrade(trade, quoteState) {
 function RunningPnlCells({ value, currency, children }) {
   const { t } = useTranslation();
   const { quote, pnl, pnlPct, pnlUsd, message } = value;
-  const quoteTime = quote?.timestamp ? new Date(quote.timestamp * 1000) : null;
+  const quoteTime = quote?.timestamp > 0 ? new Date(quote.timestamp * 1000) : null;
+  const hasQuoteTime = quoteTime && Number.isFinite(quoteTime.getTime());
   return (
     <>
       <td className={`num ${pnlTone(pnl)}`}>
@@ -140,7 +151,7 @@ function RunningPnlCells({ value, currency, children }) {
         />
         {quote ? (
           <small className="journal-trade-note">
-            <time dateTime={quoteTime?.toISOString() ?? quote.date}>{quoteTime ? quoteTimeFormat.format(quoteTime) : quote.date}</time>
+            <time dateTime={hasQuoteTime ? quoteTime.toISOString() : quote.date}>{hasQuoteTime ? quoteTimeFormat.format(quoteTime) : formatDate(quote.date)}</time>
           </small>
         ) : <small className="journal-trade-note journal-quote-note">{t(message)}</small>}
       </td>
@@ -159,6 +170,38 @@ function StatCard({ label, value, tone }) {
     <div className={`metric-card${tone ? ` metric-card--${tone}` : ''}`}>
       <span className="metric-label">{t(label)}</span>
       <strong className="metric-value">{value}</strong>
+    </div>
+  );
+}
+
+function OpenPositionSummary({ summary, count, refreshing }) {
+  const { t } = useTranslation();
+  const { total, priced, returnPct, timestamp } = summary;
+  const quoteTime = timestamp == null ? null : new Date(timestamp * 1000);
+  return (
+    <div className="journal-running">
+      <dl className="journal-running-values">
+        <div>
+          <dt>{t(priced > 0 && priced < count ? "PnL berjalan parsial (USD)" : "Total PnL berjalan (USD)")}</dt>
+          <dd className={pnlTone(total)}>
+            <UpdatedValue value={total} format={(amount) => formatPnl(amount, 'USD')} />
+          </dd>
+        </div>
+        <div><dt>{t("Return gabungan")}</dt><dd className={pnlTone(returnPct)}>{formatPct(returnPct)}</dd></div>
+        <div><dt>{t("Posisi terbuka")}</dt><dd>{count.toLocaleString(getLocale())}</dd></div>
+        <div>
+          <dt>{t("Kuotasi terbaru")}</dt>
+          <dd>{quoteTime ? <time dateTime={quoteTime.toISOString()}>{quoteTimeFormat.format(quoteTime)}</time> : '–'}</dd>
+        </div>
+      </dl>
+      <p className="journal-help">
+        {t("{0} dari {1} posisi memiliki PnL USD.", priced.toLocaleString(getLocale()), count.toLocaleString(getLocale()))}{' '}
+        {refreshing ? t("Pembaruan kuotasi berlangsung.") : priced < count ? t("Return gabungan memerlukan PnL dan nilai awal untuk semua posisi.") : ''}
+      </p>
+      <details className="journal-inline-help">
+        <summary>{t("Basis return dan kuotasi")}</summary>
+        <p className="journal-help">{t("Return gabungan membagi total PnL USD dengan jumlah nilai awal spot dan margin futures. Return tiap futures sudah memperhitungkan leverage. Waktu menunjukkan kuotasi Yahoo Finance terbaru yang dipakai; kuotasi tiap ticker bisa berbeda.")}</p>
+      </details>
     </div>
   );
 }
@@ -237,11 +280,85 @@ function PositionValueDialog({ trade, disabled, saving, feedback, onSave, onClos
   );
 }
 
+function TradeActionDialog({ action, busy, disabled, feedback, onConfirm, onClose }) {
+  const { t } = useTranslation();
+  const dialog = useRef(null);
+  const titleId = useId();
+  const hintId = useId();
+  const closePosition = action.kind === 'close';
+
+  useEffect(() => {
+    if (!dialog.current.open) dialog.current.showModal();
+  }, []);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (disabled || !await onConfirm()) return;
+    dialog.current?.close();
+    document.getElementById('journal-' + action.section + '-title')?.focus({ preventScroll: true });
+  }
+
+  return (
+    <dialog ref={dialog} className="journal-position-value-dialog" aria-labelledby={titleId}
+      aria-describedby={hintId} onClose={onClose} onCancel={(event) => { if (busy) event.preventDefault(); }}>
+      <form className="journal-form" onSubmit={handleSubmit} aria-busy={busy}>
+        <h2 id={titleId}>{t(closePosition ? "Tutup posisi {0}?" : "Hapus posisi {0}?", action.trade.pair)}</h2>
+        <p className="journal-help" id={hintId}>{closePosition
+          ? t("Jurnal akan mengambil kuotasi terakhir Yahoo Finance untuk mencatat harga keluar dan PnL.")
+          : action.returnsFunds
+            ? t("Catatan posisi akan dihapus dan dana yang dialokasikan akan kembali ke wallet.")
+            : t("Catatan posisi akan dihapus secara permanen dari jurnal.")}</p>
+        <JournalFeedback feedback={feedback} section={action.section} />
+        <div className="journal-position-value-actions">
+          <button type="button" className="journal-secondary-button" autoFocus disabled={busy}
+            onClick={() => dialog.current.close()}>{t("Batal")}</button>
+          <button type="submit" className={closePosition ? 'scan-button' : 'journal-secondary-button journal-danger-button'} disabled={disabled}>
+            {t(busy ? (closePosition ? "Mengambil harga…" : "Menghapus…") : (closePosition ? "Tutup posisi" : "Hapus posisi"))}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+function PositionDetailRow({ trade, value, currency, id, expanded, onViewScreenshot }) {
+  const { t } = useTranslation();
+  return (
+    <tr id={id} className="journal-detail-row" aria-hidden={!expanded}>
+      <td colSpan={13}>
+        <div className="journal-detail-reveal" data-expanded={expanded} inert={!expanded}>
+          <div className="journal-detail-clip">
+            <div className="journal-position-details">
+              <h3>{t("Rincian posisi {0}", trade.pair)}</h3>
+              <dl>
+                <div><dt>{t("Posisi")}</dt><dd>{t(journalSides[trade.side].label)} · {t(journalTypes[trade.type])}</dd></div>
+                <div><dt>{t("Tanggal masuk")}</dt><dd><time dateTime={trade.date}>{formatDate(trade.date)}</time></dd></div>
+                <div><dt>{t("Harga masuk")}</dt><dd>{formatJournalPrice(trade.entryPrice, currency, levelPrecision)}</dd></div>
+                {value?.quote && <div><dt>{t("Harga terbaru")}</dt><dd>{formatJournalPrice(value.quote.price, currency, quotePrecision(value.quote.price, currency))}</dd></div>}
+                {trade.stopLoss != null && <div><dt>{t("Stop Loss")}</dt><dd>{formatJournalPrice(trade.stopLoss, currency, levelPrecision)}</dd></div>}
+                {trade.takeProfit != null && <div><dt>{t("Take Profit (TP)")}</dt><dd>{formatJournalPrice(trade.takeProfit, currency, levelPrecision)}</dd></div>}
+                {trade.positionUsd != null && <div><dt>{t(trade.type === 'futures' ? "Margin awal (USD)" : "Nilai awal posisi (USD)")}</dt><dd>{formatPrice(trade.positionUsd, 'USD')}</dd></div>}
+                {trade.type === 'futures' && trade.leverage != null && <div><dt>{t("Leverage (×)")}</dt><dd>{trade.leverage.toLocaleString(getLocale())}×</dd></div>}
+                {trade.setup && <div><dt>{t("Setup")}</dt><dd>{trade.setup}</dd></div>}
+              </dl>
+              {trade.notes && <p className="journal-position-notes">{trade.notes}</p>}
+              {trade.chartScreenshot && <button className="journal-secondary-button" type="button" aria-haspopup="dialog"
+                onClick={() => onViewScreenshot(trade)}>{t("Lihat screenshot")}</button>}
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function TradeTable({
-  trades, closed = false, manualCurrency, runningValues, ready, readError, disabled, activeAction, onClose, onRemove, onViewScreenshot,
+  trades, closed = false, manualCurrency, runningValues, ready, readError, disabled, onClose, onRemove, onViewScreenshot,
   onFillPositionValue,
 }) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(null);
+  const [visited, setVisited] = useState(() => new Set());
   if (trades.length === 0) {
     return (
       <p className="journal-empty" role="status">
@@ -295,6 +412,9 @@ function TradeTable({
             const realized = closed ? realizedTradePnl(trade, manualCurrency) : null;
             const entryPrecision = trade.stopLoss != null ? levelPrecision : undefined;
             const holdingDays = holdingPeriodDays(trade);
+            const detailsId = 'journal-position-' + trade.id;
+            const showDetails = expanded === trade.id;
+            const quoteValue = runningValues?.get(trade.id);
             const actions = (
               <td className="num">
                 <div className="journal-row-actions">
@@ -303,29 +423,39 @@ function TradeTable({
                       type="button"
                       className="journal-secondary-button"
                       disabled={disabled}
+                      aria-haspopup="dialog"
                       aria-label={t("Tutup posisi {0} {1}", t(side.label), trade.pair)}
                       onClick={() => onClose(trade)}
                     >
-                      {activeAction === trade.id ? t("Mengambil harga…") : t("Tutup")}
+                      {t("Tutup")}
                     </button>
                   )}
                   <button
                     type="button"
                     className="journal-remove"
                     disabled={disabled}
+                    aria-haspopup="dialog"
                     title={t("Hapus posisi")}
                     aria-label={t("Hapus posisi {0}", trade.pair)}
                     onClick={() => onRemove(trade)}
                   >
-                    {activeAction === `remove:${trade.id}` ? '…' : '×'}
+                    ×
                   </button>
                 </div>
               </td>
             );
 
-            return (
-              <tr key={trade.id}>
-                <th scope="row" className="journal-ticker">{trade.pair}</th>
+            const row = (
+              <tr className="journal-trade-row">
+                <th scope="row" className="journal-ticker">
+                  {trade.pair}
+                  {!closed && <button type="button" className="journal-position-disclosure" aria-expanded={showDetails}
+                    aria-controls={detailsId} aria-label={t("Rincian posisi {0}", trade.pair)}
+                    onClick={() => {
+                      setExpanded(showDetails ? null : trade.id);
+                      if (!visited.has(trade.id)) setVisited((current) => new Set(current).add(trade.id));
+                    }}><WorkspaceIcon name="chevron" size={14} />{t("Rincian")}</button>}
+                </th>
                 <td>
                   <Badge meta={side} />
                   <small className="journal-trade-note">{t(journalTypes[trade.type])}</small>
@@ -344,7 +474,7 @@ function TradeTable({
                   </>
                 ) : (
                   <>
-                    <RunningPnlCells value={runningValues.get(trade.id)} currency={currency}>
+                    <RunningPnlCells value={quoteValue} currency={currency}>
                       {trade.positionUsd == null && (
                         <button type="button" className="text-button journal-position-value-button" disabled={disabled}
                           aria-label={t("Isi nilai awal {0} {1}", t(side.label), trade.pair)} aria-haspopup="dialog"
@@ -368,20 +498,20 @@ function TradeTable({
                       aria-label={t("Lihat screenshot chart {0}", trade.pair)} onClick={() => onViewScreenshot(trade)}>{t("Lihat screenshot")}</button>
                   )}
                 </td>
-                <td><time dateTime={trade.date}>{trade.date}</time></td>
+                <td><time dateTime={trade.date}>{compactTradeDate(trade.date)}</time></td>
                 <td className="num">{formatJournalPrice(trade.entryPrice, currency, entryPrecision)}</td>
                 <td className="num">{formatJournalPrice(trade.stopLoss, currency, levelPrecision)}</td>
                 <td className="num">{trade.rewardMultiple == null ? '–' : `1:${trade.rewardMultiple}`}</td>
                 <td className="num">{formatJournalPrice(trade.takeProfit, currency, levelPrecision)}</td>
                 <td className="num">
-                  {formatJournalPrice(trade.positionUsd * (trade.leverage ?? 1), 'USD')}
+                  {formatJournalPrice(trade.positionUsd == null ? null : trade.positionUsd * (trade.leverage ?? 1), 'USD')}
                   {trade.leverage > 1 && (
                     <small className="journal-trade-note">{t("Margin")} {formatPrice(trade.positionUsd, 'USD')} · {trade.leverage}×</small>
                   )}
                 </td>
                 {closed && (
                   <>
-                    <td>{trade.exitDate ? <time dateTime={trade.exitDate}>{trade.exitDate}</time> : '–'}</td>
+                    <td>{trade.exitDate ? <time dateTime={trade.exitDate}>{compactTradeDate(trade.exitDate)}</time> : '–'}</td>
                     <td className="num">{formatJournalPrice(trade.exitPrice, currency)}</td>
                     <td className={`num ${pnlTone(trade.pnl)}`}>
                       {formatPnl(trade.pnl, currency)}
@@ -391,6 +521,16 @@ function TradeTable({
                   </>
                 )}
               </tr>
+            );
+
+            return (
+              <Fragment key={trade.id}>
+                {row}
+                {!closed && (visited.has(trade.id)
+                  ? <PositionDetailRow trade={trade} value={quoteValue} currency={currency} id={detailsId}
+                      expanded={showDetails} onViewScreenshot={onViewScreenshot} />
+                  : <tr id={detailsId} hidden><td colSpan={13} /></tr>)}
+              </Fragment>
             );
           })}
         </tbody>
@@ -408,31 +548,35 @@ export default function JournalPage({ account, uid }) {
   const [feedback, setFeedback] = useState(null);
   const [viewingScreenshot, setViewingScreenshot] = useState(null);
   const [positionValueTrade, setPositionValueTrade] = useState(null);
+  const [tradeAction, setTradeAction] = useState(null);
   const running = useRef(false);
-  const sections = useSectionNavigation(journalSectionIds);
+  const sectionNav = useRef(null);
+  const sections = useSectionNavigation(journalSectionIds, sectionNav, journalAnchorIds);
   const disabled = !account.ready || account.pending || activeAction !== null;
   const { side, type, rewardMultiple } = form;
   const levels = calculateLevels(form);
   const wallet = useMemo(() => summarizeWallet(account.wallet), [account.wallet]);
+  const equityCents = ready ? wallet.equityCents : null;
+  const risk = estimateTradeRisk(form, levels, equityCents);
+  const exceedsWallet = ready && risk.positionCents != null && risk.positionCents > wallet.availableCents;
   const knownTickers = accountTickerSymbols(account);
 
-  const openTrades = journal.filter((trade) => trade.status === 'open');
+  const openTrades = useMemo(() => journal.filter((trade) => trade.status === 'open'), [journal]);
   const { quotes, refresh } = useJournalQuotes(openTrades);
-  const runningValues = new Map(openTrades.map((trade) => [trade.id, valueOpenTrade(trade, quotes[trade.pair])]));
-  const runningAmounts = [...runningValues.values()].map(({ pnlUsd }) => pnlUsd).filter(Number.isFinite);
-  const totalRunningPnl = runningAmounts.length ? runningAmounts.reduce((total, pnl) => total + pnl, 0) : null;
+  const runningValues = useMemo(() => new Map(openTrades.map((trade) => [trade.id, valueOpenTrade(trade, quotes[trade.pair])])), [openTrades, quotes]);
+  const openSummary = useMemo(() => summarizeOpenPositions(openTrades, runningValues), [openTrades, runningValues]);
   const refreshing = openTrades.some(({ pair }) => !quotes[pair] || quotes[pair].loading);
-  const closedTrades = journal.filter((trade) => trade.status !== 'open')
-    .sort((a, b) => (b.exitDate ?? b.date).localeCompare(a.exitDate ?? a.date));
-  const quoted = summarizeJournal(closedTrades.filter((trade) => trade.quoteCurrency), 'pnlPct');
-  const manual = summarizeJournal(closedTrades.filter((trade) => !trade.quoteCurrency));
+  const closedTrades = useMemo(() => journal.filter((trade) => trade.status !== 'open')
+    .sort((a, b) => (b.exitDate ?? b.date).localeCompare(a.exitDate ?? a.date)), [journal]);
+  const quoted = useMemo(() => summarizeJournal(closedTrades.filter((trade) => trade.quoteCurrency), 'pnlPct'), [closedTrades]);
+  const manual = useMemo(() => summarizeJournal(closedTrades.filter((trade) => !trade.quoteCurrency)), [closedTrades]);
   const wins = quoted.wins + manual.wins;
   const losses = quoted.losses + manual.losses;
   const decided = quoted.closedTrades + manual.closedTrades;
   const winRate = decided ? (wins / decided) * 100 : null;
   const manualStats = !quoted.totalTrades && manual.totalTrades > 0;
   const stats = manualStats ? manual : quoted;
-  const realizedPnl = summarizeRealizedPnl(closedTrades, currency);
+  const realizedPnl = useMemo(() => summarizeRealizedPnl(closedTrades, currency), [closedTrades, currency]);
   const currencyLocked = hasManualPnl(closedTrades);
 
   function statValue(value) {
@@ -458,7 +602,7 @@ export default function JournalPage({ account, uid }) {
     setFeedback(null);
     try {
       const message = await operation();
-      setFeedback({ section, type: 'success', message });
+      setFeedback(typeof message === 'string' ? { section, type: 'success', message } : { section, ...message });
       return true;
     } catch (failure) {
       setFeedback({ section, type: 'error', message: failure.message || 'Jurnal gagal diperbarui. Coba lagi.' });
@@ -599,10 +743,15 @@ export default function JournalPage({ account, uid }) {
         ? 'Posisi dibatalkan dan dana dikembalikan ke wallet.'
         : 'Posisi dihapus dari jurnal.';
       if (chartScreenshot && !await deleteJournalScreenshot(uid, id)) {
-        throw new Error(`${message} Screenshot chart gagal dihapus.`);
+        return { type: 'warning', message: `${message} Screenshot chart gagal dihapus.` };
       }
       return message;
     });
+  }
+
+  function confirmTradeAction(kind, trade, section) {
+    setFeedback(null);
+    setTradeAction({ kind, trade, section, returnsFunds: kind === 'remove' && section === 'open' && wallet.positions.has(trade.id) });
   }
 
   return (
@@ -612,22 +761,21 @@ export default function JournalPage({ account, uid }) {
           <h1>{t("Jurnal trading")}</h1>
           <p className="journal-help">{t("Catat posisi dan evaluasi hasil trading.")}</p>
         </div>
-        <nav className="journal-jump-links" aria-label={t("Bagian jurnal")}>
+      </header>
+      <nav ref={sectionNav} className="journal-section-nav" aria-label={t("Bagian jurnal")}>
+        <div className="journal-jump-links">
           {journalSections.map(({ id, label }) => (
-            <a
-              key={id}
-              href={`#${id}`}
-              aria-current={sections.active === id ? 'location' : undefined}
-              onClick={(event) => sections.handleClick(event, id)}
-            >
+            <a key={id} href={`#${id}`} aria-current={sections.active === id ? 'location' : undefined}
+              onClick={(event) => sections.handleClick(event, id)}>
               {t(label)}
             </a>
           ))}
-        </nav>
-      </header>
+        </div>
+      </nav>
 
       <JournalWallet wallet={wallet} ready={ready} readError={readError} disabled={disabled}
-        saving={activeAction === 'wallet'} onMove={handleWalletMove}>
+        saving={activeAction === 'wallet'} onMove={handleWalletMove}
+        onViewChart={(event) => sections.handleClick(event, 'journal-charts')}>
         <JournalFeedback feedback={feedback} section="wallet" />
       </JournalWallet>
 
@@ -644,7 +792,7 @@ export default function JournalPage({ account, uid }) {
             </dl>
           )}
         </div>
-        <form className="journal-form" onSubmit={handleOpen}>
+        <form className="journal-form" onSubmit={handleOpen} aria-busy={activeAction === side}>
           <div className="journal-form-groups">
             <fieldset className="journal-form-group">
               <legend>{t("Rincian posisi")}</legend>
@@ -668,21 +816,22 @@ export default function JournalPage({ account, uid }) {
                     ))}
                   </select>
                 </label>
-                <label>{t("Type")}<select value={type} onChange={(event) => {
+                <label>{t("Jenis posisi")}<select value={type} onChange={(event) => {
                     setField('type', event.target.value);
                     setFeedback((current) => current?.section === 'entry' ? null : current);
                   }} disabled={disabled}>
                     {Object.entries(journalTypes).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
                   </select>
                 </label>
-                <label>{t("Nilai posisi (USD)")}<input
+                <label>{t(type === 'futures' ? "Margin awal (USD)" : "Nilai posisi (USD)")}<input
                     type="text"
                     inputMode="decimal"
                     value={form.positionUsd}
                     onChange={(event) => setField('positionUsd', event.target.value)}
                     placeholder={t("500 atau 125,50")}
                     maxLength={13}
-                    aria-describedby="journal-wallet-note"
+                    aria-describedby={exceedsWallet ? 'journal-wallet-note journal-wallet-error' : 'journal-wallet-note'}
+                    aria-invalid={exceedsWallet || undefined}
                     disabled={disabled}
                     required
                   />
@@ -710,23 +859,36 @@ export default function JournalPage({ account, uid }) {
               </div>
               <p className="journal-help" id="journal-wallet-note">{t("Nilai posisi diambil dari")} <a href="#journal-wallet"
                 onClick={(event) => sections.handleClick(event, 'journal-wallet')}>{t("saldo wallet USD")}</a>.</p>
-              <p className="journal-help" id="journal-ticker-note">{t("Untuk kripto, gunakan")} <code>{t("BTC-USD")}</code> {t("atau")} <code>{t("CRYPTO:BTC")}</code>{t(". Awali dengan")} <code>{t("US:")}</code> {t("untuk memilih ticker AS jika kodenya sama.")}{' '}
-                {type === 'futures' ? t("Tanggal masuk mengikuti zona waktu perangkat. Gunakan kode kontrak untuk kuotasi futures.") : t("Tanggal masuk mengikuti zona waktu bursa.")}
-              </p>
+              {exceedsWallet && <p className="journal-field-error" id="journal-wallet-error">{t("Saldo wallet tidak cukup untuk nilai posisi ini.")}</p>}
+              <details className="journal-inline-help">
+                <summary>{t("Format ticker dan tanggal")}</summary>
+                <p className="journal-help" id="journal-ticker-note">{t("Untuk kripto, gunakan")} <code>{t("BTC-USD")}</code> {t("atau")} <code>{t("CRYPTO:BTC")}</code>{t(". Awali dengan")} <code>{t("US:")}</code> {t("untuk memilih ticker AS jika kodenya sama.")}{' '}
+                  {type === 'futures' ? t("Tanggal masuk mengikuti zona waktu perangkat. Gunakan kode kontrak untuk kuotasi futures.") : t("Tanggal masuk mengikuti zona waktu bursa.")}
+                </p>
+              </details>
             </fieldset>
             <fieldset className="journal-form-group">
               <legend>{t("Rencana keluar")}</legend>
               <div className="journal-form-grid">
-                <ExitPlanFields form={form} levels={levels} setField={setField} disabled={disabled} describedBy="journal-level-note" />
+                <ExitPlanFields form={form} levels={levels} setField={setField} disabled={disabled} describedBy="journal-level-note"
+                  stopError={risk.invalidStop && (side === 'long' ? 'Untuk Long, Stop Loss harus di bawah harga masuk.' : 'Untuk Short, Stop Loss harus di atas harga masuk.')}
+                  targetError={risk.invalidTarget
+                    ? (side === 'long' ? 'Untuk Long, Take Profit harus di atas harga masuk.' : 'Untuk Short, Take Profit harus di bawah harga masuk.')
+                    : rewardMultiple && levels.entryPrice && levels.stopLoss && !risk.invalidStop && !levels.takeProfit
+                      ? 'Take Profit otomatis harus lebih dari 0. Sesuaikan Stop Loss atau Risk Reward Ratio.' : undefined} />
               </div>
               {type === 'futures' && <LeverageFields form={form} setField={setField} disabled={disabled} />}
-              <p className="journal-help" id="journal-level-note">{t("Stop loss otomatis dihitung dari harga masuk. Pilih rasio untuk menghitung take profit. Gunakan mata uang ticker. Tulis desimal dengan titik atau koma tanpa pemisah ribuan.")}</p>
+              <details className="journal-inline-help">
+                <summary>{t("Cara mengisi level harga")}</summary>
+                <p className="journal-help" id="journal-level-note">{t("Stop loss otomatis dihitung dari harga masuk. Pilih rasio untuk menghitung take profit. Gunakan mata uang ticker. Tulis desimal dengan titik atau koma tanpa pemisah ribuan.")}</p>
+              </details>
               <JournalScreenshotField file={form.screenshot} disabled={disabled} onChange={(file) => {
                 setField('screenshot', file);
                 setFeedback((current) => current?.section === 'entry' ? null : current);
               }} />
             </fieldset>
           </div>
+          <TradeRiskPreview form={form} levels={levels} risk={risk} equityCents={equityCents} />
           <div className="journal-actions">
             <button type="submit" className="scan-button" disabled={disabled}>
               {activeAction === side ? t("Menyimpan…") : t("Buka {0}", t(journalSides[side].label))}
@@ -742,7 +904,6 @@ export default function JournalPage({ account, uid }) {
         <div className="journal-section-header">
           <div>
             <h2 id="journal-open-title" tabIndex={-1}>{t("Posisi terbuka")}</h2>
-            <p className="journal-help">{t("Harga keluar memakai kuotasi terakhir Yahoo Finance saat posisi ditutup.")}</p>
           </div>
           {openTrades.length > 0 && (
             <button type="button" className="journal-secondary-button" onClick={refresh} disabled={refreshing}>
@@ -750,16 +911,9 @@ export default function JournalPage({ account, uid }) {
             </button>
           )}
         </div>
-        {!positionValueTrade && <JournalFeedback feedback={feedback} section="open" />}
+        {!positionValueTrade && tradeAction?.section !== 'open' && <JournalFeedback feedback={feedback} section="open" />}
         {openTrades.length > 0 && (
-          <div className="journal-running">
-            <StatCard
-              label={t("Total PnL berjalan (USD)")}
-              value={formatPnl(totalRunningPnl, 'USD')}
-              tone={totalRunningPnl > 0 ? 'gain' : totalRunningPnl < 0 ? 'risk' : undefined}
-            />
-            <p className="journal-help">{t("PnL dari harga masuk ke kuotasi terakhir Yahoo Finance.")} {runningAmounts.length} {t("dari")} {openTrades.length} {t("posisi dihitung dalam USD. Perhitungan memakai kurs tetap untuk ticker non-USD.")}</p>
-          </div>
+          <OpenPositionSummary summary={openSummary} count={openTrades.length} refreshing={refreshing} />
         )}
         <TradeTable
           trades={openTrades}
@@ -768,9 +922,8 @@ export default function JournalPage({ account, uid }) {
           ready={ready}
           readError={readError}
           disabled={disabled}
-          activeAction={activeAction}
-          onClose={handleClose}
-          onRemove={(trade) => handleRemove(trade, 'open')}
+          onClose={(trade) => confirmTradeAction('close', trade, 'open')}
+          onRemove={(trade) => confirmTradeAction('remove', trade, 'open')}
           onViewScreenshot={setViewingScreenshot}
           onFillPositionValue={(trade) => {
             setFeedback(null);
@@ -793,7 +946,7 @@ export default function JournalPage({ account, uid }) {
             <p className="journal-help">{t("PnL terealisasi dan statistik hasil trading.")}</p>
           </div>
         </div>
-        <JournalFeedback feedback={feedback} section="closed" />
+        {tradeAction?.section !== 'closed' && <JournalFeedback feedback={feedback} section="closed" />}
         {(ready || closedTrades.length > 0) && <div className="journal-performance">
           <div className="journal-capital">
             <div className="journal-section-header">
@@ -831,27 +984,27 @@ export default function JournalPage({ account, uid }) {
             )}
             <JournalFeedback feedback={feedback} section="capital" />
           </div>
-          <div className="journal-stat-grid">
-            <StatCard label={t("Jumlah posisi")} value={closedTrades.length} />
-            <StatCard label={t("Win")} value={wins} tone={wins > 0 ? 'gain' : undefined} />
-            <StatCard label={t("Loss")} value={losses} tone={losses > 0 ? 'risk' : undefined} />
-            <StatCard label={t("Break-even")} value={quoted.be + manual.be} />
+          <div className="journal-stat-grid journal-outcomes">
             <StatCard label={t("Win rate")} value={winRate == null ? '–' : `${winRate.toLocaleString(getLocale(), { maximumFractionDigits: 2 })}%`} />
+            <StatCard label={t("Jumlah posisi")} value={closedTrades.length} />
+            <StatCard label={t("Win")} value={wins} />
+            <StatCard label={t("Loss")} value={losses} />
+            <StatCard label={t("Break-even")} value={quoted.be + manual.be} />
           </div>
+          {decided > 0 && decided < 20 && <p className="journal-help">{t("Win rate memakai {0} posisi menang atau kalah. Sampel masih kecil dan persentase mudah berubah.", decided.toLocaleString(getLocale()))}</p>}
           <RealizedTotals series={realizedPnl} closedCount={closedTrades.length} />
           <div className="journal-stat-grid journal-stat-grid--secondary">
             <StatCard label={t("Rata-rata untung")} value={statValue(stats.avgWin)} tone="gain" />
             <StatCard label={t("Rata-rata rugi")} value={statValue(stats.avgLoss == null ? null : -stats.avgLoss)} tone="risk" />
-            <StatCard label={t("Expectancy ratio")} value={stats.expectancyRatio ?? '–'} />
+            <StatCard label={t("Expectancy ratio")} value={stats.expectancyRatio?.toLocaleString(getLocale()) ?? '–'} />
             <StatCard label={t("Net expectancy")} value={statValue(stats.netExpectancy)} />
             {manual.totalTrades > 0 && <StatCard label={t("Total PnL manual")} value={formatPnl(manual.totalPnl, currency)} />}
           </div>
           <p className="journal-help">{t("PnL posisi USD adalah nilai posisi dikali PnL %. Perhitungan memakai kurs tetap untuk ticker non-USD. Profit Factor membagi total untung dengan nilai absolut total rugi.")}</p>
         </div>}
-        {(ready || closedTrades.length > 0) && <>
-          <JournalCharts series={realizedPnl} preferredCurrency={currency} walletHistory={wallet.history} />
-          <JournalPnlCalendar series={realizedPnl} preferredCurrency={currency} />
-        </>}
+        <JournalCharts series={realizedPnl} preferredCurrency={currency} walletHistory={wallet.history}
+          ready={ready || closedTrades.length > 0} readError={readError} />
+        {(ready || closedTrades.length > 0) && <JournalPnlCalendar series={realizedPnl} preferredCurrency={currency} trades={closedTrades} />}
         <TradeTable
           trades={closedTrades}
           closed
@@ -859,11 +1012,15 @@ export default function JournalPage({ account, uid }) {
           ready={ready}
           readError={readError}
           disabled={disabled}
-          activeAction={activeAction}
-          onRemove={(trade) => handleRemove(trade, 'closed')}
+          onRemove={(trade) => confirmTradeAction('remove', trade, 'closed')}
           onViewScreenshot={setViewingScreenshot}
         />
       </section>
+      {tradeAction && (
+        <TradeActionDialog action={tradeAction} busy={activeAction != null} disabled={disabled} feedback={feedback}
+          onConfirm={() => tradeAction.kind === 'close' ? handleClose(tradeAction.trade) : handleRemove(tradeAction.trade, tradeAction.section)}
+          onClose={() => setTradeAction(null)} />
+      )}
       {viewingScreenshot && (
         <JournalScreenshotDialog uid={uid} trade={viewingScreenshot} onClose={() => setViewingScreenshot(null)} />
       )}

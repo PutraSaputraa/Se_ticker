@@ -1,12 +1,13 @@
 import { getLocale } from './i18n.js';
 import useTranslation from './useTranslation.js';
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import WorkspaceIcon from './components/WorkspaceIcon.jsx';
 import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
 import UpdatedValue from './components/UpdatedValue.jsx';
 import { formatDateCompact, formatVolume } from './format.js';
 import { getStage2Score } from './stage2Score.js';
+import { strongWatchStage2, watchPriceStatus, watchVolumePass } from './watchlistSignals.js';
 
 // Skor Trend Template Minervini per simbol (analyze.js tanpa RS agar cepat).
 function useTrendScores(symbolsKey) {
@@ -116,7 +117,7 @@ function useWatchlistData(symbolsKey) {
 
 function TrendScoreBadge({ score }) {
   const { t } = useTranslation();
-  if (score === undefined) return <span className="research-cell-note">{t("Memuat…")}</span>;
+  if (score === undefined) return <QuoteSkeleton label="Memuat skor Stage 2…" />;
   const display = getStage2Score(score?.passed, score?.total);
   if (!display) return <span className="research-cell-note">{t("Belum tersedia")}</span>;
 
@@ -137,77 +138,84 @@ function CheckBadgeMini({ passed }) {
   );
 }
 
-// Breakout: Close terbaru sudah di atas Price to Watch DAN volume (sesi acuan
-// atau sesi sebelumnya) memenuhi ambang 1,4x rata-rata 50 sesi.
-function breakoutStatus(quote, priceToWatch) {
-  if (!Number.isFinite(priceToWatch)) return { state: 'none', priceAbove: null, volumeOk: null };
-  const priceAbove = quote.close > priceToWatch;
-  const volumeChecks = quote.buyTrigger?.volumeChecks ?? [];
-  const volumeOk = volumeChecks.some((check) => check?.meetsThreshold === true)
-    ? true
-    : volumeChecks.every((check) => check?.meetsThreshold === false)
-      ? false
-      : null;
-
-  if (priceAbove && volumeOk) return { state: 'breakout', priceAbove, volumeOk };
-  if (priceAbove || volumeOk) return { state: 'near', priceAbove, volumeOk };
-  return { state: 'none', priceAbove, volumeOk };
-}
+const statusLabels = {
+  breakout: 'Breakout',
+  near: 'Mendekati',
+  none: 'Menunggu',
+  unavailable: 'Belum tersedia',
+};
+const statusTones = { breakout: ' research-badge--support', near: ' research-badge--warning' };
 
 function BreakoutBadge({ state }) {
   const { t } = useTranslation();
-  if (state === 'breakout') return <span className="research-badge research-badge--support">{t("Breakout")}</span>;
-  if (state === 'near') return <span className="research-badge research-badge--warning">{t("Mendekati")}</span>;
-  return <span className="research-badge">{t("Menunggu")}</span>;
+  return <span className={'research-badge' + (statusTones[state] ?? '')}>{t(statusLabels[state])}</span>;
 }
 
 function PriceToWatchInput({ symbol, value, decimals, onSetWatchPrice, disabled }) {
   const { t } = useTranslation();
   const [text, setText] = useState(value == null ? '' : String(value));
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const errorId = useId();
 
   useEffect(() => {
     setText(value == null ? '' : String(value));
+    setError(null);
   }, [value]);
 
   async function commit() {
-    if (disabled) return;
+    if (disabled || saving) return;
     const trimmed = text.trim();
-    if (!trimmed) {
-      if (value !== null && !await onSetWatchPrice(symbol, null)) setText(String(value));
-      return;
-    }
     const pattern = decimals === 0 ? /^\d+$/ : /^\d+(?:[.,]\d{1,2})?$/;
-    if (!pattern.test(trimmed)) {
-      setText(value == null ? '' : String(value));
+    const parsed = trimmed ? Number(trimmed.replace(',', '.')) : null;
+    if (trimmed && (!pattern.test(trimmed) || !Number.isFinite(parsed))) {
+      setError(decimals === 0 ? 'Isi harga dengan angka bulat.' : 'Isi harga dengan maksimal dua angka desimal.');
       return;
     }
-    const parsed = Number(trimmed.replace(',', '.'));
-    if (!Number.isFinite(parsed)) {
+    if (parsed === value) {
       setText(value == null ? '' : String(value));
+      setError(null);
       return;
     }
-    if (parsed !== value && !await onSetWatchPrice(symbol, parsed)) {
-      setText(value == null ? '' : String(value));
+    setSaving(true);
+    try {
+      if (!await onSetWatchPrice(symbol, parsed)) {
+        setError('Perubahan harga belum tersimpan.');
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
   return (
-    <input
-      className="ptw-input"
-      type="text"
-      inputMode={decimals === 0 ? 'numeric' : 'decimal'}
-      placeholder={t("Isi harga")}
-      value={text}
-      disabled={disabled}
-      onClick={(event) => event.stopPropagation()}
-      onChange={(event) => setText(event.target.value)}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (event.key === 'Enter') event.currentTarget.blur();
-      }}
-      aria-label={t("Harga pantauan untuk {0}", symbol)}
-    />
+    <div className="watchlist-price-editor" aria-busy={saving}>
+      <input
+        className="ptw-input"
+        type="text"
+        inputMode={decimals === 0 ? 'numeric' : 'decimal'}
+        placeholder={t("Isi harga")}
+        value={text}
+        disabled={disabled || saving}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        aria-label={t("Harga pantauan untuk {0}", symbol)}
+        onClick={(event) => event.stopPropagation()}
+        onChange={(event) => { setText(event.target.value); setError(null); }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+          if (event.key === 'Escape') {
+            setText(value == null ? '' : String(value));
+            setError(null);
+          }
+        }}
+      />
+      {error && <p id={errorId} role="alert">{t(error)}</p>}
+    </div>
   );
 }
 
@@ -304,22 +312,35 @@ function WatchlistNotes({ entry, onEdit, disabled }) {
   );
 }
 
-function WatchlistRow({ entry, row, formatPrice, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled, trendScore }) {
+function QuoteSkeleton({ label }) {
+  const { t } = useTranslation();
+  return <><span className="watchlist-skeleton" aria-hidden="true" /><span className="visually-hidden">{t(label)}</span></>;
+}
+
+const WatchlistRow = memo(function WatchlistRow({
+  entry, row, formatPrice, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled, trendScore, state, volumePass, match,
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const [visited, setVisited] = useState(false);
   const detailsId = useId();
   const { symbol, priceToWatch, rating, imageId } = entry;
   const quote = row?.status === 'success' ? row.quote : null;
   const direction = quote ? priceDirections[Math.sign(quote.close - quote.open)] : null;
   const decimals = quote ? (['JPY', 'IDR'].includes(quote.currency) ? 0 : 2) : (symbol.endsWith('.JK') ? 0 : 2);
-  const volumePass = quote?.buyTrigger?.volumeChecks?.[0]?.meetsThreshold ?? null;
+  const checks = quote?.buyTrigger?.volumeChecks ?? [];
   const imageAction = imageId ? 'Lihat gambar' : 'Unggah gambar';
 
   return (
     <tbody className="watchlist-entry" data-watchlist-symbol={symbol}>
-      <tr className="watchlist-row">
+      <tr className="watchlist-row" data-match={match}>
         <th scope="row" className="research-instrument">
-          <TickerLink symbol={symbol} />
+          <div className="watchlist-symbol">
+            <TickerLink symbol={symbol} />
+            {match && <span className="watchlist-match" title={t("Memenuhi beberapa kriteria penyaringan")}>
+              <WorkspaceIcon name="check" size={15} /><span className="visually-hidden">{t("Memenuhi beberapa kriteria penyaringan")}</span>
+            </span>}
+          </div>
           {quote?.name && quote.name !== symbol && <span className="research-cell-note research-table-company">{quote.name}</span>}
         </th>
         <td className="num watchlist-quote-state">
@@ -329,93 +350,209 @@ function WatchlistRow({ entry, row, formatPrice, onRemove, onSetWatchPrice, onSe
               <UpdatedValue value={quote.close} format={(price) => formatPrice(price, quote.currency)} />
             </span>
             {quote.date && <time className="research-cell-note" dateTime={quote.date}>{formatDateCompact(quote.date)}</time>}
-          </> : <span className={row?.status === 'error' ? 'research-quote-error' : 'research-cell-note'}>
-            {row?.status === 'error' ? t(row.message) : t('Memuat harga dan volume…')}
-          </span>}
+          </> : row?.status === 'error'
+            ? <span className="research-quote-error">{t(row.message)}</span>
+            : <QuoteSkeleton label="Memuat harga dan volume…" />}
         </td>
         <td className="num"><PriceToWatchInput symbol={symbol} value={priceToWatch} decimals={decimals}
           onSetWatchPrice={onSetWatchPrice} disabled={disabled || !quote} /></td>
-        <td>{quote ? <BreakoutBadge state={breakoutStatus(quote, priceToWatch).state} /> : <span className="research-cell-note">{t('Belum tersedia')}</span>}</td>
+        <td>{state === 'loading' ? <QuoteSkeleton label="Memuat status harga pantauan…" /> : <BreakoutBadge state={state} />}</td>
         <td><WatchlistRating symbol={symbol} rating={rating} onSetRating={onSetRating} disabled={disabled} /></td>
         <td className="watchlist-stage"><TrendScoreBadge score={trendScore} /></td>
         <td className="num">
-          <span>{Number.isFinite(quote?.volume) ? quote.volume.toLocaleString(getLocale()) : t('Belum tersedia')}</span>
-          <CheckBadgeMini passed={volumePass} />
+          {state === 'loading' ? <QuoteSkeleton label="Memuat harga dan volume…" /> : <>
+            <span>{Number.isFinite(quote?.volume) ? quote.volume.toLocaleString(getLocale()) : t('Belum tersedia')}</span>
+            <CheckBadgeMini passed={volumePass} />
+          </>}
         </td>
         <td className="num watchlist-average-volume">
-          {quote ? formatVolume(quote.buyTrigger?.averageVolume, { includeUnit: false }) : t('Belum tersedia')}
+          {quote ? formatVolume(quote.buyTrigger?.averageVolume, { includeUnit: false })
+            : state === 'loading' ? <QuoteSkeleton label="Memuat harga dan volume…" /> : t('Belum tersedia')}
         </td>
         <td><button type="button" className="research-watch watchlist-disclosure" aria-expanded={expanded}
-          aria-controls={detailsId} aria-label={`${t('Rincian')} ${symbol}`} onClick={() => setExpanded((value) => !value)}>
+          aria-controls={detailsId} aria-label={`${t('Rincian')} ${symbol}`} onClick={() => {
+            setVisited(true);
+            setExpanded((value) => !value);
+          }}>
           <WorkspaceIcon name="chevron" size={14} /> <span>{t('Rincian')}</span>
         </button></td>
       </tr>
-      <tr id={detailsId} hidden={!expanded} className="watchlist-detail-row">
+      <tr id={detailsId} aria-hidden={!expanded} hidden={!visited} className="watchlist-detail-row">
         <td colSpan={9}>
-          <div className="watchlist-details">
-            <section className="watchlist-notes"><h3>{t('Catatan')}</h3><WatchlistNotes entry={entry} onEdit={onEditEntry} disabled={disabled} /></section>
-            <section className="watchlist-detail-actions watchlist-image">
-              <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
-                aria-label={`${t(imageAction)} ${symbol}`} onClick={(event) => onEditEntry(entry, 'image', event.currentTarget)}>{t(imageAction)}</button>
-              <button type="button" className="research-remove" disabled={disabled}
-                aria-label={t('Hapus {0} dari daftar', symbol)} onClick={() => onRemove(symbol)}>{t('Hapus')}</button>
-            </section>
-          </div>
+          {visited && <div className="watchlist-detail-reveal" data-expanded={expanded} inert={!expanded}>
+            <div className="watchlist-detail-clip">
+              <div className="watchlist-details">
+                <section className="watchlist-volume-details">
+                  <h3>{t('Pemeriksaan volume')}</h3>
+                  {Number.isFinite(quote?.buyTrigger?.minimumVolume) && (
+                    <p>{t('Ambang {0}', formatVolume(quote.buyTrigger.minimumVolume))} · {t('1,4× rata-rata 50 sesi')}</p>
+                  )}
+                  {checks.some((check) => check?.date) ? <ul>{checks.filter((check) => check?.date).map((check) => (
+                    <li key={check.date}>
+                      <time dateTime={check.date}>{formatDateCompact(check.date)}</time>
+                      <span>{formatVolume(check.volume, { includeUnit: false })}</span>
+                      <CheckBadgeMini passed={check.meetsThreshold} />
+                    </li>
+                  ))}</ul> : <p>{t('Belum tersedia')}</p>}
+                </section>
+                <section className="watchlist-notes">
+                  <h3>{t('Catatan')}</h3>
+                  <WatchlistNotes entry={entry} onEdit={onEditEntry} disabled={disabled} />
+                </section>
+                <div className="watchlist-detail-actions watchlist-image">
+                  <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
+                    aria-label={`${t(imageAction)} ${symbol}`} onClick={(event) => onEditEntry(entry, 'image', event.currentTarget)}>{t(imageAction)}</button>
+                  <button type="button" className="research-remove" disabled={disabled}
+                    aria-label={t('Hapus {0} dari daftar', symbol)} onClick={() => onRemove(symbol)}>{t('Hapus')}</button>
+                </div>
+              </div>
+            </div>
+          </div>}
         </td>
       </tr>
     </tbody>
   );
-}
+});
 
-const stateRank = { breakout: 0, near: 1, none: 2 };
+const stateRank = { breakout: 0, near: 1, none: 2, unavailable: 3, loading: 3 };
+const signalFilters = {
+  stars: '5 bintang',
+  stage: 'Stage 2 ≥ 7/8',
+  volume: 'Lolos ambang volume',
+};
+const sortLabels = {
+  rating: 'Bintang tertinggi',
+  stage: 'Skor Stage 2 tertinggi',
+  symbol: 'Ticker A–Z',
+  volume: 'Volume tertinggi',
+  status: 'Status harga pantauan',
+};
 
 export default function WatchlistTable({ entries, formatPrice, onRemove, onSetWatchPrice, onSetRating, onEditEntry, disabled }) {
   const { t } = useTranslation();
-  const symbolsKey = entries.map((entry) => entry.symbol).join('\n');
+  const symbolsKey = useMemo(() => entries.map((entry) => entry.symbol).join('\n'), [entries]);
   const rows = useWatchlistData(symbolsKey);
   const trendScores = useTrendScores(symbolsKey);
+  const [flags, setFlags] = useState([]);
+  const [status, setStatus] = useState('all');
+  const [sortBy, setSortBy] = useState('rating');
+  const allButton = useRef(null);
+  const filtered = flags.length > 0 || status !== 'all';
 
-  const ordered = [...entries].sort((a, b) => {
-    const byRating = (b.rating ?? 0) - (a.rating ?? 0);
-    if (byRating !== 0) return byRating;
-    const rowA = rows[a.symbol];
-    const rowB = rows[b.symbol];
-    const rankA = rowA?.status === 'success' ? stateRank[breakoutStatus(rowA.quote, a.priceToWatch).state] : 3;
-    const rankB = rowB?.status === 'success' ? stateRank[breakoutStatus(rowB.quote, b.priceToWatch).state] : 3;
-    return rankA - rankB;
-  });
+  const { ordered, pending } = useMemo(() => {
+    const candidates = [];
+    let pending = false;
+    for (const entry of entries) {
+      const row = rows[entry.symbol];
+      const trend = trendScores[entry.symbol];
+      const quote = row?.status === 'success' ? row.quote : null;
+      const volumePass = watchVolumePass(quote);
+      const state = quote ? watchPriceStatus(quote, entry.priceToWatch, volumePass)
+        : row?.status === 'error' ? 'unavailable' : 'loading';
+      const matches = { stars: entry.rating === 5, stage: strongWatchStage2(trend), volume: volumePass === true };
+      const waitingFor = { stars: false, stage: trend === undefined, volume: state === 'loading' };
+      if (flags.some((flag) => !matches[flag] && !waitingFor[flag])) continue;
+      if (status !== 'all' && status !== state && state !== 'loading') continue;
+      if (flags.some((flag) => waitingFor[flag]) || (status !== 'all' && state === 'loading')) {
+        pending = true;
+        continue;
+      }
+      candidates.push({
+        entry, row, trend, state, volumePass,
+        stage: getStage2Score(trend?.passed, trend?.total)?.ratio ?? -1,
+        volume: Number.isFinite(quote?.volume) ? quote.volume : -1,
+        match: Object.values(matches).filter(Boolean).length >= 2,
+      });
+    }
+
+    const sorters = {
+      symbol: (a, b) => a.entry.symbol.localeCompare(b.entry.symbol),
+      stage: (a, b) => b.stage - a.stage,
+      volume: (a, b) => b.volume - a.volume,
+      status: (a, b) => stateRank[a.state] - stateRank[b.state],
+    };
+    const preferred = sorters[sortBy];
+    const ordered = candidates.sort((a, b) => (preferred?.(a, b) || 0)
+      || ((b.entry.rating ?? 0) - (a.entry.rating ?? 0))
+      || stateRank[a.state] - stateRank[b.state]);
+    return { ordered, pending };
+  }, [entries, rows, trendScores, flags, status, sortBy]);
+
+  function clearFilters() {
+    setFlags([]);
+    setStatus('all');
+  }
 
   return (
-    <TableScroll className="research-table-scroll" label={t("Tabel daftar pantauan")}>
-      <table className="fund-table research-table watchlist-table">
-        <thead>
-          <tr>
-            <th scope="col">{t("Saham")}</th>
-            <th scope="col" className="num">{t("Harga tutup")}</th>
-            <th scope="col" className="num">{t("Harga pantauan")}</th>
-            <th scope="col">{t("Status")}</th>
-            <th scope="col">{t("Bintang")}</th>
-            <th scope="col">{t("Stage 2")}</th>
-            <th scope="col" className="num">{t("Volume (lembar)")}</th>
-            <th scope="col" className="num">{t("Rata-rata volume")}<span className="watchlist-header-note">{t('50 sesi (lembar)')}</span></th>
-            <th scope="col">{t("Rincian")}</th>
-          </tr>
-        </thead>
-          {ordered.map((entry) => (
-            <WatchlistRow
-              key={entry.symbol}
-              entry={entry}
-              row={rows[entry.symbol]}
-              formatPrice={formatPrice}
-              onRemove={onRemove}
-              onSetWatchPrice={onSetWatchPrice}
-              onSetRating={onSetRating}
-              onEditEntry={onEditEntry}
-              disabled={disabled}
-              trendScore={trendScores[entry.symbol]}
-            />
+    <>
+      <div className="watchlist-filters">
+        <div className="watchlist-filter-options" role="group" aria-label={t("Filter pantauan")}>
+          <button ref={allButton} type="button" aria-pressed={!filtered} onClick={clearFilters}>{t("Semua saham")}</button>
+          {Object.entries(signalFilters).map(([flag, label]) => (
+            <button type="button" key={flag} aria-pressed={flags.includes(flag)} onClick={() => setFlags((current) => (
+              current.includes(flag) ? current.filter((value) => value !== flag) : [...current, flag]
+            ))}>{t(label)}</button>
           ))}
-      </table>
-    </TableScroll>
+        </div>
+        <div className="watchlist-selects">
+          <label>{t("Status")}<select value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="all">{t("Semua status")}</option>
+            {Object.entries(statusLabels).map(([key, label]) => <option value={key} key={key}>{t(label)}</option>)}
+          </select></label>
+          <label>{t("Urutkan")}<select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            {Object.entries(sortLabels).map(([key, label]) => <option value={key} key={key}>{t(label)}</option>)}
+          </select></label>
+        </div>
+        <div className="watchlist-filter-summary">
+          <p role="status">{t("{0} dari {1} saham ditampilkan", ordered.length.toLocaleString(getLocale()), entries.length.toLocaleString(getLocale()))}
+            {pending && ' · ' + t("Filter masih menunggu data.")}</p>
+          {filtered && <button type="button" className="text-button" onClick={() => {
+            clearFilters();
+            allButton.current?.focus({ preventScroll: true });
+          }}>{t("Reset filter")}</button>}
+        </div>
+      </div>
+      {ordered.length > 0 ? (
+        <TableScroll className="research-table-scroll watchlist-table-scroll" label={t("Tabel daftar pantauan")}>
+          <table className="fund-table research-table watchlist-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("Saham")}</th>
+                <th scope="col" className="num">{t("Harga tutup")}</th>
+                <th scope="col" className="num">{t("Harga pantauan")}</th>
+                <th scope="col">{t("Status")}</th>
+                <th scope="col">{t("Bintang")}</th>
+                <th scope="col" className="watchlist-stage">{t("Stage 2")}</th>
+                <th scope="col" className="num">{t("Volume (lembar)")}</th>
+                <th scope="col" className="num">{t("Rata-rata volume")}<span className="watchlist-header-note">{t('50 sesi (lembar)')}</span></th>
+                <th scope="col">{t("Rincian")}</th>
+              </tr>
+            </thead>
+            {ordered.map(({ entry, row, trend, state, volumePass, match }) => (
+              <WatchlistRow
+                key={entry.symbol}
+                entry={entry}
+                row={row}
+                formatPrice={formatPrice}
+                onRemove={onRemove}
+                onSetWatchPrice={onSetWatchPrice}
+                onSetRating={onSetRating}
+                onEditEntry={onEditEntry}
+                disabled={disabled}
+                trendScore={trend}
+                state={state}
+                volumePass={volumePass}
+                match={match}
+              />
+            ))}
+          </table>
+        </TableScroll>
+      ) : (
+        <div className="research-empty">
+          <h3>{t(pending ? "Menunggu data untuk filter ini…" : "Tidak ada saham yang cocok dengan filter.")}</h3>
+          {!pending && <p>{t("Ubah status atau kurangi kriteria penyaringan.")}</p>}
+        </div>
+      )}
+    </>
   );
 }

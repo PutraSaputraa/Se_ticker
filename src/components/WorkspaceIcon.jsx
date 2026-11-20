@@ -11,6 +11,7 @@ const paths = {
   chevron: 'm6 9 6 6 6-6',
   history: 'M3 12a9 9 0 1 1 2.4 6.1M3 7v5h5m4-5v5l3 2',
   check: 'm5 12 4 4L19 6',
+  image: 'M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm-1 13 5-5 4 4 3-3 4 4M9 8h.01',
 };
 
 export default function WorkspaceIcon({ name, size = 19 }) {

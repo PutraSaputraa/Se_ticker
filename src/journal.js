@@ -211,7 +211,7 @@ export function realizedTradePnl(trade, manualCurrency) {
   return Number.isFinite(amount) ? { currency, amount } : null;
 }
 
-function realizedDate(trade) {
+export function realizedTradeDate(trade) {
   const date = trade.exitDate ?? (trade.quoteCurrency ? null : trade.date);
   if (!date) return null;
   const timestamp = Date.parse(`${date}T00:00:00Z`);
@@ -244,7 +244,7 @@ export function summarizeRealizedPnl(journal, manualCurrency) {
     addPnl(totals, amount);
     totalsByCurrency.set(currency, totals);
 
-    const date = realizedDate(trade);
+    const date = realizedTradeDate(trade);
     if (!date) {
       totals.undatedCount += 1;
       continue;

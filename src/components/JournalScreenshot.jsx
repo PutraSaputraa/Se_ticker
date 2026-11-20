@@ -2,6 +2,7 @@ import useTranslation from '../useTranslation.js';
 import { useEffect, useId, useRef, useState } from 'react';
 import { downloadJournalScreenshot } from '../journalScreenshot.js';
 import { imageContentTypes, imageFileError, maxImageSizeLabel } from '../imageFile.js';
+import WorkspaceIcon from './WorkspaceIcon.jsx';
 
 export function JournalScreenshotField({ file, onChange, disabled }) {
   const { t } = useTranslation();
@@ -36,7 +37,7 @@ export function JournalScreenshotField({ file, onChange, disabled }) {
     <div className="journal-screenshot-field">
       <label htmlFor={inputId}>{t("Screenshot chart (opsional)")}</label>
       <div className="journal-screenshot-picker">
-        <span className="journal-secondary-button" aria-hidden="true">{t("Pilih gambar")}</span>
+        <span className="journal-secondary-button" aria-hidden="true"><WorkspaceIcon name="image" size={16} />{file ? t("Ganti gambar") : t("Unggah chart")}</span>
         <span className="journal-screenshot-filename" aria-hidden="true">{file?.name ?? t("Belum ada gambar")}</span>
         <input
           ref={input}
@@ -49,7 +50,7 @@ export function JournalScreenshotField({ file, onChange, disabled }) {
           disabled={disabled}
         />
       </div>
-      <p className="journal-help" id={hintId}>{t("PNG, JPG, atau WebP hingga")} {maxImageSizeLabel}{t(". Unggahan disimpan sebagai WebP.")}</p>
+      <p className="journal-help" id={hintId}>{t("PNG, JPG, atau WebP hingga {0}.", maxImageSizeLabel)}</p>
       {error && <p className="journal-feedback journal-feedback--error" id={errorId} role="alert">{t(error)}</p>}
       {file && (
         <>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildPnlCalendar, shiftCalendarMonth } from '../src/journalCalendar.js';
+import { buildPnlCalendar, buildPnlWeek, shiftCalendarMonth } from '../src/journalCalendar.js';
 
 test('moves across years in both directions', () => {
   assert.equal(shiftCalendarMonth('2025-12', 1), '2026-01');
@@ -27,4 +27,18 @@ test('sums only the displayed month and distinguishes break-even from no close',
   assert.equal(calendar.pnl, 20);
   assert.equal(calendar.weeks[0][4].entry.pnl, 0);
   assert.equal(calendar.weeks[0][5].entry, null);
+});
+
+test('a weekly view carries actual closures across a year boundary and includes weekends', () => {
+  const calendar = buildPnlWeek('2026-01-01', [
+    { date: '2025-12-28', count: 9, pnl: 900 },
+    { date: '2025-12-31', count: 1, pnl: 50 },
+    { date: '2026-01-04', count: 2, pnl: -30 },
+    { date: '2026-01-05', count: 8, pnl: 100 },
+  ]);
+  assert.equal(calendar.start, '2025-12-29');
+  assert.equal(calendar.end, '2026-01-04');
+  assert.equal(calendar.weeks[0][6].entry.pnl, -30);
+  assert.equal(calendar.count, 3);
+  assert.equal(calendar.pnl, 20);
 });

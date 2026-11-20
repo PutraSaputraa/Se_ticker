@@ -1,27 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-function clearance() {
-  // Computed scroll padding resolves rem/calc to pixels, unlike parsing tokens.
-  return Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingBlockStart) || 0;
-}
-
 function reducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-export default function useSectionNavigation(ids) {
+export default function useSectionNavigation(ids, navRef, additionalAnchors = ids) {
   const [active, setActive] = useState(ids[0]);
   const navigate = useNavigate();
   const { hash, pathname, search, state } = useLocation();
   const explicitTarget = useRef(null);
-  const key = ids.join(',');
 
   const scrollToSection = useCallback((id, { focus = false, smooth = false } = {}) => {
     const element = document.getElementById(id);
     if (!element) return false;
-    const top = Math.max(0, element.getBoundingClientRect().top + window.scrollY - clearance());
-    window.scrollTo({ top, behavior: smooth && !reducedMotion() ? 'smooth' : 'instant' });
+    element.scrollIntoView({ block: 'start', behavior: smooth && !reducedMotion() ? 'smooth' : 'instant' });
     if (focus) {
       const heading = document.getElementById(element.getAttribute('aria-labelledby'));
       (heading ?? element).focus({ preventScroll: true });
@@ -44,53 +37,73 @@ export default function useSectionNavigation(ids) {
     const id = hash.slice(1);
     const explicit = explicitTarget.current === id;
     explicitTarget.current = null;
-    if (!ids.includes(id)) return;
+    if (!additionalAnchors.includes(id)) return;
     const frame = requestAnimationFrame(() => {
       scrollToSection(id, { focus: explicit, smooth: explicit });
     });
     return () => cancelAnimationFrame(frame);
-    // ids are represented by their stable contents.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hash, key, scrollToSection]);
+  }, [hash, additionalAnchors, scrollToSection]);
 
   useEffect(() => {
-    let frame = 0;
+    const nav = navRef.current;
+    const page = nav.parentElement;
+    const root = document.documentElement;
+    const sections = ids.map((id) => document.getElementById(id)).filter(Boolean);
+    let offsets = [];
+    let clearance = 0;
+    let scrollEnd = 0;
+    let current = ids[0];
+
     function update() {
-      frame = 0;
-      const root = document.documentElement;
-      const line = clearance() + 2;
-      const scrollable = root.scrollHeight > window.innerHeight + 2;
-      const bottom = scrollable && window.scrollY + window.innerHeight >= root.scrollHeight - 2;
-      let current = ids[0];
-      for (const id of ids) {
-        const element = document.getElementById(id);
-        if (element && (bottom || element.getBoundingClientRect().top <= line)) current = id;
-      }
-      setActive(current);
+      const y = window.scrollY;
+      const atEnd = scrollEnd > 2 && y >= scrollEnd - 2;
+      const index = atEnd ? sections.length - 1 : offsets.findLastIndex((offset) => offset <= y + clearance);
+      const id = sections[Math.max(0, index)].id;
+      if (id === current) return;
+      current = id;
+      setActive(id);
     }
-    function schedule() {
-      if (!frame) frame = requestAnimationFrame(update);
+
+    function measure() {
+      const height = nav.offsetHeight;
+      const y = window.scrollY;
+      clearance = (Number.parseFloat(getComputedStyle(root).scrollPaddingBlockStart) || 0) + height + 2;
+      offsets = sections.map((section) => section.getBoundingClientRect().top + y);
+      scrollEnd = root.scrollHeight - window.innerHeight;
+      page.style.setProperty('--journal-nav-height', height + 'px');
+      update();
     }
-    // Account content and wallet history can change section positions without
-    // a window resize. Reconcile the indicator without moving scroll or focus.
-    const observer = new ResizeObserver(schedule);
-    for (const id of ids) {
-      const element = document.getElementById(id);
-      if (element) observer.observe(element);
-    }
+
+    // The passive scroll listener uses cached coordinates. Section resizing can
+    // move subsequent sections even when the viewport stays the same size.
+    const observer = new ResizeObserver(measure);
+    for (const element of [page, nav, ...sections]) observer.observe(element);
     const header = document.querySelector('.workspace-bar');
     if (header) observer.observe(header);
-    schedule();
-    window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
+    measure();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', measure);
     return () => {
       observer.disconnect();
-      if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', measure);
+      page.style.removeProperty('--journal-nav-height');
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [ids, navRef]);
+
+  useEffect(() => {
+    const link = navRef.current?.querySelector('[aria-current="location"]');
+    if (!link) return;
+    const list = link.parentElement;
+    const bounds = list.getBoundingClientRect();
+    const item = link.getBoundingClientRect();
+    if (item.left < bounds.left || item.right > bounds.right) {
+      list.scrollBy({
+        left: item.left - bounds.left - (list.clientWidth - item.width) / 2,
+        behavior: reducedMotion() ? 'instant' : 'smooth',
+      });
+    }
+  }, [active, navRef]);
 
   return { active, handleClick };
 }
