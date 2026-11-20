@@ -1,3 +1,101 @@
+.support-control {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
+.workspace-bar .support-control .support-trigger {
+  color: var(--nav-accent);
+  border-color: color-mix(in srgb, var(--nav-accent) 55%, var(--nav-current));
+  background: color-mix(in srgb, var(--nav-accent) 8%, var(--nav-surface));
+  transition-duration: var(--motion-page);
+}
+
+.workspace-bar .support-control:is(:hover, :focus-within, [data-open]) .support-trigger {
+  color: var(--nav-accent);
+  border-color: color-mix(in srgb, var(--nav-accent) 82%, var(--nav-current));
+  background: color-mix(in srgb, var(--nav-accent) 15%, var(--nav-surface));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--nav-accent) 20%, transparent),
+    0 2px 8px color-mix(in srgb, var(--nav-accent) 14%, transparent);
+}
+
+.support-coffee { pointer-events: none; }
+.support-cup { transition: transform var(--motion-page) var(--motion-ease); }
+.support-steam { opacity: 0.72; transition: opacity var(--motion-page) var(--motion-ease); }
+.support-control:is(:hover, :focus-within) .support-steam { opacity: 1; }
+
+.support-steam path {
+  opacity: 0.6;
+  animation: support-steam-rise 3s ease-in-out infinite;
+}
+.support-steam path:nth-child(2) { animation-duration: 3.35s; animation-delay: -1.25s; }
+.support-steam path:nth-child(3) { animation-duration: 2.75s; animation-delay: -1.85s; }
+
+@keyframes support-steam-rise {
+  0% { opacity: 0; transform: translateY(2px); }
+  32% { opacity: 0.82; }
+  67% { opacity: 0.48; }
+  100% { opacity: 0; transform: translate(0.65px, -3px); }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .support-control:hover .support-cup { transform: translateY(-2px); }
+}
+
+.support-tooltip {
+  position: absolute;
+  z-index: 5;
+  inset-block-start: calc(100% + 0.5rem);
+  inset-inline-start: 50%;
+  width: max-content;
+  max-width: 14rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--nav-edge);
+  border-radius: var(--field-radius);
+  background: var(--nav-current);
+  color: var(--nav-text);
+  box-shadow: var(--shadow-raised);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity var(--motion-standard) var(--motion-ease),
+    transform var(--motion-standard) var(--motion-ease), visibility 0s var(--motion-standard);
+}
+
+.support-tooltip::before {
+  content: '';
+  position: absolute;
+  inset: -0.75rem 0 auto;
+  height: 0.75rem;
+}
+
+.support-control:not([data-open], [data-tooltip-dismissed]):has(.support-trigger:focus-visible) .support-tooltip {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+  transition-delay: 0s;
+}
+
+@media (hover: hover) {
+  .support-control:not([data-open], [data-tooltip-dismissed]):hover .support-tooltip {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate(-50%, 0);
+    transition-delay: 0s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-cup { transition: none; }
+  .support-steam path { animation: none; }
+  .support-tooltip { transform: translate(-50%, 0); }
+}
+
 .support-dialog-header button {
   min-height: var(--touch-size);
   min-width: var(--touch-size);

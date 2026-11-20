@@ -124,6 +124,7 @@ export const english = {
   "Impor ke akun": "Import to account",
   "Data historis dari Yahoo Finance.": "Historical data from Yahoo Finance.",
   "Dukung Dev": "Support the dev",
+  "Traktir kopi untuk developer ☕": "Buy the developer a coffee ☕",
   "USDC di jaringan Base": "USDC on Base",
   "Pilih aset dan jaringan ini di wallet pengirim, lalu pindai QR atau salin alamat.": "Select this asset and network in your wallet, then scan the QR code or copy the address.",
   "Alamat penerima": "Receiving address",

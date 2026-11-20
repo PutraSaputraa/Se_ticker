@@ -1,5 +1,5 @@
 import useTranslation from './useTranslation.js';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from './firebase.js';
@@ -36,10 +36,51 @@ function Brand() {
   );
 }
 
+function placeNavHighlight(nav, highlight, slide) {
+  const link = nav.querySelector('a[aria-current="page"]');
+  const anchor = highlight.offsetParent;
+  if (!link || !anchor) {
+    nav.removeAttribute('data-highlight-active');
+    return;
+  }
+
+  // Use the existing positioned ancestor so the Search panel keeps its anchor.
+  const item = link.getBoundingClientRect();
+  const host = anchor.getBoundingClientRect();
+  const x = item.left - host.left - anchor.clientLeft;
+  const y = item.top - host.top - anchor.clientTop;
+  Object.assign(highlight.style, {
+    width: item.width + 'px',
+    height: item.height + 'px',
+    transform: 'translate(' + x + 'px, ' + y + 'px)',
+  });
+  highlight.toggleAttribute('data-sliding', slide);
+  nav.setAttribute('data-highlight-active', '');
+}
+
 function WorkspaceNav({ account, initialTicker, searchKey }) {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
+  const nav = useRef(null);
+  const highlight = useRef(null);
+
+  useLayoutEffect(() => {
+    placeNavHighlight(nav.current, highlight.current, true);
+  }, [pathname]);
+
+  useEffect(() => {
+    const menu = nav.current;
+    const marker = highlight.current;
+    const observer = new ResizeObserver(() => placeNavHighlight(menu, marker, false));
+    observer.observe(menu.closest('.workspace-bar'));
+    observer.observe(menu);
+    menu.querySelectorAll(':scope > a').forEach(link => observer.observe(link));
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <nav className="workspace-nav" aria-label={t("Menu utama")}>
+    <nav className="workspace-nav" ref={nav} aria-label={t("Menu utama")}>
+      <span className="workspace-nav-highlight" ref={highlight} aria-hidden="true" />
       {navigation.map(({ to, name, mobile, icon, action }) => action === 'search' ? (
         <NavbarSearch key={`search-${searchKey}`} initialTicker={initialTicker} account={account} />
       ) : (
@@ -67,6 +108,10 @@ function TopBar({ user, account }) {
   const header = useRef(null);
   const { pathname, search, key } = useLocation();
   const initialTicker = pathname === '/' ? new URLSearchParams(search).get('ticker') : null;
+
+  useLayoutEffect(() => {
+    if (accountMenu.current.open) accountMenu.current.open = false;
+  }, [pathname]);
 
   // Topbar menempel di atas konten, jadi tinggi aslinya menentukan jarak aman
   // untuk scroll ke anchor. Tinggi berubah mengikuti breakpoint dan ukuran teks.
@@ -113,7 +158,11 @@ function TopBar({ user, account }) {
             <LanguageSwitcher />
             <SupportButton />
             <ThemeToggle />
-            <details className="account-menu" key={pathname} ref={accountMenu}
+            <details className="account-menu" ref={accountMenu}
+              onToggle={(event) => {
+                const menu = event.currentTarget;
+                menu.querySelector('.account-popover').inert = !menu.open;
+              }}
               onBlur={(event) => {
                 if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
               }}
@@ -128,7 +177,7 @@ function TopBar({ user, account }) {
                 <span>{t("Akun")}</span>
                 <span className="account-chevron"><WorkspaceIcon name="chevron" size={14} /></span>
               </summary>
-              <div className="account-popover">
+              <div className="account-popover" inert>
                 <span className="account-email">{user.email}</span>
                 <button type="button" className="account-signout" disabled={signingOut} onClick={handleSignOut}>
                   {signingOut ? t("Keluar…") : t("Keluar")}
