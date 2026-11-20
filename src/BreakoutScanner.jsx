@@ -1,4 +1,4 @@
-import { localizedNumberFormat } from './i18n.js';
+import { localizedDateFormat, localizedNumberFormat } from './i18n.js';
 import useTranslation from './useTranslation.js';
 import { useEffect, useRef, useState } from 'react';
 import { defaultBreakoutParams } from '../netlify/functions/shared/breakoutLogic.js';
@@ -12,6 +12,9 @@ import { requestScanResult } from './scanRequest.js';
 const { volumeMinRatio, volumeLookback } = defaultBreakoutParams;
 const ratioFormat = localizedNumberFormat({ maximumFractionDigits: 2 });
 const countFormat = localizedNumberFormat();
+const positionFormat = localizedNumberFormat({ maximumFractionDigits: 1 });
+const monthFormat = localizedDateFormat({ year: 'numeric', month: 'short', timeZone: 'UTC' });
+const consolidationTimeframes = { daily: 'Harian', monthly: 'Bulanan' };
 
 const regions = [
   { value: 'auto', label: 'Semua bursa' },
@@ -233,21 +236,55 @@ function ScanResultHeading({ title, results, scope, formatDate }) {
   );
 }
 
-function ResearchBrief({ pick, inWatchlist, disabled, onAdd }) {
+function formatMonth(month) {
+  return monthFormat.format(new Date(`${month}-01T00:00:00Z`));
+}
+
+function ConsolidationCard({ pick, monthly, inWatchlist, disabled, onAdd, formatPrice }) {
   const { t } = useTranslation();
+  const { support, resistance, currency } = pick;
+
+  function formatZone({ low, high }) {
+    const bottom = formatPrice(low, currency);
+    const top = formatPrice(high, currency);
+    return bottom === top ? bottom : `${bottom}–${top}`;
+  }
+
   return (
-    <li className="research-brief">
-      <div className="research-brief-heading">
+    <li className="consolidation-card">
+      <div className="consolidation-card-heading">
         <div>
           <TickerLink symbol={pick.symbol} />
           {pick.name && <p className="research-company">{pick.name}</p>}
+          <p className="research-cell-note">
+            {t(pick.universe)} · <time dateTime={pick.date}>{monthly ? formatMonth(pick.date) : formatDateCompact(pick.date)}</time>
+          </p>
         </div>
         <WatchAction symbol={pick.symbol} inWatchlist={inWatchlist} disabled={disabled} onAdd={onAdd} />
       </div>
-      <dl className="research-brief-details">
-        {pick.note && <div><dt>{t("Analisis teknikal")}</dt><dd>{pick.note}</dd></div>}
-        {pick.level && <div><dt>{t("Level pantauan")}</dt><dd>{pick.level}</dd></div>}
-        {pick.catalyst && <div><dt>{t("Katalis")}</dt><dd>{pick.catalyst}</dd></div>}
+      <dl className="consolidation-zones">
+        <div>
+          <dt>{t("Zona support")}</dt>
+          <dd><strong>{formatZone(support)}</strong></dd>
+          <dd className="consolidation-touches">{t("{0} pantulan", countFormat.format(support.touches))}</dd>
+        </div>
+        <div>
+          <dt>{t("Zona resistance")}</dt>
+          <dd><strong>{formatZone(resistance)}</strong></dd>
+          <dd className="consolidation-touches">{t("{0} pantulan", countFormat.format(resistance.touches))}</dd>
+        </div>
+      </dl>
+      <div className="consolidation-track" aria-hidden="true" style={{ '--range-position': `${pick.positionPct}%` }} />
+      <dl className="consolidation-details">
+        <div>
+          <dt>{t("Harga tutup")}</dt>
+          <dd><strong>{formatPrice(pick.close, currency)}</strong></dd>
+          <dd>{t("{0}% dari support", positionFormat.format(pick.positionPct))}</dd>
+        </div>
+        <div>
+          <dt>{t("Durasi range")}</dt>
+          <dd>{t(monthly ? "{0} bulan" : "{0} sesi", countFormat.format(pick.duration))}</dd>
+        </div>
       </dl>
     </li>
   );
@@ -255,8 +292,9 @@ function ResearchBrief({ pick, inWatchlist, disabled, onAdd }) {
 
 export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPrice, formatDate }) {
   const { t, language } = useTranslation();
-  const [mode, setMode] = useState('scan');      // 'scan' | 'research'
+  const [mode, setMode] = useState('scan');
   const [region, setRegion] = useState('auto');
+  const [timeframe, setTimeframe] = useState('daily');
   const [request, setRequest] = useState({ status: 'idle' });
   const [lastResult, setLastResult] = useState(null);
   const activeScan = useRef(null);
@@ -266,7 +304,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     activeScan.current = null;
   }, []);
 
-  async function run(targetMode = mode, targetRegion = region) {
+  async function run(targetMode = mode, targetRegion = region, targetTimeframe = timeframe) {
     if (loading || activeScan.current) return;
 
     const controller = new AbortController();
@@ -274,15 +312,15 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     activeScan.current = controller;
     setRequest({ status: 'starting' });
     try {
-      const data = await requestScanResult(targetMode, targetRegion, language, controller, (status) => {
+      const scanMode = targetMode === 'consolidation' ? `consolidation-${targetTimeframe}` : targetMode;
+      const data = await requestScanResult(scanMode, targetRegion, language, controller, (status) => {
         setRequest(current => current.status === status ? current : { status });
       });
-      if (targetMode === 'research' && data.ai?.error) {
-        setRequest({ status: 'error', message: data.ai.error });
-      } else {
-        setLastResult({ mode: targetMode, data: { ...data, language: data.language ?? language } });
-        setRequest({ status: 'success' });
+      if (targetMode === 'consolidation' && data.mode !== scanMode) {
+        throw new Error('Pemindaian konsolidasi gagal. Coba lagi nanti.');
       }
+      setLastResult({ mode: targetMode, data: { ...data, language: data.language ?? language } });
+      setRequest({ status: 'success' });
     } catch (error) {
       if (activeScan.current === controller) {
         const message = signal.reason?.name === 'TimeoutError' ? signal.reason.message : error.message;
@@ -305,35 +343,42 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     if (request.status === 'success' || request.status === 'error') run(mode, next);
   }
 
+  function changeTimeframe(next) {
+    if (loading || activeScan.current || next === timeframe) return;
+    setTimeframe(next);
+    if (request.status === 'success' || request.status === 'error') run(mode, region, next);
+  }
+
   const watched = new Set(watchlist.map((entry) => entry.symbol));
-  const result = lastResult?.data;
+  const isConsolidation = mode === 'consolidation';
+  const finished = request.status === 'success';
+  const result = lastResult?.mode === mode && (!isConsolidation || finished) ? lastResult.data : null;
   const results = result?.results ?? [];
   const ai = result?.ai;
-  const isResearch = mode === 'research';
-  const resultIsResearch = lastResult?.mode === 'research';
-  const scanScope = [t(result?.universe),
-    Number.isFinite(result?.scanned) && t('{0} saham dalam cakupan', countFormat.format(result.scanned)),
+  const scopeCount = isConsolidation
+    ? Number.isFinite(result?.checked) && t('{0} dari {1} saham diperiksa', countFormat.format(result.checked), countFormat.format(result.scanned))
+    : Number.isFinite(result?.scanned) && t('{0} saham dalam cakupan', countFormat.format(result.scanned));
+  const scanScope = [
+    isConsolidation && t(consolidationTimeframes[result?.timeframe]),
+    t(result?.universe),
+    scopeCount,
   ].filter(Boolean).join(' · ');
-  const resultSummary = result && (resultIsResearch
-    ? t('{0} · {1} kandidat', t(result.universe), results.length)
-    : t('{0}{1} kandidat ditampilkan', scanScope ? `${scanScope} · ` : '', results.length));
-  const finished = request.status === 'success';
-  const resultTitle = resultIsResearch
-    ? (finished ? 'Kandidat riset AI' : 'Hasil riset sebelumnya')
+  const resultSummary = result && t('{0}{1} kandidat ditampilkan', scanScope ? `${scanScope} · ` : '', results.length);
+  const resultTitle = isConsolidation
+    ? 'Konsolidasi aktif'
     : (finished ? 'Hasil scan matematis' : 'Hasil scan sebelumnya');
-  const scanLabel = isResearch ? 'Riset' : 'Pemindaian';
+  const monthly = result?.timeframe === 'monthly';
+  const scanLabel = 'Pemindaian';
   const phase = {
     starting: { action: 'Menyiapkan…', status: `${scanLabel} sedang disiapkan.` },
     pending: { action: 'Dalam antrean…', status: `${scanLabel} dalam antrean.` },
-    running: { action: isResearch ? 'Meriset…' : 'Memindai…', status: `${scanLabel} sedang berjalan.` },
+    running: { action: 'Memindai…', status: `${scanLabel} sedang berjalan.` },
   }[request.status];
   const loading = Boolean(phase);
-  const description = isResearch
-    ? 'Kandidat disusun dari penelusuran web dan interpretasi AI.'
+  const description = isConsolidation
+    ? 'Cari saham yang masih bergerak di antara zona support dan resistance.'
     : 'Pindai resistance 50 sesi, konsolidasi, dan volume dari data harga.';
-  const actions = isResearch
-    ? { idle: 'Mulai riset', success: 'Riset ulang' }
-    : { idle: 'Jalankan scan', success: 'Pindai ulang' };
+  const actions = { idle: 'Jalankan scan', success: 'Pindai ulang' };
   const action = phase?.action ?? (request.status === 'error' ? 'Coba lagi' : actions[request.status]);
   const statusLabel = finished ? `${scanLabel} selesai. ${resultSummary}.` : phase?.status;
 
@@ -344,13 +389,16 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           <h1 id="breakout-scanner-title">{t("Rekomendasi")}</h1>
           <p>{t(description)}</p>
         </header>
-        <form className="research-controls" onSubmit={(event) => { event.preventDefault(); run(); }}>
+        <form
+          className={`research-controls${isConsolidation ? ' research-controls--consolidation' : ''}`}
+          onSubmit={(event) => { event.preventDefault(); run(); }}
+        >
           <fieldset className="research-mode">
             <legend>{t("Metode")}</legend>
             <div className="candle-timeframe">
               {[
                 { value: 'scan', label: 'Scan matematis' },
-                { value: 'research', label: 'Riset AI' },
+                { value: 'consolidation', label: 'Konsolidasi' },
               ].map(({ value, label }) => (
                 <button
                   key={value}
@@ -369,6 +417,16 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
               {regions.map(({ value, label }) => <option key={value} value={value}>{t(label)}</option>)}
             </select>
           </label>
+          {isConsolidation && (
+            <label className="research-field">
+              {t("Timeframe")}
+              <select value={timeframe} onChange={(event) => changeTimeframe(event.target.value)} disabled={loading}>
+                {Object.entries(consolidationTimeframes).map(([value, label]) => (
+                  <option key={value} value={value}>{t(label)}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <button type="submit" className="scan-button" aria-disabled={loading}>
             {t(action)}
             {loading && <ResearchProgress />}
@@ -383,23 +441,10 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
 
       {result && (
         <section className="research-panel recommend-panel" aria-labelledby="research-results-title">
-          {resultIsResearch ? (
-            <div className="research-panel-heading motion-enter motion-enter--after">
-              <div className="section-accent">
-                <h2 id="research-results-title">{t(resultTitle)}</h2>
-                <p><span className="motion-status" key={resultSummary}>{t(resultSummary)}</span></p>
-              </div>
-              {result.date && (
-                <p className="research-result-date">{t("Tanggal riset")} <time dateTime={result.date}>{formatDate(result.date)}</time>
-                </p>
-              )}
-            </div>
-          ) : (
-            <ScanResultHeading title={t(resultTitle)} results={results} scope={scanScope} formatDate={formatDate} />
-          )}
+          <ScanResultHeading title={t(resultTitle)} results={results} scope={scanScope} formatDate={monthly ? formatMonth : formatDate} />
           {ai?.summary && (
             <div className="research-summary">
-              <h3>{resultIsResearch ? t("Ringkasan riset") : t("Catatan AI atas hasil scan")}</h3>
+              <h3>{t("Catatan AI atas hasil scan")}</h3>
               <p lang={result.language}>{t(ai.summary)}</p>
               {result.language !== language && (
                 <p className="research-form-help">{t('Bahasa laporan {0}. Jalankan ulang untuk membuat laporan dalam bahasa pilihan.', result.language === 'en' ? 'English' : 'Bahasa Indonesia')}</p>
@@ -408,17 +453,19 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           )}
           {results.length === 0 ? (
             <p className="research-empty">
-              {resultIsResearch ? t("Belum ada kandidat dengan sumber yang cukup.") : t("Belum ada saham yang memenuhi kriteria scan pada sesi ini.")}
+              {isConsolidation ? t("Belum ada saham dengan konsolidasi aktif pada timeframe ini.") : t("Belum ada saham yang memenuhi kriteria scan pada sesi ini.")}
             </p>
-          ) : resultIsResearch ? (
-            <ul className="research-brief-list">
-              {results.map((pick, index) => (
-                <ResearchBrief
-                  key={`${pick.symbol}-${index}`}
+          ) : isConsolidation ? (
+            <ul className="consolidation-list" role="list">
+              {results.map((pick) => (
+                <ConsolidationCard
+                  key={pick.symbol}
                   pick={pick}
+                  monthly={monthly}
                   inWatchlist={watched.has(pick.symbol)}
                   disabled={disabled}
                   onAdd={onAdd}
+                  formatPrice={formatPrice}
                 />
               ))}
             </ul>

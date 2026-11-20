@@ -7,6 +7,7 @@ import {
   readSessions,
 } from './sessionLogic.js';
 import { analyzeBaseBreakout } from './breakoutLogic.js';
+import { findActiveConsolidation } from './consolidationLogic.js';
 import { getUniverse, universeRegions } from './universe.js';
 import { fetchFundamentals } from './fundamentals.js';
 import { fetchGrowthInputs, fillSalesComparisons, growthValues } from './growth.js';
@@ -17,6 +18,10 @@ const fetchTimeoutMs = 8_000;
 const aiTimeoutMs = 120_000;
 const webSearchTimeoutMs = 15_000;
 const maxScanResults = 10;
+const consolidationScans = new Map([
+  ['consolidation-daily', { timeframe: 'daily', range: '1y', interval: '1d' }],
+  ['consolidation-monthly', { timeframe: 'monthly', range: '5y', interval: '1mo' }],
+]);
 
 const noKeyError = 'Kunci API Kenari belum dikonfigurasi di server.';
 const aiUnavailable = 'Layanan AI Kenari belum tersedia. Coba lagi.';
@@ -50,11 +55,12 @@ export function scanWaitMs(mode, region) {
     return total + batches * fetchTimeoutMs;
   }, 0);
   if (mode === 'growth') return yahooWaitMs + regionsFor(region).length * fetchTimeoutMs + 30_000;
+  if (consolidationScans.has(mode)) return yahooWaitMs + 30_000;
   return mode === 'screener' ? 2 * yahooWaitMs + 30_000 : yahooWaitMs + aiTimeoutMs + 30_000;
 }
 
 export function scanMode(value) {
-  return ['research', 'screener', 'growth'].includes(value) ? value : 'scan';
+  return consolidationScans.has(value) || ['research', 'screener', 'growth'].includes(value) ? value : 'scan';
 }
 
 const kenariHeaders = (apiKey) => ({
@@ -62,8 +68,8 @@ const kenariHeaders = (apiKey) => ({
   'Content-Type': 'application/json',
 });
 
-async function fetchDailySessions(symbol, range) {
-  const query = new URLSearchParams({ range, interval: '1d' });
+async function fetchPriceSessions(symbol, range, interval = '1d') {
+  const query = new URLSearchParams({ range, interval });
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`;
 
   const response = await fetch(url, {
@@ -79,11 +85,16 @@ async function fetchDailySessions(symbol, range) {
   if (!Array.isArray(timestamps) || timestamps.length === 0 || !quote) return null;
 
   const timeZone = result.meta?.exchangeTimezoneName || 'UTC';
+  const monthly = interval === '1mo';
   const marketDate = new Intl.DateTimeFormat('sv-SE', {
-    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone, year: 'numeric', month: '2-digit', day: monthly ? undefined : '2-digit',
   });
   const sessions = readSessions(timestamps, quote, marketDate);
-  const index = latestCompletedIndex(sessions, result.meta, marketDate);
+  // Yahoo can append an intramonth snapshot. Evaluate only months that have ended in the exchange time zone.
+  const currentMonth = monthly ? marketDate.format(Date.now()) : null;
+  const index = monthly
+    ? sessions.findLastIndex(({ date }) => date < currentMonth)
+    : latestCompletedIndex(sessions, result.meta, marketDate);
   if (index < 0) return null;
 
   const name = [result.meta?.longName, result.meta?.shortName].find(
@@ -123,8 +134,10 @@ function toPick(evaluated, analysis) {
 }
 
 async function scanRegion(region, mode) {
-  const { name, symbols } = getUniverse(region);
+  const { name, symbols, currency } = getUniverse(region);
+  const consolidation = consolidationScans.get(mode);
   let cursor = 0;
+  let checked = 0;
   const picks = [];
 
   async function worker() {
@@ -138,8 +151,29 @@ async function scanRegion(region, mode) {
           picks.push({ symbol, name: inputs.name ?? null, ...growthValues(statements, inputs) });
           continue;
         }
-        const evaluated = await fetchDailySessions(symbol, mode === 'screener' ? '1y' : '9mo');
+        const evaluated = await fetchPriceSessions(
+          symbol, consolidation?.range ?? (mode === 'screener' ? '1y' : '9mo'), consolidation?.interval,
+        );
         if (!evaluated) continue;
+        if (consolidation) {
+          const { sessions, index } = evaluated;
+          const { date, close } = sessions[index];
+          if (!Number.isFinite(close)) continue;
+          checked += 1;
+          const range = findActiveConsolidation(sessions, index, consolidation.timeframe);
+          if (range) {
+            picks.push({
+              symbol: evaluated.symbol,
+              name: evaluated.name,
+              currency: evaluated.currency ?? currency,
+              universe: name,
+              date,
+              close,
+              ...range,
+            });
+          }
+          continue;
+        }
         if (mode === 'screener') {
           const statements = await fetchFundamentals(symbol, true);
           picks.push({ ...screenerRow(evaluated, statements), region, universe: name });
@@ -158,7 +192,7 @@ async function scanRegion(region, mode) {
 
   await Promise.all(Array.from({ length: Math.min(fetchConcurrency, symbols.length) }, worker));
   if (mode === 'growth') await fillSalesComparisons(picks);
-  return { picks, scanned: symbols.length, universeName: name };
+  return { picks, scanned: symbols.length, universeName: name, checked };
 }
 
 async function scanMath(regions, mode) {
@@ -168,11 +202,17 @@ async function scanMath(regions, mode) {
     results.push(await scanRegion(region, mode));
   }
   const rows = results.flatMap(result => result.picks);
+  const scanned = results.reduce((sum, result) => sum + result.scanned, 0);
+  const universeName = regions.length === 1 ? results[0].universeName : `${regions.length} bursa`;
+  if (consolidationScans.has(mode)) {
+    const picks = rows.sort((a, b) =>
+      b.insideRatio - a.insideRatio || b.duration - a.duration || a.symbol.localeCompare(b.symbol));
+    const checked = results.reduce((sum, result) => sum + result.checked, 0);
+    return { picks, scanned, universeName, checked };
+  }
   const picks = mode === 'screener' || mode === 'growth'
     ? rows.sort((a, b) => a.symbol.localeCompare(b.symbol))
     : rows.sort((a, b) => (b.volumeRatio ?? 0) - (a.volumeRatio ?? 0)).slice(0, maxScanResults);
-  const scanned = results.reduce((sum, result) => sum + result.scanned, 0);
-  const universeName = regions.length === 1 ? results[0].universeName : `${regions.length} bursa`;
   return { picks, scanned, universeName };
 }
 
@@ -356,7 +396,15 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
     };
   }
 
-  const { picks, scanned, universeName } = await scanMath(regions, mode);
+  const { picks, scanned, universeName, checked } = await scanMath(regions, mode);
+  const consolidation = consolidationScans.get(mode);
+  if (consolidation) {
+    if (!checked) throw new Error('Data harga konsolidasi belum tersedia.');
+    return {
+      mode, language, region: regionParam, universe: universeName, timeframe: consolidation.timeframe,
+      scanned, checked, results: picks,
+    };
+  }
   if (mode === 'growth') {
     if (!picks.some(row => row.salesTTMComparison || Object.values(row).some(Number.isFinite))) throw new Error('Data Growth belum tersedia. Coba lagi.');
     return { mode, region: regionParam, universe: universeName, scanned, results: picks };

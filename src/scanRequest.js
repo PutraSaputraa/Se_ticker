@@ -15,7 +15,9 @@ function waitForNextPoll(signal) {
 
 export async function requestScanResult(mode, region, language, controller, onPhase) {
   const { signal } = controller;
-  const failure = 'Pemindaian breakout gagal. Coba lagi nanti.';
+  const failure = mode.startsWith('consolidation-')
+    ? 'Pemindaian konsolidasi gagal. Coba lagi nanti.'
+    : 'Pemindaian breakout gagal. Coba lagi nanti.';
   let deadline;
   try {
     const query = new URLSearchParams({ mode, region, lang: language });

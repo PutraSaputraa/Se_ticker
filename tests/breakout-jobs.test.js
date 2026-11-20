@@ -149,3 +149,52 @@ test('riset menampilkan kegagalan Kenari dan memerlukan sumber web untuk kandida
   assert.deepEqual(withoutSources.results, []);
   assert.equal(fetch.mock.callCount(), 2);
 });
+
+test('job konsolidasi bulanan menilai bulan terakhir yang selesai di bursa', async (t) => {
+  // July has started in Shenzhen while the browser/server UTC date is still June.
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-06-30T16:30:00Z') });
+  let body;
+  const priceRequests = [];
+  const cycle = [76, 81, 83, 77, 69, 73];
+  const closes = Array.from({ length: 22 }, (_, index) => cycle[index % cycle.length]);
+  closes.push(93, 94);
+  const timestamps = closes.map((_, index) => Date.UTC(2024, 8 + index, 0, 16) / 1000);
+  // Yahoo may append a second bar for the current month.
+  timestamps[timestamps.length - 1] = timestamps.at(-2) + 600;
+  mockJobStore(t, (url, init) => {
+    if (url.pathname.endsWith('/breakout-scan-background')) {
+      body = init.body;
+      return new Response(null, { status: 202 });
+    }
+    priceRequests.push(url);
+    if (!url.pathname.endsWith('/000333.SZ')) return new Response(null, { status: 404 });
+    return Response.json({ chart: { result: [{
+      meta: { symbol: '000333.SZ', exchangeTimezoneName: 'Asia/Shanghai', currency: 'CNY' },
+      timestamp: timestamps,
+      indicators: { quote: [{
+        open: closes,
+        high: closes.map(value => value + 1),
+        low: closes.map(value => value - 1),
+        close: closes,
+      }] },
+    }] } });
+  });
+
+  const request = new Request(`${functionsUrl}breakout-start?mode=consolidation-monthly&region=sz&lang=en`, { method: 'POST' });
+  const started = await breakoutStart(request);
+  assert.equal(started.status, 202);
+  const { jobId } = await started.json();
+  await breakoutWorker(new Request(`${functionsUrl}breakout-scan-background`, { method: 'POST', body }));
+  const { status, result } = await (await readJob(jobId)).json();
+  assert.equal(status, 'done');
+  assert.equal(result.timeframe, 'monthly');
+  assert.equal(result.language, 'en');
+  assert.equal(result.checked, 1);
+  assert.equal(result.scanned, priceRequests.length);
+  assert.equal(result.ai, undefined);
+  assert.ok(priceRequests.every(url => url.hostname === 'query1.finance.yahoo.com'
+    && url.searchParams.get('interval') === '1mo' && url.searchParams.get('range') === '5y'));
+  assert.equal(result.results.length, 1);
+  assert.equal(result.results[0].date, '2026-06');
+  assert.equal(result.results[0].close, 77);
+});
