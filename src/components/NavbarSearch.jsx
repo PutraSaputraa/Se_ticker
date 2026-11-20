@@ -6,6 +6,7 @@ import WorkspaceIcon from './WorkspaceIcon.jsx';
 
 export default function NavbarSearch({ initialTicker, account }) {
   const { t } = useTranslation();
+  const searchLabel = t("Cari saham");
   const panelId = useId();
   const root = useRef(null);
   const trigger = useRef(null);
@@ -47,14 +48,13 @@ export default function NavbarSearch({ initialTicker, account }) {
         type="button"
         ref={trigger}
         className="workspace-nav-link navbar-search-trigger"
-        aria-label={t("Cari saham")}
+        aria-label={searchLabel}
+        title={searchLabel}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(current => !current)}
       >
-        <WorkspaceIcon name="search" size={18} />
-        <span className="workspace-nav-name">{t("Cari saham")}</span>
-        <span className="workspace-nav-mobile" aria-hidden="true">{t("Cari")}</span>
+        <WorkspaceIcon name="search" />
       </button>
       {open && (
         <>

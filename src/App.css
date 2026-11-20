@@ -274,7 +274,9 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .navbar-search { min-width: 0; }
 
 .navbar-search-trigger {
+  justify-content: center;
   width: 100%;
+  min-width: var(--touch-size);
   background: transparent;
 }
 
