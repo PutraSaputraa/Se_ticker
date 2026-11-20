@@ -1,4 +1,5 @@
 const paths = {
+  dashboard: 'M4 4h7v7H4zM14 4h6v7h-6zM4 14h7v6H4zM14 14h6v6h-6z',
   filter: 'M3 5h18l-7 8v6l-4 2v-8L3 5Z',
   edit: 'm15 4 5 5M4 20l4-1 12-12a2 2 0 0 0-4-4L4 15l-1 6 5-2',
   search: 'M15.5 15.5 21 21M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z',

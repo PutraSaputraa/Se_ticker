@@ -1,0 +1,105 @@
+.dashboard-page {
+  max-width: var(--workspace-content-width);
+  margin-inline: auto;
+  container: dashboard / inline-size;
+}
+
+.dashboard-page > .page-heading { margin-block-end: var(--workspace-card-gap); }
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--workspace-card-gap);
+}
+
+.dashboard-card {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--workspace-card-radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.dashboard-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.15rem 0.65rem;
+  min-height: 3.5rem;
+  padding: 0.35rem 1rem;
+  border-radius: var(--workspace-card-radius) var(--workspace-card-radius) 0 0;
+  background: var(--surface-heading);
+}
+
+.dashboard-card-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.dashboard-card-header h2 svg { flex: none; color: var(--support-text); }
+
+.dashboard-card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: var(--touch-size);
+  color: var(--action-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.dashboard-card-action:hover { text-decoration: underline; }
+.dashboard-card-action svg { flex: none; }
+
+.dashboard-list { margin: 0; padding: 0; list-style: none; }
+.dashboard-list li { border-top: 1px solid var(--border); }
+
+.dashboard-list a {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.9rem;
+  padding: 0.55rem 1rem;
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-list li:last-child a {
+  border-radius: 0 0 var(--workspace-card-radius) var(--workspace-card-radius);
+}
+
+.dashboard-list a:is(:hover, :focus-visible) { background: var(--surface-hover); }
+.dashboard-list a:focus-visible { outline-offset: -3px; }
+.dashboard-list strong { min-width: 0; margin-inline-end: auto; font-weight: 650; }
+.dashboard-list svg { flex: none; color: var(--muted); }
+
+.dashboard-setup-limit {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.dashboard-empty {
+  padding: 0.85rem 1rem 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@container dashboard (width < 54rem) {
+  .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container dashboard (width < 36rem) {
+  .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+}

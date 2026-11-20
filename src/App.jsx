@@ -1,6 +1,6 @@
 import useTranslation from './useTranslation.js';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Route, Routes, useLocation, useMatch, useNavigationType } from 'react-router-dom';
+import { Link, NavLink, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from './firebase.js';
 import useAccountData from './useAccountData.js';
@@ -8,9 +8,10 @@ import { clearLegacyData, mergeLegacyData, readLegacyData } from './accountData.
 import BrandMark from './components/BrandMark.jsx';
 import ThemeToggle from './components/ThemeToggle.jsx';
 import LanguageSwitcher from './components/LanguageSwitcher.jsx';
+import NavbarSearch from './components/NavbarSearch.jsx';
 import SupportButton from './components/SupportButton.jsx';
 import WorkspaceIcon from './components/WorkspaceIcon.jsx';
-import HomePage from './pages/HomePage.jsx';
+import DashboardPage from './pages/DashboardPage.jsx';
 import StockDetailPage from './pages/StockDetailPage.jsx';
 import WatchlistPage from './pages/WatchlistPage.jsx';
 import RecommendPage from './pages/RecommendPage.jsx';
@@ -19,7 +20,7 @@ import JournalPage from './pages/JournalPage.jsx';
 const ScreenerPage = lazy(() => import('./pages/ScreenerPage.jsx'));
 
 const navigation = [
-  { to: '/', name: 'Cari saham', mobile: 'Cari', icon: 'search' },
+  { to: '/', name: 'Dashboard', icon: 'dashboard' },
   { to: '/watchlist', name: 'Pantauan', icon: 'watch' },
   { to: '/rekomendasi', name: 'Rekomendasi', mobile: 'Riset', icon: 'scan' },
   { to: '/screener', name: 'Screener', mobile: 'Filter', icon: 'filter' },
@@ -39,7 +40,6 @@ function Brand() {
 
 function WorkspaceNav() {
   const { t } = useTranslation();
-  const stock = useMatch('/stock/:symbol');
   return (
     <nav className="workspace-nav" aria-label={t("Menu utama")}>
       {navigation.map(({ to, name, mobile, icon }) => (
@@ -48,7 +48,7 @@ function WorkspaceNav() {
           to={to}
           end={to === '/'}
           aria-label={t(name)}
-          className={({ isActive }) => `workspace-nav-link${isActive || (stock && to === '/') ? ' workspace-nav-link--active' : ''}`}
+          className={({ isActive }) => `workspace-nav-link${isActive ? ' workspace-nav-link--active' : ''}`}
         >
           <WorkspaceIcon name={icon} />
           <span className="workspace-nav-name">{t(name)}</span>
@@ -59,13 +59,14 @@ function WorkspaceNav() {
   );
 }
 
-function TopBar({ user }) {
+function TopBar({ user, account }) {
   const { t } = useTranslation();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const accountMenu = useRef(null);
   const header = useRef(null);
-  const { pathname } = useLocation();
+  const { pathname, search, key } = useLocation();
+  const initialTicker = pathname === '/' ? new URLSearchParams(search).get('ticker') : null;
 
   // Topbar menempel di atas konten, jadi tinggi aslinya menentukan jarak aman
   // untuk scroll ke anchor. Tinggi berubah mengikuti breakpoint dan ukuran teks.
@@ -107,7 +108,7 @@ function TopBar({ user }) {
       <header className="workspace-bar" ref={header}>
         <div className="workspace-bar-inner">
           <Brand />
-          <WorkspaceNav />
+          <NavbarSearch key={key} initialTicker={initialTicker} account={account} />
           <div className="account-controls">
             <LanguageSwitcher />
             <SupportButton />
@@ -135,6 +136,7 @@ function TopBar({ user }) {
               </div>
             </details>
           </div>
+          <WorkspaceNav />
         </div>
       </header>
       {signOutError && (
@@ -169,7 +171,7 @@ export default function App({ user }) {
   return (
     <div className="workspace-shell">
       <a className="skip-link" href="#workspace-content">{t("Lewati ke konten")}</a>
-      <TopBar user={user} />
+      <TopBar user={user} account={account} />
       <main className="workspace" id="workspace-content" tabIndex={-1}>
         {account.error && (
           <div className="account-message account-message--error" role="alert">
@@ -186,13 +188,13 @@ export default function App({ user }) {
 
         <div className="workspace-route">
           <Routes>
-            <Route path="/" element={<HomePage account={account} />} />
+            <Route path="/" element={<DashboardPage account={account} uid={user.uid} />} />
             <Route path="/stock/:symbol" element={<StockDetailPage account={account} />} />
             <Route path="/watchlist" element={<WatchlistPage account={account} uid={user.uid} />} />
             <Route path="/rekomendasi" element={<RecommendPage account={account} />} />
             <Route path="/screener" element={<Suspense fallback={<p role="status">{t('Memuat…')}</p>}><ScreenerPage userId={user.uid} /></Suspense>} />
             <Route path="/jurnal" element={<JournalPage account={account} uid={user.uid} />} />
-            <Route path="*" element={<HomePage account={account} />} />
+            <Route path="*" element={<DashboardPage account={account} uid={user.uid} />} />
           </Routes>
         </div>
 

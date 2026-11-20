@@ -349,7 +349,7 @@ function StockDetail({ symbol, account }) {
   const quoteContext = entryContext(entryDistance);
   const chartSnapshot = range === defaultRange ? null : chartData.snapshot;
   const alternatives = result.notFound ? suggestTickerAlternatives(symbol) : [];
-  const searchUrl = result.status === 'error' ? `/?${new URLSearchParams({ ticker: symbol })}` : '/';
+  const searchUrl = `/?${new URLSearchParams({ ticker: result.status === 'error' ? symbol : '' })}`;
 
   return (
     <div className="stock-detail">

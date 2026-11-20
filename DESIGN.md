@@ -42,8 +42,8 @@ Gunakan `--workspace-on-action` di tombol biru. Pasangkan `--support-text` denga
 
 ## Komposisi halaman
 
-- **Shell.** Navbar navy di atas memuat brand, menu utama, pengaturan tema, dan akun. Ikon teal dan garis bawah menandai menu aktif. Hingga lebar viewport 58 rem, menu tampil di bawah dan kontrol akun tetap di atas.
-- **Cari saham.** Judul, form, dan contoh ticker berada di panel utama. Riwayat berfungsi sebagai daftar pindai cepat di samping atau di bawahnya. Pintasan Pantauan dan Rekomendasi memakai tautan yang sudah tersedia.
+- **Shell.** Navbar memusatkan tombol Cari saham di antara brand dan kontrol akun. Menu utama berada di baris bawah pada desktop dan di bagian bawah layar hingga lebar viewport 58 rem. Panel pencarian turun dari tepi navbar dan memuat pilihan bursa serta isian ticker.
+- **Dashboard.** Tampilkan ringkasan Pantauan, Trade Setup aktif, dan pencarian terakhir di halaman awal setelah masuk. Baris ticker membuka detail saham, sedangkan tautan di judul kartu membuka daftar pantauan atau setup di Jurnal.
 - **Detail saham.** Identitas dan penutupan berada di header. Candlestick memakai kolom utama. Di ruang konten mulai 52 rem, Rencana trading dan rincian sesi memakai kolom samping. Di lebar yang lebih sempit, bagian itu mengikuti grafik. Buy Trigger, Stop loss, Target, dan Resistance memakai label dan aksen semantik. Baca nilai sesi lewat pointer, sentuhan, atau tombol panah.
 - **Pantauan.** Pertahankan ticker semat, isian harga, catatan, gambar, dan aksi baris. Bintang tampil sebagai tombol di desktop dan pemilih besar di layar sempit atau perangkat sentuh. Status penyimpanan berada di toolbar tabel.
 - **Rekomendasi.** Metode dan bursa berada dalam panel konfigurasi. Mode Konsolidasi menyediakan pilihan harian dan bulanan. Saat pemindaian berjalan, indikator mengikuti status permintaan. Kartu konsolidasi menampilkan zona support dan resistance beserta posisi harga di antaranya.

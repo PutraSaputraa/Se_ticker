@@ -1,20 +1,31 @@
 import useTranslation from '../useTranslation.js';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { suggestTickers } from '../tickers.js';
 
 export default function TickerField({
   value, onChange, onSelect, knownSymbols, market, className, icon,
-  placeholder, describedBy, maxLength, disabled,
+  placeholder, describedBy, maxLength, disabled, inputRef,
 }) {
   const { t } = useTranslation();
   const inputId = useId();
   const listId = `${inputId}-suggestions`;
+  const listRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [activeSymbol, setActiveSymbol] = useState(null);
   const suggestions = suggestTickers(value, knownSymbols, market);
   const expanded = open && !disabled && suggestions.length > 0;
   const activeIndex = expanded ? suggestions.findIndex(({ symbol }) => symbol === activeSymbol) : -1;
   const active = expanded ? suggestions[activeIndex] : null;
+
+  useEffect(() => {
+    const list = listRef.current;
+    const option = list?.children[activeIndex];
+    if (!option || list.scrollHeight <= list.clientHeight) return;
+    const viewport = list.getBoundingClientRect();
+    const item = option.getBoundingClientRect();
+    if (item.top < viewport.top) list.scrollTop += item.top - viewport.top;
+    else if (item.bottom > viewport.bottom) list.scrollTop += item.bottom - viewport.bottom;
+  }, [activeIndex]);
 
   function dismiss() {
     setOpen(false);
@@ -51,6 +62,7 @@ export default function TickerField({
       <div className={icon ? 'ticker-input ticker-input--icon' : 'ticker-input'}>
         {icon}
         <input
+          ref={inputRef}
           id={inputId}
           name="ticker"
           type="text"
@@ -78,7 +90,7 @@ export default function TickerField({
           required
         />
         {expanded && (
-          <ul id={listId} className="ticker-suggestions" role="listbox" aria-label={t("Saran ticker")}>
+          <ul ref={listRef} id={listId} className="ticker-suggestions" role="listbox" aria-label={t("Saran ticker")}>
             {suggestions.map(({ symbol, market }, index) => (
               <li
                 key={symbol}
