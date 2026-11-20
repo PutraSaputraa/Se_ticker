@@ -6,6 +6,15 @@
   font-display: swap;
 }
 
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+@supports (scrollbar-gutter: stable) {
+  html { overflow-y: auto; }
+}
+
 :root {
   color-scheme: light;
   font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
@@ -67,6 +76,9 @@
   --action-highlight: rgb(255 255 255 / 0.35);
   --action-shadow-color: rgb(0 0 0 / 0.14);
   --action-shadow-blur: 2px;
+  --scrollbar-size: 10px;
+  --scrollbar-thumb: color-mix(in srgb, var(--workspace-action) 75%, transparent);
+  --scrollbar-thumb-edge: var(--action-text);
   --workspace-title-size: clamp(1.875rem, 3.5cqi, 2.625rem);
   --section-title-size: clamp(1.125rem, 2.15cqi, 1.375rem);
   --workspace-card-radius: 1rem;
@@ -127,7 +139,35 @@
   --action-highlight: rgb(255 255 255 / 0.18);
   --action-shadow-color: rgb(0 0 0 / 0.5);
   --action-shadow-blur: 3px;
+  --scrollbar-thumb: color-mix(in srgb, var(--workspace-action) 65%, var(--border));
+  --scrollbar-thumb-edge: transparent;
 }
+
+/* Standard scrollbar properties override the WebKit pseudo-elements if both apply. */
+@supports not selector(::-webkit-scrollbar) {
+  :root { --scrollbar-thumb: color-mix(in srgb, var(--workspace-action) 66%, var(--workspace-on-action)); }
+  * { scrollbar-color: var(--scrollbar-thumb) transparent; scrollbar-width: thin; }
+}
+
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+  background: transparent;
+}
+
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--scrollbar-thumb-edge);
+  transition: background-color var(--motion-fast) var(--motion-ease);
+}
+
+::-webkit-scrollbar-thumb:hover { background-color: var(--workspace-action); }
+::-webkit-scrollbar-thumb:active { background-color: var(--workspace-action-active); }
 
 * { box-sizing: border-box; }
 body { margin: 0; line-height: 1.5; }
@@ -213,20 +253,18 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   color: var(--nav-muted);
   text-decoration: none;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   transition-duration: var(--motion-standard);
 }
 
 .workspace-nav-link svg { flex: none; }
 .workspace-nav-link:hover { background: var(--nav-hover); color: var(--nav-text); }
-.workspace-nav-link--active,
-.navbar-search-trigger[aria-expanded="true"] {
+.workspace-nav-link--active {
   background: var(--nav-current);
   border-color: var(--nav-edge);
   color: var(--nav-text);
-  font-weight: 600;
 }
-:is(.workspace-nav-link--active, .navbar-search-trigger[aria-expanded="true"]) svg { color: var(--nav-accent); }
+.workspace-nav-link--active svg { color: var(--nav-accent); }
 .workspace-nav-link--active::before {
   content: "";
   position: absolute;
@@ -276,7 +314,8 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   justify-content: center;
   width: 100%;
   min-width: var(--touch-size);
-  background: transparent;
+  height: 100%;
+  transition-duration: var(--motion-fast);
 }
 
 .navbar-search-backdrop {
@@ -332,6 +371,10 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   color: var(--nav-accent);
 }
 
+.workspace-bar .language-switcher { background: var(--nav-current); }
+.workspace-bar .language-switcher button { min-width: var(--touch-size); }
+.workspace-bar .language-switcher button:hover { background: var(--nav-hover); }
+
 @media (max-width: 23rem) {
   .workspace-bar-inner { flex-wrap: wrap; gap: 0.35rem; padding-block: 0.45rem; }
   .workspace-bar .account-controls { margin-inline-start: auto; }
@@ -365,6 +408,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 
 .theme-toggle, .support-trigger, .account-menu summary {
   min-height: var(--touch-size);
+  min-width: var(--touch-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -383,7 +427,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .theme-toggle svg { width: 1.18rem; height: 1.18rem; }
 .theme-toggle-sun, :root[data-theme="dark"] .theme-toggle-moon { display: none; }
 :root[data-theme="dark"] .theme-toggle-sun { display: inline; }
-:is(.theme-toggle, .support-trigger):hover, .account-menu summary:hover, .account-menu[open] summary {
+:is(.theme-toggle, .support-trigger):hover, .account-menu summary:hover {
   border-color: var(--field-border);
   background: var(--surface-hover);
 }
@@ -396,8 +440,24 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   color: var(--nav-text);
 }
 
-:is(.workspace-bar, .auth-brand-row) :is(.theme-toggle:hover, .support-trigger:hover, .account-menu summary:hover, .account-menu[open] summary) {
+.workspace-bar :is(.theme-toggle, .support-trigger, .account-menu summary) { color: var(--nav-muted); }
+.workspace-bar .account-menu summary {
+  color: color-mix(in srgb, var(--nav-text) 75%, var(--nav-muted));
+}
+
+:is(.workspace-bar, .auth-brand-row) :is(.theme-toggle:hover, .support-trigger:hover, .account-menu summary:hover) {
   background: var(--nav-hover);
+  color: var(--nav-text);
+}
+
+.workspace-bar :is(
+  .language-switcher button[aria-pressed="true"],
+  .theme-toggle[aria-pressed="true"],
+  .support-trigger:has(+ .support-dialog[open]),
+  .account-menu[open] summary
+) {
+  border-color: var(--workspace-action);
+  color: var(--workspace-action);
 }
 
 .account-menu { position: relative; }
@@ -412,7 +472,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   top: calc(100% + 0.5rem);
   right: 0;
   width: max-content;
-  max-width: min(19rem, calc(100vw - 2rem));
+  max-width: 19rem;
   display: grid;
   gap: 0.6rem;
   min-width: 11rem;
@@ -423,6 +483,15 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   box-shadow: var(--shadow-raised);
 }
 
+@media (max-width: 31rem) {
+  .account-popover {
+    position: fixed;
+    top: calc(var(--header-height) + 0.5rem);
+    right: var(--workspace-gutter);
+    max-width: min(19rem, calc(100% - 2 * var(--workspace-gutter)));
+  }
+}
+
 .account-email {
   color: var(--muted);
   font-size: 0.88rem;
@@ -430,7 +499,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 }
 
 .workspace-bar .brand { --focus: var(--nav-focus); color: var(--nav-text); }
-.workspace-bar .account-chevron { color: var(--nav-muted); }
+.workspace-bar .account-chevron { color: inherit; }
 
 .workspace { min-width: 0; padding-block: clamp(1rem, 2.3vw, 2rem) 2rem; }
 .workspace-route { min-width: 0; }
@@ -496,7 +565,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 :is(.account-signout, .watch-toggle):active:not(:disabled) { background: var(--workspace-action-soft); }
 .watch-toggle--active { background: var(--workspace-action-soft); border-color: var(--action-text); }
 
-:is(.scan-button, .check-button, .stock-identity .watch-toggle:not(.watch-toggle--active)) {
+:is(.scan-button, .check-button, .navbar-search-trigger, .stock-identity .watch-toggle:not(.watch-toggle--active)) {
   --action-drop-shadow: 0 1px var(--action-shadow-blur) var(--action-shadow-color);
   border-color: color-mix(in srgb, var(--workspace-action-active) 58%, var(--workspace-on-action));
   /* Shift between thirds of the gradient to animate the button colors. */
@@ -512,14 +581,14 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 }
 
 @media (hover: hover) {
-  :is(.scan-button, .check-button, .stock-identity .watch-toggle:not(.watch-toggle--active)):hover:not(:disabled, [aria-disabled="true"]) {
+  :is(.scan-button, .check-button, .navbar-search-trigger, .stock-identity .watch-toggle:not(.watch-toggle--active)):hover:not(:disabled, [aria-disabled="true"]) {
     --action-drop-shadow: 0 2px 6px var(--action-shadow-color);
     background-position: top;
     transform: translateY(var(--motion-action-lift));
   }
 }
 
-:is(.scan-button, .check-button, .stock-identity .watch-toggle:not(.watch-toggle--active)):active:not(:disabled, [aria-disabled="true"]) {
+:is(.scan-button, .check-button, .navbar-search-trigger, .stock-identity .watch-toggle:not(.watch-toggle--active)):is(:active, .navbar-search-trigger[aria-expanded="true"]):not(:disabled, [aria-disabled="true"]) {
   --action-drop-shadow: 0 1px 1px var(--action-shadow-color);
   background-position: bottom;
   transform: translateY(0);
