@@ -1,0 +1,244 @@
+//@version=6
+indicator("Web Ticker Konsolidasi", max_bars_back = 500)
+
+// Pilih 1D atau 1M di Pine Screener, lalu filter "Konsolidasi aktif" sama dengan 1.
+// Aturan deteksi mengikuti netlify/functions/shared/consolidationLogic.js.
+
+const int MAX_SCAN_BARS = 500
+const int MIN_TOUCHES = 2
+const float MIN_INSIDE_RATIO = 0.8
+var array<int> dailyLookbacks = array.from(40, 60, 90, 120, 150, 180)
+var array<int> monthlyLookbacks = array.from(12, 15, 18, 21, 24, 30)
+
+type PriceZone
+    float low
+    float high
+    int outsideCloses
+    array<int> visits
+    array<float> retreatCloses = na
+
+type Consolidation
+    float supportLow
+    float supportHigh
+    float resistanceLow
+    float resistanceHigh
+    int supportTouches
+    int resistanceTouches
+    int duration
+    float positionPct
+    float referenceClose
+
+validPriceBar(float candleHigh, float candleLow, float candleClose) =>
+    bool hasPrices = not na(candleHigh) and not na(candleLow) and not na(candleClose)
+    hasPrices and candleLow > 0 and candleClose >= candleLow and candleClose <= candleHigh
+
+monthKey(int candleTime) =>
+    year(candleTime, syminfo.timezone) * 12 + month(candleTime, syminfo.timezone)
+
+latestClosedOffset(bool monthly) =>
+    int selected = na
+    int currentMonth = monthly ? monthKey(timenow) : na
+    for offset = 0 to math.min(bar_index, MAX_SCAN_BARS - 1)
+        int closesAt = time_close[offset]
+        if na(closesAt) or closesAt > timenow or (offset == 0 and not barstate.isconfirmed)
+            continue
+
+        // Web Ticker includes a monthly candle after its calendar month ends at the exchange.
+        bool hasPrices = not na(open[offset]) and not na(high[offset]) and not na(low[offset]) and not na(close[offset])
+        bool eligible = monthly ? monthKey(time[offset]) < currentMonth : hasPrices
+        if eligible
+            selected := offset
+            break
+    selected
+
+findSwings(array<float> highs, array<float> lows, int radius) =>
+    array<int> swingHighs = array.new<int>()
+    array<int> swingLows = array.new<int>()
+    int lastPivot = array.size(highs) - radius - 1
+    if lastPivot >= radius
+        for bar = radius to lastPivot
+            float pivotHigh = array.get(highs, bar)
+            float pivotLow = array.get(lows, bar)
+            bool highPivot = true
+            bool lowPivot = true
+            // Equal prices on the left select the last candle of a flat peak or trough.
+            for step = 1 to radius
+                highPivot := highPivot and pivotHigh >= array.get(highs, bar - step) and pivotHigh > array.get(highs, bar + step)
+                lowPivot := lowPivot and pivotLow <= array.get(lows, bar - step) and pivotLow < array.get(lows, bar + step)
+            if highPivot
+                array.push(swingHighs, bar)
+            if lowPivot
+                array.push(swingLows, bar)
+    [swingHighs, swingLows]
+
+windowValues(array<float> highs, array<float> lows, array<float> closes, int start) =>
+    array<float> trueRanges = array.new<float>()
+    array<float> sortedCloses = array.new<float>()
+    for bar = start to array.size(closes) - 1
+        float candleHigh = array.get(highs, bar)
+        float candleLow = array.get(lows, bar)
+        float previousClose = bar == start ? na : array.get(closes, bar - 1)
+        float trueRange = na(previousClose) ? candleHigh - candleLow : math.max(candleHigh, previousClose) - math.min(candleLow, previousClose)
+        array.push(trueRanges, trueRange)
+        array.push(sortedCloses, array.get(closes, bar))
+    array.sort(trueRanges)
+    array.sort(sortedCloses)
+    int size = array.size(trueRanges)
+    float volatility = (array.get(trueRanges, int(size / 2)) + array.get(trueRanges, int((size - 1) / 2))) / 2.0
+    [volatility, sortedCloses]
+
+countOutside(array<float> sortedCloses, float boundary, bool isSupport) =>
+    // Find the lower bound for support and the upper bound for resistance.
+    int left = 0
+    int right = array.size(sortedCloses)
+    while left < right
+        int middle = int((left + right) / 2)
+        float value = array.get(sortedCloses, middle)
+        bool beforeBoundary = isSupport ? value < boundary : value <= boundary
+        if beforeBoundary
+            left := middle + 1
+        else
+            right := middle
+    isSupport ? left : array.size(sortedCloses) - left
+
+retreatExtrema(array<int> visits, array<float> closes, bool isSupport) =>
+    array.sort(visits)
+    array<float> extrema = array.new<float>()
+    for visit = 1 to array.size(visits) - 1
+        int firstBetween = array.get(visits, visit - 1) + 1
+        int lastBetween = array.get(visits, visit) - 1
+        if firstBetween <= lastBetween
+            float extreme = array.get(closes, firstBetween)
+            for bar = firstBetween to lastBetween
+                float price = array.get(closes, bar)
+                extreme := isSupport ? math.max(extreme, price) : math.min(extreme, price)
+            array.push(extrema, extreme)
+    extrema
+
+findZones(array<int> pivots, array<float> pivotPrices, array<float> sortedCloses, int start, float tolerance, float referenceClose, bool isSupport) =>
+    array<float> prices = array.new<float>()
+    array<int> bars = array.new<int>()
+    for pivot in pivots
+        if pivot >= start
+            array.push(prices, array.get(pivotPrices, pivot))
+            array.push(bars, pivot)
+
+    array<PriceZone> zones = array.new<PriceZone>()
+    int pivotCount = array.size(prices)
+    if pivotCount >= MIN_TOUCHES
+        array<int> ordered = array.sort_indices(prices, order.ascending)
+        int finish = 0
+        for first = 0 to pivotCount - MIN_TOUCHES
+            float zoneLow = array.get(prices, array.get(ordered, first))
+            if first > 0 and zoneLow == array.get(prices, array.get(ordered, first - 1))
+                continue
+            while finish < pivotCount and array.get(prices, array.get(ordered, finish)) <= zoneLow + tolerance
+                finish += 1
+            if finish - first < MIN_TOUCHES
+                continue
+
+            float zoneHigh = array.get(prices, array.get(ordered, finish - 1))
+            bool containsClose = isSupport ? referenceClose >= zoneLow : referenceClose <= zoneHigh
+            if not containsClose
+                continue
+
+            array<int> visits = array.new<int>()
+            for member = first to finish - 1
+                array.push(visits, array.get(bars, array.get(ordered, member)))
+
+            float outerBoundary = isSupport ? zoneLow : zoneHigh
+            int outsideCloses = countOutside(sortedCloses, outerBoundary, isSupport)
+            array.push(zones, PriceZone.new(zoneLow, zoneHigh, outsideCloses, visits))
+    zones
+
+countReactions(PriceZone zone, array<float> closes, float threshold, bool isSupport) =>
+    if na(zone.retreatCloses)
+        zone.retreatCloses := retreatExtrema(zone.visits, closes, isSupport)
+    int count = 1
+    for price in zone.retreatCloses
+        bool movedAway = isSupport ? price >= threshold : price <= threshold
+        if movedAway
+            count += 1
+    count
+
+findConsolidation(int referenceOffset, bool monthly) =>
+    array<int> lookbacks = monthly ? monthlyLookbacks : dailyLookbacks
+    int radius = monthly ? 1 : 2
+    int longest = array.get(lookbacks, array.size(lookbacks) - 1)
+    int oldestOffset = math.min(math.min(bar_index, MAX_SCAN_BARS - 1), referenceOffset + longest - 1 + radius)
+    float referenceClose = close[referenceOffset]
+
+    array<float> highs = array.new<float>()
+    array<float> lows = array.new<float>()
+    array<float> closes = array.new<float>()
+    // Use older candles to build the zones, in chronological order.
+    if oldestOffset > referenceOffset
+        for offset = oldestOffset to referenceOffset + 1
+            if validPriceBar(high[offset], low[offset], close[offset])
+                array.push(highs, high[offset])
+                array.push(lows, low[offset])
+                array.push(closes, close[offset])
+
+    [swingHighs, swingLows] = findSwings(highs, lows, radius)
+    Consolidation best = na
+    float bestScore = na
+    int historySize = array.size(closes)
+    for duration in lookbacks
+        if historySize + 1 < duration
+            break
+
+        int start = historySize + 1 - duration
+        [volatility, sortedCloses] = windowValues(highs, lows, closes, start)
+        if volatility <= 0
+            continue
+
+        float tolerance = volatility * 0.65
+        array<PriceZone> supports = findZones(swingLows, lows, sortedCloses, start, tolerance, referenceClose, true)
+        array<PriceZone> resistances = findZones(swingHighs, highs, sortedCloses, start, tolerance, referenceClose, false)
+        for support in supports
+            for resistance in resistances
+                float gap = resistance.low - support.high
+                float width = resistance.high - support.low
+                if gap <= 0 or width < volatility * 1.5
+                    continue
+
+                // The two sets of outside closes are disjoint. The reference close is inside.
+                float insideRatio = (duration - support.outsideCloses - resistance.outsideCloses) * 1.0 / duration
+                if insideRatio < MIN_INSIDE_RATIO
+                    continue
+
+                float zoneWidth = (support.high - support.low) + (resistance.high - resistance.low)
+                float score = insideRatio - 0.2 * (zoneWidth / width)
+                if not na(bestScore) and score < bestScore
+                    continue
+
+                float retreat = gap / 4.0
+                int supportTouches = countReactions(support, closes, support.high + retreat, true)
+                int resistanceTouches = countReactions(resistance, closes, resistance.low - retreat, false)
+                if supportTouches < MIN_TOUCHES or resistanceTouches < MIN_TOUCHES
+                    continue
+
+                bestScore := score
+                float positionPct = (referenceClose - support.low) / width * 100.0
+                best := Consolidation.new(support.low, support.high, resistance.low, resistance.high, supportTouches, resistanceTouches, duration, positionPct, referenceClose)
+    best
+
+bool daily = timeframe.isdaily and timeframe.multiplier == 1
+bool monthly = timeframe.ismonthly and timeframe.multiplier == 1
+Consolidation result = na
+if barstate.islast and (daily or monthly)
+    int referenceOffset = latestClosedOffset(monthly)
+    if not na(referenceOffset) and validPriceBar(high[referenceOffset], low[referenceOffset], close[referenceOffset])
+        result := findConsolidation(referenceOffset, monthly)
+
+bool active = not na(result)
+plot(active ? 1 : 0, "Konsolidasi aktif", precision = 0)
+plot(active ? result.supportLow : na, "Support bawah")
+plot(active ? result.supportHigh : na, "Support atas")
+plot(active ? result.resistanceLow : na, "Resistance bawah")
+plot(active ? result.resistanceHigh : na, "Resistance atas")
+plot(active ? result.supportTouches : na, "Pantulan support", precision = 0)
+plot(active ? result.resistanceTouches : na, "Pantulan resistance", precision = 0)
+plot(active ? result.duration : na, "Durasi (candle)", precision = 0)
+plot(active ? result.positionPct : na, "Posisi dalam range (%)", precision = 2)
+plot(active ? result.referenceClose : na, "Harga tutup acuan")
