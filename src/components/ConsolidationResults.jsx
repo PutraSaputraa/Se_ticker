@@ -64,18 +64,18 @@ function ConsolidationSummary({ result, picks, stale, titleRef }) {
           <dd>{countFormat.format(picks.length)}</dd>
         </div>
         <div>
-          <dt>{t('Saham dalam cakupan')}</dt>
+          <dt>{t('Aset dalam cakupan')}</dt>
           <dd>{validCount(scanned) ? countFormat.format(scanned) : t('Tidak tersedia')}</dd>
         </div>
         <div>
-          <dt>{t('Saham diperiksa')}</dt>
+          <dt>{t('Aset diperiksa')}</dt>
           <dd>{validCount(checked) ? countFormat.format(checked) : t('Tidak tersedia')}</dd>
         </div>
         <div>
           <dt>{t(Array.isArray(referenceSessions) ? 'Sesi acuan' : 'Sesi pada kandidat')}</dt>
           <dd className="consolidation-summary-date">
             {sessions.length === 1 ? <SessionTime date={sessions[0]} timeframe={timeframe} />
-              : t(sessions.length ? 'Berbeda antar saham' : 'Tidak tersedia')}
+              : t(sessions.length ? 'Berbeda antar aset' : 'Tidak tersedia')}
           </dd>
         </div>
       </dl>
@@ -87,8 +87,8 @@ function ConsolidationSummary({ result, picks, stale, titleRef }) {
           </div>
           {coverage.unavailable > 0 && <p className="consolidation-muted">
             {t(coverage.unavailable === 1
-              ? '1 saham belum dapat diperiksa. Rincian statusnya belum tersedia.'
-              : '{0} saham belum dapat diperiksa. Rincian status tiap saham belum tersedia.', countFormat.format(coverage.unavailable))}
+              ? '1 aset belum dapat diperiksa. Rincian statusnya belum tersedia.'
+              : '{0} aset belum dapat diperiksa. Rincian status tiap aset belum tersedia.', countFormat.format(coverage.unavailable))}
           </p>}
         </> : <p className="consolidation-muted">{t('Cakupan pemindaian belum tersedia.')}</p>}
         <p className="consolidation-muted">{t('Pemindai mencari penutupan di dalam rentang dan reaksi di kedua zona.')}</p>
@@ -257,7 +257,7 @@ export default function ConsolidationResults({ result, stale, watched, disabled,
       ) : <p className="research-empty">
         {t(candidates.length ? 'Tidak ada kandidat yang cocok dengan filter posisi ini.'
           : picks.length ? 'Data kandidat yang bisa ditampilkan belum tersedia.'
-            : 'Belum ada saham dengan konsolidasi aktif pada timeframe ini.')}
+            : 'Belum ada konsolidasi aktif pada timeframe ini.')}
       </p>}
       {selection && <ConsolidationAnalysis row={selection.row} timeframe={result.timeframe} onClose={closeAnalysis} />}
     </section>

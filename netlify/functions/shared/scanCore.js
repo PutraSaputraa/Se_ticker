@@ -3,14 +3,18 @@
 // Semua pekerjaan berat (fetch Yahoo + panggil Kenari) ada di sini.
 
 import {
+  completedCryptoDays,
+  completedCryptoWeekIndex,
+  cryptoWeeks,
+  dayMilliseconds,
   latestCompletedIndex,
   readSessions,
   volumeLookback,
 } from './sessionLogic.js';
 import { analyzeBaseBreakout } from './breakoutLogic.js';
-import { consolidationCloses, consolidationWeeks, findActiveConsolidation } from './consolidationLogic.js';
-import { findFallingWedge, latestCompletedWedgeWeek } from './fallingWedgeLogic.js';
-import { completedCryptoCloses, findMovingAverageCrosses } from './movingAverageCross.js';
+import { consolidationCloses, consolidationWeeks, cryptoConsolidationWeeks, findActiveConsolidation } from './consolidationLogic.js';
+import { cryptoWedgeWeek, findFallingWedge, latestCompletedWedgeWeek } from './fallingWedgeLogic.js';
+import { findMovingAverageCrosses } from './movingAverageCross.js';
 import { cryptoUniverse, getUniverse, universeRegions } from './universe.js';
 import { fetchFundamentals } from './fundamentals.js';
 import { fetchGrowthInputs, fillSalesComparisons, growthValues } from './growth.js';
@@ -62,7 +66,8 @@ function getScanUniverse(region) {
 }
 
 export function scanRegionError(mode, region) {
-  return region === 'crypto' && !crossScans.has(mode) ? 'Pilih metode Golden Cross untuk memindai kripto.' : null;
+  if (region !== 'crypto' || consolidationScans.has(mode) || crossScans.has(mode) || mode === 'falling-wedge') return null;
+  return 'Pilih Konsolidasi, Falling Wedge Pattern, atau Golden Cross untuk memindai kripto.';
 }
 
 export function scanWaitMs(mode, region) {
@@ -107,10 +112,17 @@ async function fetchPriceSessions(symbol, range, { interval = '1d', cryptoDay } 
   });
   const sessions = readSessions(timestamps, quote, marketDate);
   // Exclude the current month or the open UTC crypto day.
-  const marketPeriod = cryptoDay ?? marketDate.format(Date.now());
-  const index = monthly || cryptoDay
-    ? sessions.findLastIndex(({ date }) => date < marketPeriod)
-    : latestCompletedIndex(sessions, result.meta, marketDate);
+  const marketPeriod = cryptoDay?.slice(0, monthly ? 7 : 10) ?? marketDate.format(Date.now());
+  let index;
+  if (monthly && cryptoDay) {
+    const monthStart = Date.parse(`${marketPeriod}-01T00:00:00Z`);
+    const previousMonth = marketDate.format(monthStart - dayMilliseconds);
+    index = sessions.findLastIndex(({ date }) => date === previousMonth);
+  } else if (monthly || cryptoDay) {
+    index = sessions.findLastIndex(({ date }) => date < marketPeriod);
+  } else {
+    index = latestCompletedIndex(sessions, result.meta, marketDate);
+  }
   if (index < 0) return null;
 
   const name = [result.meta?.longName, result.meta?.shortName].find(
@@ -177,9 +189,15 @@ async function scanRegion(region, mode) {
           symbol, priceScan?.range ?? (mode === 'screener' || fallingWedge ? '1y' : '9mo'), { interval: priceScan?.interval, cryptoDay },
         );
         if (!evaluated) continue;
+        let { sessions, index } = evaluated;
+        if (cryptoDay && priceScan?.timeframe !== 'monthly') {
+          sessions = completedCryptoDays(sessions, cryptoDay);
+          index = sessions.length - 1;
+        }
         if (fallingWedge) {
-          const { sessions, index, marketDay } = evaluated;
-          const week = latestCompletedWedgeWeek(sessions, index, marketDay);
+          const week = cryptoDay
+            ? cryptoWedgeWeek(sessions, completedCryptoWeekIndex(sessions, cryptoDay))
+            : latestCompletedWedgeWeek(sessions, index, evaluated.marketDay);
           if (!week || week.endIndex < volumeLookback) continue;
           checked += 1;
           referenceSessions.add(week.date);
@@ -196,13 +214,14 @@ async function scanRegion(region, mode) {
           continue;
         }
         if (priceScan) {
-          const weekly = priceScan.timeframe === 'weekly';
-          let { sessions, index } = evaluated;
-          if (cryptoDay) {
-            sessions = completedCryptoCloses(sessions, cryptoDay, priceScan.timeframe);
-            index = sessions.length - 1;
-          } else if (weekly) {
-            sessions = consolidationWeeks(sessions, index, evaluated.marketDay);
+          if (priceScan.timeframe === 'weekly') {
+            if (cryptoDay) {
+              const endIndex = completedCryptoWeekIndex(sessions, cryptoDay);
+              sessions = consolidation ? cryptoConsolidationWeeks(sessions, endIndex)
+                : cryptoWeeks(sessions, endIndex).map(week => week.at(-1));
+            } else {
+              sessions = consolidationWeeks(sessions, index, evaluated.marketDay);
+            }
             index = sessions.length - 1;
           }
           const { date, close } = sessions[index] ?? {};

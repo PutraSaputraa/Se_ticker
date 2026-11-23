@@ -97,8 +97,8 @@ export function readConsolidationCloses(pick, timeframe) {
 }
 
 export function consolidationPrice(value, currency, digits) {
-  return validClose(value) && typeof currency === 'string' && currency.trim()
-    ? formatPrice(value, currency, digits) : t('Tidak tersedia');
+  if (!validClose(value) || typeof currency !== 'string' || !currency.trim()) return t('Tidak tersedia');
+  return formatPrice(value, currency, digits ?? (currency === 'USD' && value < 1 ? 6 : undefined));
 }
 
 export function consolidationZoneLabel(zone, currency) {

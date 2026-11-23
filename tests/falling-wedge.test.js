@@ -6,13 +6,15 @@ import { runScan } from '../netlify/functions/shared/scanCore.js';
 const breakoutDate = '2026-11-18';
 const friday = '2026-11-20';
 
-function fixture({ upperSlope = -0.55, lowerSlope = -0.16, volume = 1500, closeAtBreakout, weeklyClose } = {}) {
+function fixture({ upperSlope = -0.55, lowerSlope = -0.16, volume = 1500, closeAtBreakout, weeklyClose, includeWeekends = false } = {}) {
   const sessions = [];
-  const day = new Date('2026-08-24T00:00:00Z');
+  const day = new Date(includeWeekends ? '2026-09-21T00:00:00Z' : '2026-08-24T00:00:00Z');
+  const weekEnd = includeWeekends ? '2026-11-22' : friday;
+  const breakoutDay = includeWeekends ? '2026-11-21' : breakoutDate;
   let breakoutIndex = 0;
   let level = 0;
-  while (day.toISOString().slice(0, 10) <= friday) {
-    if (day.getUTCDay() > 0 && day.getUTCDay() < 6) {
+  while (day.toISOString().slice(0, 10) <= weekEnd) {
+    if (includeWeekends || (day.getUTCDay() > 0 && day.getUTCDay() < 6)) {
       const date = day.toISOString().slice(0, 10);
       const index = sessions.length;
       const upper = 148 + index * upperSlope;
@@ -20,26 +22,27 @@ function fixture({ upperSlope = -0.55, lowerSlope = -0.16, volume = 1500, closeA
       const width = upper - lower;
       const wave = (1 + Math.cos(index * Math.PI / 5)) / 2;
       const center = lower + 0.6 + (width - 1.2) * wave;
-      if (date < breakoutDate) {
+      if (date < breakoutDay) {
         const close = Math.min(upper, Math.max(lower, center));
         sessions.push({ date, open: close - 0.3, high: close + 0.6, low: close - 0.6, close, volume: 1000 });
       } else {
-        if (date === breakoutDate) {
+        if (date === breakoutDay) {
           breakoutIndex = index;
           level = upper;
         }
-        const close = date === breakoutDate ? closeAtBreakout ?? level + 3
-          : date === friday ? weeklyClose ?? level + 4 : level + 4;
+        const close = date === breakoutDay ? closeAtBreakout ?? level + 3
+          : date === weekEnd ? weeklyClose ?? level + 4 : level + 4;
         sessions.push({
           date, open: close - 0.3, high: close + 1.5, low: close - 0.6, close,
-          volume: date === breakoutDate ? volume : 1000,
+          volume: date === breakoutDay ? volume : 1000,
         });
       }
     }
     day.setUTCDate(day.getUTCDate() + 1);
   }
   const endIndex = sessions.length - 1;
-  return { sessions, level, breakoutIndex, week: latestCompletedWedgeWeek(sessions, endIndex, friday) };
+  const week = includeWeekends ? null : latestCompletedWedgeWeek(sessions, endIndex, weekEnd);
+  return { sessions, level, breakoutIndex, week };
 }
 
 test('accepts converging lower highs and lower lows with a volume breakout and a finished weekly confirmation', () => {
@@ -134,4 +137,47 @@ test('scan retrieves daily quotes and reports only the completed reference week 
   assert.deepEqual(confirmed.referenceSessions, [friday]);
   assert.deepEqual(confirmed.results.map(({ symbol, date, confirmation }) => [symbol, date, confirmation.date]), [['INTC', breakoutDate, friday]]);
   assert.equal(confirmed.ai, undefined);
+});
+
+test('crypto Falling Wedge confirms a Saturday breakout at the Sunday UTC close', async t => {
+  const monday = Date.parse('2026-11-23T00:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now: monday - 60_000 });
+  const { sessions } = fixture({ includeWeekends: true });
+  sessions.push({ ...sessions.at(-1), date: '2026-11-23', volume: 1800 });
+  let missingSunday = false;
+  t.mock.method(globalThis, 'fetch', async input => {
+    const url = new URL(input);
+    assert.equal(url.searchParams.get('interval'), '1d');
+    assert.equal(url.searchParams.get('range'), '1y');
+    if (!url.pathname.endsWith('/BTC-USD')) return new Response(null, { status: 404 });
+    const bars = missingSunday ? sessions.filter(bar => bar.date !== '2026-11-22') : sessions;
+    return Response.json({ chart: { result: [{
+      meta: { symbol: 'BTC-USD', currency: 'USD', exchangeTimezoneName: 'UTC' },
+      timestamp: bars.map(({ date }) => Date.parse(date + 'T00:00:00Z') / 1000),
+      indicators: { quote: [Object.fromEntries(['open', 'high', 'low', 'close', 'volume'].map(key => [key, bars.map(bar => bar[key])]))] },
+    }] } });
+  });
+
+  const openWeek = await runScan('falling-wedge', 'crypto');
+  assert.deepEqual(openWeek.referenceSessions, ['2026-11-15']);
+  assert.deepEqual(openWeek.results, []);
+
+  t.mock.timers.setTime(monday);
+  const confirmed = await runScan('falling-wedge', 'crypto');
+  assert.equal(confirmed.region, 'crypto');
+  assert.equal(confirmed.universe, 'Kripto');
+  assert.equal(confirmed.checked, 1);
+  assert.deepEqual(confirmed.referenceSessions, ['2026-11-22']);
+  const [pick] = confirmed.results;
+  assert.equal(confirmed.results.length, 1);
+  assert.equal(pick.symbol, 'BTC-USD');
+  assert.equal(pick.date, '2026-11-21');
+  assert.equal(pick.confirmation.date, '2026-11-22');
+  assert.equal(pick.candles.at(-1).date, pick.confirmation.date);
+
+  missingSunday = true;
+  const incomplete = await runScan('falling-wedge', 'crypto');
+  assert.equal(incomplete.checked, 0);
+  assert.deepEqual(incomplete.referenceSessions, []);
+  assert.deepEqual(incomplete.results, []);
 });

@@ -26,6 +26,13 @@ export function latestCompletedWedgeWeek(sessions, completedIndex, marketDay) {
   return { startIndex, endIndex, date, close };
 }
 
+export function cryptoWedgeWeek(days, endIndex) {
+  const startIndex = endIndex - 6;
+  if (startIndex < 0 || !days.slice(startIndex, endIndex + 1).every(validDailyBar)) return null;
+  const { date, close } = days[endIndex];
+  return { startIndex, endIndex, date, close };
+}
+
 function pivots(bars, field, direction) {
   const points = [];
   for (let index = pivotRadius; index < bars.length - pivotRadius; index += 1) {

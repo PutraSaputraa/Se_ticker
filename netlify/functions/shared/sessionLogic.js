@@ -22,6 +22,35 @@ export function completedMarketWeekFriday(marketDay, lastCompletedDate) {
   return new Date(Date.parse(friday + 'T00:00:00Z') - 7 * dayMilliseconds).toISOString().slice(0, 10);
 }
 
+export function completedCryptoDays(sessions, utcDay) {
+  const firstDay = Date.parse(`${sessions[0]?.date}T00:00:00Z`);
+  const cutoff = Date.parse(`${utcDay}T00:00:00Z`);
+  const byDate = new Map(sessions.map(bar => [bar.date, bar]));
+  const days = [];
+  for (let time = firstDay; time < cutoff; time += dayMilliseconds) {
+    const date = new Date(time).toISOString().slice(0, 10);
+    // Preserve gaps in the 24/7 calendar instead of joining nonconsecutive candles.
+    days.push(byDate.get(date) ?? { date, close: null });
+  }
+  return days;
+}
+
+export function completedCryptoWeekIndex(days, utcDay) {
+  const yesterday = Date.parse(`${utcDay}T00:00:00Z`) - dayMilliseconds;
+  if (!Number.isFinite(yesterday)) return -1;
+  const sunday = yesterday - new Date(yesterday).getUTCDay() * dayMilliseconds;
+  const date = new Date(sunday).toISOString().slice(0, 10);
+  return days.findLastIndex(bar => bar.date === date);
+}
+
+export function cryptoWeeks(days, endIndex) {
+  const weeks = [];
+  for (let end = endIndex; end >= 0; end -= 7) {
+    weeks.push(days.slice(Math.max(0, end - 6), end + 1));
+  }
+  return weeks.reverse();
+}
+
 export function readSessions(timestamps, quote, marketDate) {
   const sessions = new Map();
 

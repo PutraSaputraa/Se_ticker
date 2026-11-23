@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   consolidationCoverage,
+  consolidationPrice,
   getConsolidationPosition,
   readConsolidationCloses,
   selectConsolidationCandidates,
@@ -61,4 +62,10 @@ test('coverage and snapshots reject inconsistent counts, sessions, and close pri
   assert.equal(readConsolidationCloses({ ...pick, closes: [['2026-06', 101], ['2026-06', 104]] }, 'monthly'), null);
   assert.equal(readConsolidationCloses({ ...pick, closes: null }, 'monthly'), null);
   assert.equal(readConsolidationCloses(pick, 'daily'), null);
+});
+
+test('USD prices below one dollar keep enough precision to distinguish nearby levels', () => {
+  assert.equal(consolidationPrice(0.123414, 'USD'), '$0.123414');
+  assert.equal(consolidationPrice(0.123426, 'USD'), '$0.123426');
+  assert.equal(consolidationPrice(1.23426, 'USD'), '$1.23');
 });

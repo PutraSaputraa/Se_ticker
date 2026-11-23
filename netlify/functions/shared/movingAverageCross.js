@@ -1,25 +1,7 @@
 import { sma } from './minervini.js';
-import { dayMilliseconds } from './sessionLogic.js';
 
 const fastPeriod = 50;
 const slowPeriod = 200;
-
-export function completedCryptoCloses(sessions, utcDay, timeframe) {
-  const yesterday = Date.parse(`${utcDay}T00:00:00Z`) - dayMilliseconds;
-  const weekly = timeframe === 'weekly';
-  const step = (weekly ? 7 : 1) * dayMilliseconds;
-  // A UTC week closes at Monday 00:00, using the preceding Sunday's close.
-  const lastClose = weekly ? yesterday - new Date(yesterday).getUTCDay() * dayMilliseconds : yesterday;
-  const firstDay = Date.parse(`${sessions[0]?.date}T00:00:00Z`);
-  const closes = new Map(sessions.map(({ date, close }) => [date, close]));
-  const completed = [];
-  for (let time = lastClose; time >= firstDay; time -= step) {
-    const date = new Date(time).toISOString().slice(0, 10);
-    // Preserve missing periods so a gap cannot turn into a crossover.
-    completed.push({ date, close: closes.get(date) ?? null });
-  }
-  return completed.reverse();
-}
 
 function latestEmas(closes, period) {
   const weight = 2 / (period + 1);

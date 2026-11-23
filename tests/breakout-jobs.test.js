@@ -419,9 +419,9 @@ test('crypto Golden Cross jobs use weekend closes and wait for Monday 00:00 UTC 
   ]);
 });
 
-test('stock universes stay separate from the crypto Golden Cross universe', async (t) => {
+test('stock-only methods and the all-exchanges stock scope stay separate from crypto', async (t) => {
   const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 404 }));
-  const query = 'mode=consolidation-daily&region=crypto';
+  const query = 'mode=scan&region=crypto';
   const start = await breakoutStart(new Request(`${functionsUrl}breakout-start?${query}`, { method: 'POST' }));
   const sync = await breakoutScan(new Request(`${functionsUrl}breakout-scan?${query}`));
   assert.equal(start.status, 400);
@@ -432,4 +432,65 @@ test('stock universes stay separate from the crypto Golden Cross universe', asyn
   const requested = fetch.mock.calls.map(({ arguments: [url] }) => new URL(url).pathname.split('/').at(-1));
   assert.ok(requested.includes('BBCA.JK') && requested.includes('AAPL'));
   assert.ok(cryptoUniverse.symbols.every(symbol => !requested.includes(symbol)));
+});
+
+test('crypto consolidation evaluates completed UTC days, weeks, and months', async (t) => {
+  const dayMs = 86_400_000;
+  const monday = Date.parse('2026-11-23T00:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now: monday - 60_000 });
+  const cycle = [76, 81, 83, 77, 69, 73];
+  const historyDays = 30 * 7;
+  const daily = Array.from({ length: historyDays + 8 }, (_, index) => {
+    const close = index < historyDays ? cycle[Math.floor(index / 7) % cycle.length]
+      : index < historyDays + 6 ? 75 : 95;
+    return { timestamp: (monday - (historyDays + 7 - index) * dayMs) / 1000, close, wick: index % 7 === 5 ? 2 : 1 };
+  });
+  const monthly = Array.from({ length: 31 }, (_, index) => ({
+    timestamp: Date.UTC(2024, 4 + index, 1) / 1000, close: index < 30 ? cycle[index % cycle.length] : 95, wick: 2,
+  }));
+  let workerBody;
+  mockJobStore(t, (url, init) => {
+    if (url.pathname.endsWith('/breakout-scan-background')) {
+      workerBody = init.body;
+      return new Response(null, { status: 202 });
+    }
+    const symbol = url.pathname.split('/').at(-1);
+    assert.ok(cryptoUniverse.symbols.includes(symbol));
+    const interval = url.searchParams.get('interval');
+    assert.equal(url.searchParams.get('range'), interval === '1mo' ? '5y' : '1y');
+    const bars = symbol === 'BTC-USD' ? (interval === '1mo' ? monthly : daily)
+      : symbol === 'ETH-USD' && interval === '1mo' ? monthly.slice(0, -2) : [];
+    if (!bars.length) return new Response(null, { status: 404 });
+    const closes = bars.map(bar => bar.close);
+    return Response.json({ chart: { result: [{
+      meta: { symbol, currency: 'USD', exchangeTimezoneName: 'UTC' },
+      timestamp: bars.map(bar => bar.timestamp),
+      indicators: { quote: [{ open: closes, close: closes, high: bars.map(bar => bar.close + bar.wick), low: bars.map(bar => bar.close - bar.wick) }] },
+    }] } });
+  });
+
+  const started = await breakoutStart(new Request(`${functionsUrl}breakout-start?mode=consolidation-weekly&region=crypto`, { method: 'POST' }));
+  assert.equal(started.status, 202);
+  const { jobId } = await started.json();
+  await breakoutWorker(new Request(`${functionsUrl}breakout-scan-background`, { method: 'POST', body: workerBody }));
+  const { status, result } = await (await readJob(jobId)).json();
+  assert.equal(status, 'done');
+  assert.equal(result.region, 'crypto');
+  assert.equal(result.universe, 'Kripto');
+  assert.equal(result.timeframe, 'weekly');
+  assert.equal(result.checked, 1);
+  assert.deepEqual(result.referenceSessions, ['2026-11-15']);
+  assert.deepEqual(result.results.map(({ symbol, closes }) => [symbol, closes.at(-1)]), [['BTC-USD', ['2026-11-15', 73]]]);
+
+  const dailyResult = await runScan('consolidation-daily', 'crypto');
+  assert.deepEqual(dailyResult.referenceSessions, ['2026-11-21']);
+  const monthlyResult = await runScan('consolidation-monthly', 'crypto');
+  assert.deepEqual(monthlyResult.referenceSessions, ['2026-10']);
+  assert.equal(monthlyResult.checked, 1);
+  assert.deepEqual(monthlyResult.results.map(({ symbol, closes }) => [symbol, closes.at(-1)]), [['BTC-USD', ['2026-10', 73]]]);
+
+  t.mock.timers.setTime(monday);
+  const closedWeek = await runScan('consolidation-weekly', 'crypto');
+  assert.deepEqual(closedWeek.referenceSessions, ['2026-11-22']);
+  assert.deepEqual(closedWeek.results, []);
 });

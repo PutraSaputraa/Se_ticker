@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { consolidationCloses, consolidationWeeks, findActiveConsolidation } from '../netlify/functions/shared/consolidationLogic.js';
+import { consolidationCloses, consolidationWeeks, cryptoConsolidationWeeks, findActiveConsolidation } from '../netlify/functions/shared/consolidationLogic.js';
+import { completedCryptoDays, completedCryptoWeekIndex } from '../netlify/functions/shared/sessionLogic.js';
 
 const cycle = [90, 95, 100, 105, 110, 105, 100, 95, 90, 85, 80, 85];
 
@@ -77,4 +78,21 @@ test('pekan libur memakai sesi terakhir dan data Jumat yang rusak tidak digantik
 
   daily.push({ date: '2026-01-02', high: 110, low: 95, close: null });
   assert.deepEqual(consolidationWeeks(daily, 2, '2026-01-03').at(-1), { date: '2026-01-02', close: null });
+});
+
+test('crypto consolidation computes the full weekly range including weekend highs and lows', () => {
+  const sessions = Array.from({ length: 8 }, (_, index) => ({
+    date: `2026-11-${16 + index}`, close: 100 + index, high: 108, low: 99,
+  }));
+  sessions[5].high = 122;
+  sessions[6].low = 82;
+  sessions[7].high = 200;
+  const scanWeeks = (bars, day) => {
+    const days = completedCryptoDays(bars, day);
+    return cryptoConsolidationWeeks(days, completedCryptoWeekIndex(days, day));
+  };
+  assert.deepEqual(scanWeeks(sessions, '2026-11-22'), []);
+  assert.deepEqual(scanWeeks(sessions, '2026-11-23'), [{ date: '2026-11-22', close: 106, high: 122, low: 82 }]);
+  const missingSunday = sessions.filter(bar => bar.date !== '2026-11-22');
+  assert.deepEqual(scanWeeks(missingSunday, '2026-11-23'), [{ date: '2026-11-22', close: null }]);
 });

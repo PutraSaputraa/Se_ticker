@@ -33,11 +33,12 @@ function WedgeFacts({ pick }) {
   );
 }
 
-function WedgeAnalysis({ pick, volumeLookback, onClose }) {
+function WedgeAnalysis({ pick, volumeLookback, isCrypto, onClose }) {
   const { t } = useTranslation();
   const dialog = useRef(null);
   const titleId = useId();
   const sessions = pick.candles;
+  const displayVolume = value => formatVolume(value, { includeUnit: !isCrypto });
   const chartReady = Array.isArray(sessions) && Number.isInteger(pick.duration)
     && sessions[pick.duration]?.date === pick.date && sessions.at(-1)?.date === pick.confirmation?.date
     && sessions[pick.duration]?.close === pick.close && sessions.at(-1)?.close === pick.confirmation?.close
@@ -64,18 +65,18 @@ function WedgeAnalysis({ pick, volumeLookback, onClose }) {
         {chartReady ? (
           <CandlestickChart sessions={sessions} referenceDate={pick.date} referenceLabel="Breakout 1D" highlightHistoricalReference
             averageVolume={pick.averageVolume} trendLines={trendLines} formatDate={formatDate}
-            formatPrice={price => consolidationPrice(price, pick.currency)} formatVolume={formatVolume} />
+            formatPrice={price => consolidationPrice(price, pick.currency)} formatVolume={displayVolume} />
         ) : <p className="research-empty">{t('Riwayat harga belum tersedia.')}</p>}
         <section className="consolidation-analysis-facts" aria-label={t('Rincian breakout')}>
           <h3>{t('Rincian breakout')}</h3>
           <WedgeFacts pick={pick} />
           <dl className="consolidation-facts wedge-evidence">
-            <div><dt>{t('Volume breakout')}</dt><dd>{formatVolume(pick.volume)}</dd></div>
-            <div><dt>{t('Volume rata-rata {0} sesi', volumeLookback)}</dt><dd>{formatVolume(pick.averageVolume)}</dd></div>
+            <div><dt>{t('Volume breakout')}</dt><dd>{displayVolume(pick.volume)}</dd></div>
+            <div><dt>{t('Volume rata-rata {0} sesi', volumeLookback)}</dt><dd>{displayVolume(pick.averageVolume)}</dd></div>
             {validCount(pick.duration) && <div><dt>{t('Durasi pola')}</dt><dd>{t('{0} sesi', countFormat.format(pick.duration))}</dd></div>}
           </dl>
           <p className="consolidation-muted">{t('Garis resistance dan support sama-sama menurun. Resistance turun lebih curam sehingga jarak antar garis menyempit.')}</p>
-          <p className="consolidation-muted">{t('Konfirmasi 1W memakai penutupan sesi terakhir pada pekan bursa yang selesai. Harga tutup pekan harus berada di atas resistance saat breakout 1D.')}</p>
+          <p className="consolidation-muted">{t('Konfirmasi 1W memakai penutupan pekan terakhir yang sudah selesai. Harga tutup pekan harus berada di atas resistance saat breakout 1D.')}</p>
         </section>
       </div>
     </dialog>
@@ -107,10 +108,10 @@ export default function FallingWedgeResults({ result, stale, watched, disabled, 
       {stale && <p className="consolidation-stale">{t('Menampilkan hasil pemindaian sebelumnya untuk pilihan ini.')}</p>}
       <dl className="consolidation-summary">
         <div className="consolidation-summary-primary"><dt>{t('Kandidat ditampilkan')}</dt><dd>{countFormat.format(picks.length)}</dd></div>
-        <div><dt>{t('Saham dalam cakupan')}</dt><dd>{validCount(result.scanned) ? countFormat.format(result.scanned) : t('Tidak tersedia')}</dd></div>
-        <div><dt>{t('Saham diperiksa')}</dt><dd>{validCount(result.checked) ? countFormat.format(result.checked) : t('Tidak tersedia')}</dd></div>
+        <div><dt>{t('Aset dalam cakupan')}</dt><dd>{validCount(result.scanned) ? countFormat.format(result.scanned) : t('Tidak tersedia')}</dd></div>
+        <div><dt>{t('Aset diperiksa')}</dt><dd>{validCount(result.checked) ? countFormat.format(result.checked) : t('Tidak tersedia')}</dd></div>
         <div><dt>{t('Pekan acuan (1W)')}</dt><dd className="consolidation-summary-date">
-          {dates.length === 1 ? <SessionTime date={dates[0]} timeframe="daily" /> : t(dates.length ? 'Berbeda antar saham' : 'Tidak tersedia')}
+          {dates.length === 1 ? <SessionTime date={dates[0]} timeframe="daily" /> : t(dates.length ? 'Berbeda antar aset' : 'Tidak tersedia')}
         </dd></div>
       </dl>
       {picks.length ? (
@@ -140,9 +141,9 @@ export default function FallingWedgeResults({ result, stale, watched, disabled, 
           ))}
         </ul>
       ) : <p className="research-empty">{t(result.checked === 0
-        ? 'Data harian dan penutupan pekan belum cukup untuk memeriksa bursa ini.'
-        : 'Belum ada Falling Wedge yang terkonfirmasi pada pekan bursa terakhir yang selesai.')}</p>}
-      {selection && <WedgeAnalysis pick={selection.pick} volumeLookback={volumeLookback} onClose={closeAnalysis} />}
+        ? 'Data harian dan penutupan pekan belum cukup untuk memeriksa pasar ini.'
+        : 'Belum ada Falling Wedge yang terkonfirmasi pada pekan terakhir yang sudah selesai.')}</p>}
+      {selection && <WedgeAnalysis pick={selection.pick} volumeLookback={volumeLookback} isCrypto={result.region === 'crypto'} onClose={closeAnalysis} />}
     </section>
   );
 }
