@@ -17,7 +17,7 @@ export async function requestScanResult(mode, region, language, controller, onPh
   const { signal } = controller;
   const failure = mode.startsWith('consolidation-')
     ? 'Pemindaian konsolidasi gagal. Coba lagi nanti.'
-    : 'Pemindaian breakout gagal. Coba lagi nanti.';
+    : mode === 'falling-wedge' ? 'Pemindaian Falling Wedge gagal. Coba lagi nanti.' : 'Pemindaian breakout gagal. Coba lagi nanti.';
   let deadline;
   try {
     const query = new URLSearchParams({ mode, region, lang: language });

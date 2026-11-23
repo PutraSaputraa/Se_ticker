@@ -209,3 +209,33 @@ test('job konsolidasi bulanan menilai bulan terakhir yang selesai di bursa', asy
   assert.deepEqual(result.results[0].closes.at(-1), ['2026-06', 77]);
   assert.deepEqual(result.results[0].closes.map(([, close]) => close), closes.slice(0, 22).slice(-result.results[0].duration));
 });
+
+test('job falling wedge preserves the third method and reports missing market data', async (t) => {
+  let workerBody;
+  let quoteRequests = 0;
+  mockJobStore(t, (url, init) => {
+    if (url.pathname.endsWith('/breakout-scan-background')) {
+      workerBody = init.body;
+      return new Response(null, { status: 202 });
+    }
+    assert.equal(url.hostname, 'query1.finance.yahoo.com');
+    assert.equal(url.searchParams.get('interval'), '1d');
+    quoteRequests += 1;
+    return new Response(null, { status: 404 });
+  });
+
+  const started = await breakoutStart(new Request(
+    `${functionsUrl}breakout-start?mode=falling-wedge&region=sz&lang=en`, { method: 'POST' },
+  ));
+  assert.equal(started.status, 202);
+  const { jobId } = await started.json();
+  await breakoutWorker(new Request(`${functionsUrl}breakout-scan-background`, { method: 'POST', body: workerBody }));
+  const { status, result } = await (await readJob(jobId)).json();
+  assert.equal(status, 'done');
+  assert.deepEqual(result, {
+    mode: 'falling-wedge', language: 'en', region: 'sz', universe: 'Shenzhen Top 10',
+    timeframe: 'daily', confirmationTimeframe: 'weekly', volumeLookback: 50,
+    scanned: quoteRequests, checked: 0, referenceSessions: [], results: [],
+  });
+  assert.ok(quoteRequests > 0);
+});

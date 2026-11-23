@@ -14,13 +14,13 @@ const defaultRanges = [
   { value: '1wk', label: 'Mingguan' },
 ];
 
-function CandleReadout({ session, active, isReference, formatDate, formatPrice, formatVolume }) {
+function CandleReadout({ session, active, isReference, referenceLabel, formatDate, formatPrice, formatVolume }) {
   const { t } = useTranslation();
   return (
     <div className={active ? 'candle-readout candle-tooltip' : 'candle-readout'} id="candle-tooltip" role={active ? 'tooltip' : undefined}>
       <div className="candle-readout-date">
         <time dateTime={session.date}>{formatDate(session.date)}</time>
-        {isReference && <span>{t("Sesi acuan")}</span>}
+        {isReference && <span>{t(referenceLabel)}</span>}
       </div>
       <dl>
         <div><dt>{t("Buka")}</dt><dd>{formatPrice(session.open)}</dd></div>
@@ -85,6 +85,7 @@ function ChartHeader({ count, timeframe, selectedRange, ranges, onTimeframeChang
 export default function CandlestickChart({
   sessions, referenceDate, buyLevel, sellLevel, averageVolume, formatPrice, formatDate, formatVolume,
   timeframe = '1d', selectedRange = timeframe, onTimeframeChange, ranges, loading, error, onRetry,
+  trendLines = [], referenceLabel = 'Sesi acuan', highlightHistoricalReference = false,
 }) {
   const { t } = useTranslation();
   const plotRef = useRef(null);
@@ -125,8 +126,12 @@ export default function CandlestickChart({
     );
   }
 
-  const high = Math.max(...sessions.map((session) => session.high));
-  const low = Math.min(...sessions.map((session) => session.low));
+  const trends = trendLines.filter(({ from, to, start, end }) =>
+    Number.isInteger(from) && Number.isInteger(to) && from >= 0 && to > from && to < sessions.length
+    && Number.isFinite(start) && Number.isFinite(end));
+  const trendPrices = trends.flatMap(({ start, end }) => [start, end]);
+  const high = Math.max(...sessions.map((session) => session.high), ...trendPrices);
+  const low = Math.min(...sessions.map((session) => session.low), ...trendPrices);
   const padding = (high - low) * 0.08 || Math.max(Math.abs(high) * 0.01, 0.01);
   const ceiling = high + padding;
   const floor = low >= 0 ? Math.max(0, low - padding) : low - padding;
@@ -144,6 +149,9 @@ export default function CandlestickChart({
   const maxVolume = Math.max(...sessions.map(({ volume }) => volume ?? 0), hasAverage ? averageVolume : 0) || 1;
   const volumeY = (volume) => 100 * (1 - volume / (maxVolume * 1.06));
   const inspected = tooltipOpen ? sessions[activeIndex] : latest;
+  const referenceIndex = highlightHistoricalReference
+    ? sessions.findIndex(({ date }) => date === referenceDate)
+    : latest.date === referenceDate ? sessions.length - 1 : -1;
 
   function inspectPointer(event) {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -200,8 +208,8 @@ export default function CandlestickChart({
             role="img"
             aria-label={t("Grafik OHLC {0} candle. Harga tutup terakhir {1}.", sessions.length, formatPrice(latest.close))}
           >
-            {latest.date === referenceDate && (
-              <rect className="candle-reference" x={100 - step} y="0" width={step} height="100" />
+            {referenceIndex >= 0 && (
+              <rect className="candle-reference" x={referenceIndex * step} y="0" width={step} height="100" />
             )}
             <path className="candle-guide" d="M0 0H100 M0 25H100 M0 50H100 M0 75H100 M0 100H100" vectorEffect="non-scaling-stroke" />
             {triggers.filter(({ level }) => isOnScale(level)).map(({ type, level }) => (
@@ -228,6 +236,10 @@ export default function CandlestickChart({
                 </g>
               );
             })}
+            {trends.map(({ kind, from, to, start, end }) => (
+              <line className={'candle-trend candle-trend--' + kind} key={kind}
+                x1={candleCenter(from)} x2={candleCenter(to)} y1={y(start)} y2={y(end)} vectorEffect="non-scaling-stroke" />
+            ))}
             {tooltipOpen && (
               <line className="candle-crosshair" x1={candleCenter(activeIndex)} x2={candleCenter(activeIndex)} y1="0" y2="100" vectorEffect="non-scaling-stroke" />
             )}
@@ -282,13 +294,14 @@ export default function CandlestickChart({
           })}
         </div>
       </div>
-      {(triggers.length > 0 || hasAverage) && (
+      {(triggers.length > 0 || trends.length > 0 || hasAverage) && (
         <ul className="candle-legend" aria-label={t("Legenda grafik")}>
           {triggers.map(({ type, label, level }) => (
             <li className={`candle-legend--${type}`} key={type}>
               {t(label)} <strong>{formatPrice(level)}</strong>{!isOnScale(level) && t(" · di luar skala")}
             </li>
           ))}
+          {trends.map(({ kind, label }) => <li className={'candle-legend--' + kind} key={kind}>{t(label)}</li>)}
           {hasAverage && <li className="candle-legend--average">{t("Volume rata-rata 50 sesi")}</li>}
         </ul>
       )}
@@ -296,6 +309,7 @@ export default function CandlestickChart({
         session={inspected}
         active={tooltipOpen}
         isReference={inspected.date === referenceDate}
+        referenceLabel={referenceLabel}
         formatPrice={formatPrice}
         formatDate={formatDate}
         formatVolume={formatVolume}

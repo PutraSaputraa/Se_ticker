@@ -5,9 +5,11 @@
 import {
   latestCompletedIndex,
   readSessions,
+  volumeLookback,
 } from './sessionLogic.js';
 import { analyzeBaseBreakout } from './breakoutLogic.js';
 import { consolidationCloses, findActiveConsolidation } from './consolidationLogic.js';
+import { findFallingWedge, latestCompletedWedgeWeek } from './fallingWedgeLogic.js';
 import { getUniverse, universeRegions } from './universe.js';
 import { fetchFundamentals } from './fundamentals.js';
 import { fetchGrowthInputs, fillSalesComparisons, growthValues } from './growth.js';
@@ -55,12 +57,12 @@ export function scanWaitMs(mode, region) {
     return total + batches * fetchTimeoutMs;
   }, 0);
   if (mode === 'growth') return yahooWaitMs + regionsFor(region).length * fetchTimeoutMs + 30_000;
-  if (consolidationScans.has(mode)) return yahooWaitMs + 30_000;
+  if (consolidationScans.has(mode) || mode === 'falling-wedge') return yahooWaitMs + 30_000;
   return mode === 'screener' ? 2 * yahooWaitMs + 30_000 : yahooWaitMs + aiTimeoutMs + 30_000;
 }
 
 export function scanMode(value) {
-  return consolidationScans.has(value) || ['research', 'screener', 'growth'].includes(value) ? value : 'scan';
+  return consolidationScans.has(value) || ['research', 'screener', 'growth', 'falling-wedge'].includes(value) ? value : 'scan';
 }
 
 const kenariHeaders = (apiKey) => ({
@@ -91,9 +93,9 @@ async function fetchPriceSessions(symbol, range, interval = '1d') {
   });
   const sessions = readSessions(timestamps, quote, marketDate);
   // Yahoo can append an intramonth snapshot. Evaluate only months that have ended in the exchange time zone.
-  const currentMonth = monthly ? marketDate.format(Date.now()) : null;
+  const marketPeriod = marketDate.format(Date.now());
   const index = monthly
-    ? sessions.findLastIndex(({ date }) => date < currentMonth)
+    ? sessions.findLastIndex(({ date }) => date < marketPeriod)
     : latestCompletedIndex(sessions, result.meta, marketDate);
   if (index < 0) return null;
 
@@ -105,6 +107,7 @@ async function fetchPriceSessions(symbol, range, interval = '1d') {
     symbol: typeof result.meta?.symbol === 'string' && result.meta.symbol.trim() ? result.meta.symbol : symbol,
     name: name ?? null,
     currency: typeof result.meta?.currency === 'string' ? result.meta.currency : null,
+    marketDay: interval === '1d' && result.meta?.exchangeTimezoneName ? marketPeriod : null,
     sessions,
     index,
   };
@@ -136,6 +139,7 @@ function toPick(evaluated, analysis) {
 async function scanRegion(region, mode) {
   const { name, symbols, currency } = getUniverse(region);
   const consolidation = consolidationScans.get(mode);
+  const fallingWedge = mode === 'falling-wedge';
   let cursor = 0;
   let checked = 0;
   const referenceSessions = new Set();
@@ -153,9 +157,27 @@ async function scanRegion(region, mode) {
           continue;
         }
         const evaluated = await fetchPriceSessions(
-          symbol, consolidation?.range ?? (mode === 'screener' ? '1y' : '9mo'), consolidation?.interval,
+          symbol, consolidation?.range ?? (mode === 'screener' || fallingWedge ? '1y' : '9mo'), consolidation?.interval,
         );
         if (!evaluated) continue;
+        if (fallingWedge) {
+          const { sessions, index, marketDay } = evaluated;
+          const week = latestCompletedWedgeWeek(sessions, index, marketDay);
+          if (!week || week.endIndex < volumeLookback) continue;
+          checked += 1;
+          referenceSessions.add(week.date);
+          const wedge = findFallingWedge(sessions, week);
+          if (wedge) {
+            picks.push({
+              symbol: evaluated.symbol,
+              name: evaluated.name,
+              currency: evaluated.currency ?? currency,
+              universe: name,
+              ...wedge,
+            });
+          }
+          continue;
+        }
         if (consolidation) {
           const { sessions, index } = evaluated;
           const { date, close } = sessions[index];
@@ -207,9 +229,10 @@ async function scanMath(regions, mode) {
   const rows = results.flatMap(result => result.picks);
   const scanned = results.reduce((sum, result) => sum + result.scanned, 0);
   const universeName = regions.length === 1 ? results[0].universeName : `${regions.length} bursa`;
-  if (consolidationScans.has(mode)) {
-    const picks = rows.sort((a, b) =>
-      b.insideRatio - a.insideRatio || b.duration - a.duration || a.symbol.localeCompare(b.symbol));
+  if (consolidationScans.has(mode) || mode === 'falling-wedge') {
+    const picks = mode === 'falling-wedge'
+      ? rows.sort((a, b) => b.date.localeCompare(a.date) || b.volumeRatio - a.volumeRatio || a.symbol.localeCompare(b.symbol))
+      : rows.sort((a, b) => b.insideRatio - a.insideRatio || b.duration - a.duration || a.symbol.localeCompare(b.symbol));
     const checked = results.reduce((sum, result) => sum + result.checked, 0);
     const referenceSessions = [...new Set(results.flatMap(result => [...result.referenceSessions]))].sort();
     return { picks, scanned, universeName, checked, referenceSessions };
@@ -401,6 +424,12 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
   }
 
   const { picks, scanned, universeName, checked, referenceSessions } = await scanMath(regions, mode);
+  if (mode === 'falling-wedge') {
+    return {
+      mode, language, region: regionParam, universe: universeName, timeframe: 'daily', confirmationTimeframe: 'weekly',
+      scanned, checked, referenceSessions, volumeLookback, results: picks,
+    };
+  }
   const consolidation = consolidationScans.get(mode);
   if (consolidation) {
     if (!checked) throw new Error('Data harga konsolidasi belum tersedia.');

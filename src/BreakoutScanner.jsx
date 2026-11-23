@@ -2,7 +2,10 @@ import { localizedNumberFormat } from './i18n.js';
 import useTranslation from './useTranslation.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { defaultBreakoutParams } from '../netlify/functions/shared/breakoutLogic.js';
+import { volumeLookback as wedgeVolumeLookback } from '../netlify/functions/shared/sessionLogic.js';
 import ConsolidationResults from './components/ConsolidationResults.jsx';
+import FallingWedgeResults from './components/FallingWedgeResults.jsx';
+import WatchAction from './components/ScannerWatchAction.jsx';
 import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
 import ResearchRequestStatus, { ResearchProgress } from './components/ResearchRequestStatus.jsx';
@@ -25,21 +28,6 @@ const regions = [
   { value: 'ss', label: 'Shanghai' },
   { value: 'sz', label: 'Shenzhen' },
 ];
-
-function WatchAction({ symbol, inWatchlist, disabled, onAdd }) {
-  const { t } = useTranslation();
-  return (
-    <button
-      type="button"
-      className={`research-watch${inWatchlist ? ' research-watch--added' : ''}`}
-      disabled={disabled || inWatchlist}
-      onClick={() => onAdd(symbol)}
-      aria-label={inWatchlist ? t("{0} sudah dipantau", symbol) : t("Pantau {0}", symbol)}
-    >
-      {inWatchlist ? t("Dipantau") : t("Pantau")}
-    </button>
-  );
-}
 
 function ScanVolume({ ratio, scale }) {
   const { t } = useTranslation();
@@ -268,6 +256,11 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         || (data.region != null && data.region !== targetRegion))) {
         throw new Error('Hasil pemindaian konsolidasi belum lengkap. Coba lagi.');
       }
+      if (targetMode === 'falling-wedge' && (data.mode !== scanMode || data.timeframe !== 'daily'
+        || data.confirmationTimeframe !== 'weekly' || !Array.isArray(data.results)
+        || (data.region != null && data.region !== targetRegion))) {
+        throw new Error('Hasil pemindaian Falling Wedge belum lengkap. Coba lagi.');
+      }
       setLastResult({
         mode: targetMode, region: targetRegion, timeframe: targetTimeframe,
         data: { ...data, language: data.language ?? language },
@@ -303,15 +296,18 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
 
   const watched = useMemo(() => new Set(watchlist.map((entry) => entry.symbol)), [watchlist]);
   const isConsolidation = mode === 'consolidation';
+  const isWedge = mode === 'falling-wedge';
   const finished = request.status === 'success';
-  const sameConsolidationScope = isConsolidation && lastResult?.region === region && lastResult?.timeframe === timeframe;
-  const result = lastResult?.mode === mode && (!isConsolidation || sameConsolidationScope) ? lastResult.data : null;
+  const matchingRegion = lastResult?.region === region;
+  const scopeMatches = isConsolidation ? matchingRegion && lastResult?.timeframe === timeframe : !isWedge || matchingRegion;
+  const result = lastResult?.mode === mode && scopeMatches ? lastResult.data : null;
   const results = Array.isArray(result?.results) ? result.results : [];
   const ai = result?.ai;
   const scopeCount = Number.isFinite(result?.scanned) && t('{0} saham dalam cakupan', countFormat.format(result.scanned));
   const scanScope = [t(result?.universe), scopeCount].filter(Boolean).join(' · ');
   const resultSummary = isConsolidation ? t(results.length === 1 ? '1 kandidat konsolidasi ditemukan' : '{0} kandidat konsolidasi ditemukan', countFormat.format(results.length))
-    : t('{0}{1} kandidat ditampilkan', scanScope ? `${scanScope} · ` : '', results.length);
+    : isWedge ? t(results.length === 1 ? '1 Falling Wedge terkonfirmasi ditemukan' : '{0} Falling Wedge terkonfirmasi ditemukan', countFormat.format(results.length))
+      : t('{0}{1} kandidat ditampilkan', scanScope ? `${scanScope} · ` : '', results.length);
   const resultTitle = finished ? 'Hasil scan matematis' : 'Hasil scan sebelumnya';
   const scanLabel = 'Pemindaian';
   const phase = {
@@ -322,7 +318,8 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   const loading = Boolean(phase);
   const description = isConsolidation
     ? 'Cari saham yang masih bergerak di antara zona support dan resistance.'
-    : 'Pindai resistance 50 sesi, konsolidasi, dan volume dari data harga.';
+    : isWedge ? 'Cari pola Falling Wedge harian dengan breakout bervolume dan konfirmasi penutupan pekan.'
+      : 'Pindai resistance 50 sesi, konsolidasi, dan volume dari data harga.';
   const actions = { idle: 'Jalankan scan', success: 'Pindai ulang' };
   const action = phase?.action ?? (request.status === 'error' ? 'Coba lagi' : actions[request.status]);
   const statusLabel = finished ? `${scanLabel} selesai. ${resultSummary}.` : phase?.status;
@@ -344,6 +341,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
               {[
                 { value: 'scan', label: 'Scan matematis' },
                 { value: 'consolidation', label: 'Konsolidasi' },
+                { value: 'falling-wedge', label: 'Falling Wedge Pattern' },
               ].map(({ value, label }) => (
                 <button
                   key={value}
@@ -376,8 +374,12 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
             {t(action)}
             {loading && <ResearchProgress />}
           </button>
+          {isWedge && <p className="research-form-help">
+            {t('Analisis 1D · Konfirmasi 1W')}{' · '}
+            {t('Volume breakout di atas rata-rata {0} sesi sebelumnya.', countFormat.format(wedgeVolumeLookback))}
+          </p>}
         </form>
-        {isConsolidation && loading ? (
+        {(isConsolidation || isWedge) && loading ? (
           <p className="consolidation-scan-phase" role="status">{t(phase.status)} {t('Cakupan tersedia setelah pemindaian selesai.')}</p>
         ) : <p className="visually-hidden" role="status">{t(statusLabel)}</p>}
 
@@ -389,7 +391,10 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
       {result && isConsolidation && (
         <ConsolidationResults key={region + ':' + timeframe} result={result} stale={!finished} watched={watched} disabled={disabled} onAdd={onAdd} />
       )}
-      {result && !isConsolidation && (
+      {result && isWedge && (
+        <FallingWedgeResults key={region} result={result} stale={!finished} watched={watched} disabled={disabled} onAdd={onAdd} />
+      )}
+      {result && mode === 'scan' && (
         <section className="research-panel recommend-panel" aria-labelledby="research-results-title">
           <ScanResultHeading title={t(resultTitle)} results={results} scope={scanScope} formatDate={formatDate} />
           {ai?.summary && (

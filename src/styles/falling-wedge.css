@@ -1,0 +1,21 @@
+.wedge-card .wedge-confirmed {
+  color: color-mix(in srgb, var(--positive) 87%, var(--text));
+  background: var(--positive-soft);
+}
+
+.wedge-card .wedge-facts,
+.wedge-evidence {
+  padding-block-start: 0.65rem;
+  border-block-start: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+}
+
+.wedge-inspect { margin-block-start: auto; }
+.wedge-analysis .candle-chart { min-width: 0; }
+.wedge-analysis .candle-chart-head h2 { font-size: 1rem; }
+.wedge-analysis .candle-chart-head .stock-muted { margin-block-start: 0.2rem; }
+.wedge-analysis .candle-trend { stroke-width: 2; pointer-events: none; }
+.wedge-analysis .candle-trend--resistance { stroke: var(--support); }
+.wedge-analysis .candle-trend--support { stroke: var(--positive); stroke-dasharray: 5 3; }
+.wedge-analysis .candle-legend--resistance::before { border-color: var(--support); border-top-style: solid; }
+.wedge-analysis .candle-legend--support::before { border-color: var(--positive); }
