@@ -12,6 +12,7 @@ export default function NavbarSearch({ initialTicker, account }) {
   const trigger = useRef(null);
   const input = useRef(null);
   const [open, setOpen] = useState(initialTicker !== null);
+  const [formKey, setFormKey] = useState(initialTicker !== null ? 1 : 0);
 
   useEffect(() => {
     if (!open) return;
@@ -29,6 +30,15 @@ export default function NavbarSearch({ initialTicker, account }) {
     trigger.current?.focus({ preventScroll: true });
   }
 
+  function toggleSearch() {
+    if (open) {
+      closeAndFocus();
+    } else {
+      setFormKey(current => current + 1);
+      setOpen(true);
+    }
+  }
+
   function onKeyDown(event) {
     if (!open || event.key !== 'Escape' || event.defaultPrevented) return;
     event.preventDefault();
@@ -39,6 +49,7 @@ export default function NavbarSearch({ initialTicker, account }) {
     <div
       ref={root}
       className="navbar-search"
+      data-open={open || undefined}
       onKeyDown={onKeyDown}
       onBlur={(event) => {
         if (open && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setOpen(false);
@@ -51,24 +62,25 @@ export default function NavbarSearch({ initialTicker, account }) {
         aria-label={searchLabel}
         title={searchLabel}
         aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        onClick={() => setOpen(current => !current)}
+        aria-controls={panelId}
+        onClick={toggleSearch}
       >
         <WorkspaceIcon name="search" />
       </button>
-      {open && (
-        <>
-          <div className="navbar-search-backdrop" aria-hidden="true" onClick={closeAndFocus} />
-          <div className="navbar-search-panel" id={panelId}>
+      <div className="navbar-search-backdrop" aria-hidden="true" onClick={closeAndFocus} />
+      <div className="navbar-search-panel" id={panelId} inert={!open}>
+        <div className="navbar-search-panel-content">
+          {formKey > 0 && (
             <SearchForm
+              key={formKey}
               initialTicker={initialTicker ?? ''}
               knownSymbols={accountTickerSymbols(account)}
               inputRef={input}
               onSelect={() => setOpen(false)}
             />
-          </div>
-        </>
-      )}
+          )}
+        </div>
+      </div>
     </div>
   );
 }
