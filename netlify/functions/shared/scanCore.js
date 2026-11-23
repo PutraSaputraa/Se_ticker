@@ -10,6 +10,7 @@ import {
 import { analyzeBaseBreakout } from './breakoutLogic.js';
 import { consolidationCloses, consolidationWeeks, findActiveConsolidation } from './consolidationLogic.js';
 import { findFallingWedge, latestCompletedWedgeWeek } from './fallingWedgeLogic.js';
+import { findMovingAverageCrosses } from './movingAverageCross.js';
 import { getUniverse, universeRegions } from './universe.js';
 import { fetchFundamentals } from './fundamentals.js';
 import { fetchGrowthInputs, fillSalesComparisons, growthValues } from './growth.js';
@@ -24,6 +25,10 @@ const consolidationScans = new Map([
   ['consolidation-daily', { timeframe: 'daily', range: '1y', interval: '1d' }],
   ['consolidation-weekly', { timeframe: 'weekly', range: '1y', interval: '1d' }],
   ['consolidation-monthly', { timeframe: 'monthly', range: '5y', interval: '1mo' }],
+]);
+const crossScans = new Map([
+  ['golden-cross-daily', { timeframe: 'daily', range: '5y' }],
+  ['golden-cross-weekly', { timeframe: 'weekly', range: '10y' }],
 ]);
 
 const noKeyError = 'Kunci API Kenari belum dikonfigurasi di server.';
@@ -58,12 +63,12 @@ export function scanWaitMs(mode, region) {
     return total + batches * fetchTimeoutMs;
   }, 0);
   if (mode === 'growth') return yahooWaitMs + regionsFor(region).length * fetchTimeoutMs + 30_000;
-  if (consolidationScans.has(mode) || mode === 'falling-wedge') return yahooWaitMs + 30_000;
+  if (consolidationScans.has(mode) || crossScans.has(mode) || mode === 'falling-wedge') return yahooWaitMs + 30_000;
   return mode === 'screener' ? 2 * yahooWaitMs + 30_000 : yahooWaitMs + aiTimeoutMs + 30_000;
 }
 
 export function scanMode(value) {
-  return consolidationScans.has(value) || ['research', 'screener', 'growth', 'falling-wedge'].includes(value) ? value : 'scan';
+  return consolidationScans.has(value) || crossScans.has(value) || ['research', 'screener', 'growth', 'falling-wedge'].includes(value) ? value : 'scan';
 }
 
 const kenariHeaders = (apiKey) => ({
@@ -140,6 +145,8 @@ function toPick(evaluated, analysis) {
 async function scanRegion(region, mode) {
   const { name, symbols, currency } = getUniverse(region);
   const consolidation = consolidationScans.get(mode);
+  const crossScan = crossScans.get(mode);
+  const priceScan = consolidation ?? crossScan;
   const fallingWedge = mode === 'falling-wedge';
   let cursor = 0;
   let checked = 0;
@@ -158,7 +165,7 @@ async function scanRegion(region, mode) {
           continue;
         }
         const evaluated = await fetchPriceSessions(
-          symbol, consolidation?.range ?? (mode === 'screener' || fallingWedge ? '1y' : '9mo'), consolidation?.interval,
+          symbol, priceScan?.range ?? (mode === 'screener' || fallingWedge ? '1y' : '9mo'), priceScan?.interval,
         );
         if (!evaluated) continue;
         if (fallingWedge) {
@@ -179,27 +186,23 @@ async function scanRegion(region, mode) {
           }
           continue;
         }
-        if (consolidation) {
-          const weekly = consolidation.timeframe === 'weekly';
+        if (priceScan) {
+          const weekly = priceScan.timeframe === 'weekly';
           const sessions = weekly ? consolidationWeeks(evaluated.sessions, evaluated.index, evaluated.marketDay) : evaluated.sessions;
           const index = weekly ? sessions.length - 1 : evaluated.index;
           const { date, close } = sessions[index] ?? {};
           if (!Number.isFinite(close)) continue;
+          const instrument = { symbol: evaluated.symbol, name: evaluated.name, currency: evaluated.currency ?? currency, universe: name, date, close };
+          if (crossScan) {
+            const signals = findMovingAverageCrosses(sessions, index);
+            if (signals === null) continue;
+            for (const signal of signals) picks.push({ ...instrument, ...signal });
+          } else {
+            const range = findActiveConsolidation(sessions, index, consolidation.timeframe);
+            if (range) picks.push({ ...instrument, ...range, closes: consolidationCloses(sessions, index, range.duration) });
+          }
           checked += 1;
           referenceSessions.add(date);
-          const range = findActiveConsolidation(sessions, index, consolidation.timeframe);
-          if (range) {
-            picks.push({
-              symbol: evaluated.symbol,
-              name: evaluated.name,
-              currency: evaluated.currency ?? currency,
-              universe: name,
-              date,
-              close,
-              ...range,
-              closes: consolidationCloses(sessions, index, range.duration),
-            });
-          }
           continue;
         }
         if (mode === 'screener') {
@@ -232,13 +235,13 @@ async function scanMath(regions, mode) {
   const rows = results.flatMap(result => result.picks);
   const scanned = results.reduce((sum, result) => sum + result.scanned, 0);
   const universeName = regions.length === 1 ? results[0].universeName : `${regions.length} bursa`;
-  if (consolidationScans.has(mode) || mode === 'falling-wedge') {
-    const picks = mode === 'falling-wedge'
-      ? rows.sort((a, b) => b.date.localeCompare(a.date) || b.volumeRatio - a.volumeRatio || a.symbol.localeCompare(b.symbol))
-      : rows.sort((a, b) => b.insideRatio - a.insideRatio || b.duration - a.duration || a.symbol.localeCompare(b.symbol));
+  if (consolidationScans.has(mode) || crossScans.has(mode) || mode === 'falling-wedge') {
+    const sort = consolidationScans.has(mode)
+      ? (a, b) => b.insideRatio - a.insideRatio || b.duration - a.duration || a.symbol.localeCompare(b.symbol)
+      : (a, b) => b.date.localeCompare(a.date) || (mode === 'falling-wedge' && b.volumeRatio - a.volumeRatio) || a.symbol.localeCompare(b.symbol);
     const checked = results.reduce((sum, result) => sum + result.checked, 0);
     const referenceSessions = [...new Set(results.flatMap(result => [...result.referenceSessions]))].sort();
-    return { picks, scanned, universeName, checked, referenceSessions };
+    return { picks: rows.sort(sort), scanned, universeName, checked, referenceSessions };
   }
   const picks = mode === 'screener' || mode === 'growth'
     ? rows.sort((a, b) => a.symbol.localeCompare(b.symbol))
@@ -434,10 +437,11 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
     };
   }
   const consolidation = consolidationScans.get(mode);
-  if (consolidation) {
-    if (!checked) throw new Error('Data harga konsolidasi belum tersedia.');
+  const priceScan = consolidation ?? crossScans.get(mode);
+  if (priceScan) {
+    if (consolidation && !checked) throw new Error('Data harga konsolidasi belum tersedia.');
     return {
-      mode, language, region: regionParam, universe: universeName, timeframe: consolidation.timeframe,
+      mode, language, region: regionParam, universe: universeName, timeframe: priceScan.timeframe,
       scanned, checked, referenceSessions, results: picks,
     };
   }

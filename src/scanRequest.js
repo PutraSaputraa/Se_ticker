@@ -15,9 +15,10 @@ function waitForNextPoll(signal) {
 
 export async function requestScanResult(mode, region, language, controller, onPhase) {
   const { signal } = controller;
-  const failure = mode.startsWith('consolidation-')
-    ? 'Pemindaian konsolidasi gagal. Coba lagi nanti.'
-    : mode === 'falling-wedge' ? 'Pemindaian Falling Wedge gagal. Coba lagi nanti.' : 'Pemindaian breakout gagal. Coba lagi nanti.';
+  let failure = 'Pemindaian breakout gagal. Coba lagi nanti.';
+  if (mode.startsWith('consolidation-')) failure = 'Pemindaian konsolidasi gagal. Coba lagi nanti.';
+  if (mode.startsWith('golden-cross-')) failure = 'Pemindaian Golden Cross gagal. Coba lagi nanti.';
+  if (mode === 'falling-wedge') failure = 'Pemindaian Falling Wedge gagal. Coba lagi nanti.';
   let deadline;
   try {
     const query = new URLSearchParams({ mode, region, lang: language });

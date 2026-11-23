@@ -299,3 +299,64 @@ test('job konsolidasi mingguan menggabungkan sesi dan baru menilai breakout sete
   assert.ok(requests.every(url => url.hostname === 'query1.finance.yahoo.com'
     && url.searchParams.get('interval') === '1d' && url.searchParams.get('range') === '1y'));
 });
+
+test('Golden Cross jobs scan both averages on the last completed daily or weekly candle', async (t) => {
+  const dayMs = 86_400_000;
+  const fridayOpen = Date.parse('2026-11-20T01:30:00Z');
+  const fridayEnd = Date.parse('2026-11-20T07:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now: fridayEnd - 60_000 });
+  const timestamps = Array.from({ length: 205 }, (_, index) => (fridayOpen - (205 - index) * 7 * dayMs) / 1000);
+  timestamps.push((fridayOpen - dayMs) / 1000, fridayOpen / 1000);
+  const closes = [...Array(205).fill(100), 150, 150];
+  const quote = { open: closes, high: closes, low: closes, close: closes };
+  let body;
+  const ranges = new Set();
+  mockJobStore(t, (url, init) => {
+    if (url.pathname.endsWith('/breakout-scan-background')) {
+      body = init.body;
+      return new Response(null, { status: 202 });
+    }
+    assert.equal(url.hostname, 'query1.finance.yahoo.com');
+    assert.equal(url.searchParams.get('interval'), '1d');
+    ranges.add(url.searchParams.get('range'));
+    if (!url.pathname.endsWith('/000333.SZ')) return new Response(null, { status: 404 });
+    return Response.json({ chart: { result: [{
+      meta: {
+        symbol: '000333.SZ', currency: 'CNY', exchangeTimezoneName: 'Asia/Shanghai',
+        currentTradingPeriod: { regular: { end: fridayEnd / 1000 } },
+        regularMarketTime: Math.min(fridayEnd, Date.now()) / 1000,
+      },
+      timestamp: timestamps, indicators: { quote: [quote] },
+    }] } });
+  });
+
+  async function runJob(timeframe) {
+    const mode = `golden-cross-${timeframe}`;
+    const started = await breakoutStart(new Request(`${functionsUrl}breakout-start?mode=${mode}&region=sz`, { method: 'POST' }));
+    assert.equal(started.status, 202);
+    const { jobId } = await started.json();
+    await breakoutWorker(new Request(`${functionsUrl}breakout-scan-background`, { method: 'POST', body }));
+    const { status, result } = await (await readJob(jobId)).json();
+    assert.equal(status, 'done');
+    assert.equal(result.mode, mode);
+    assert.equal(result.timeframe, timeframe);
+    assert.equal(result.checked, 1);
+    assert.equal(result.region, 'sz');
+    return result;
+  }
+
+  const signals = result => result.results.map(({ symbol, method, signal, date }) => [symbol, method, signal, date]);
+  assert.deepEqual(signals(await runJob('daily')), [
+    ['000333.SZ', 'SMA', 'golden', '2026-11-19'], ['000333.SZ', 'EMA', 'golden', '2026-11-19'],
+  ]);
+  const openWeek = await runJob('weekly');
+  assert.deepEqual(openWeek.referenceSessions, ['2026-11-13']);
+  assert.deepEqual(openWeek.results, []);
+
+  t.mock.timers.setTime(fridayEnd + 60_000);
+  assert.deepEqual(signals(await runJob('weekly')), [
+    ['000333.SZ', 'SMA', 'golden', '2026-11-20'], ['000333.SZ', 'EMA', 'golden', '2026-11-20'],
+  ]);
+  assert.deepEqual((await runJob('daily')).results, []);
+  assert.deepEqual(ranges, new Set(['5y', '10y']));
+});

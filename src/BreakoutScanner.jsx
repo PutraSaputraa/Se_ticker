@@ -5,6 +5,7 @@ import { defaultBreakoutParams } from '../netlify/functions/shared/breakoutLogic
 import { volumeLookback as wedgeVolumeLookback } from '../netlify/functions/shared/sessionLogic.js';
 import ConsolidationResults from './components/ConsolidationResults.jsx';
 import FallingWedgeResults from './components/FallingWedgeResults.jsx';
+import GoldenCrossResults, { goldenCrossTimeframes } from './components/GoldenCrossResults.jsx';
 import WatchAction from './components/ScannerWatchAction.jsx';
 import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
@@ -28,6 +29,13 @@ const regions = [
   { value: 'ss', label: 'Shanghai' },
   { value: 'sz', label: 'Shenzhen' },
 ];
+
+const modeDescriptions = {
+  scan: 'Pindai resistance 50 sesi, konsolidasi, dan volume dari data harga.',
+  consolidation: 'Cari saham yang masih bergerak di antara zona support dan resistance.',
+  'falling-wedge': 'Cari pola Falling Wedge harian dengan breakout bervolume dan konfirmasi penutupan pekan.',
+  'golden-cross': 'Cari Golden Cross dan Death Cross SMA serta EMA 50/200 pada candle yang sudah tutup.',
+};
 
 function ScanVolume({ ratio, scale }) {
   const { t } = useTranslation();
@@ -227,17 +235,26 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   const { t, language } = useTranslation();
   const [mode, setMode] = useState('scan');
   const [region, setRegion] = useState('auto');
-  const [timeframe, setTimeframe] = useState('daily');
+  const [consolidationTimeframe, setConsolidationTimeframe] = useState('daily');
+  const [crossTimeframe, setCrossTimeframe] = useState('daily');
+  const [crossMethod, setCrossMethod] = useState('SMA');
   const [request, setRequest] = useState({ status: 'idle' });
   const [lastResult, setLastResult] = useState(null);
   const activeScan = useRef(null);
+  const isConsolidation = mode === 'consolidation';
+  const isWedge = mode === 'falling-wedge';
+  const isCross = mode === 'golden-cross';
+  const timeframes = isCross ? goldenCrossTimeframes : consolidationTimeframes;
+  const usesTimeframe = isConsolidation || isCross;
+  const timeframe = isCross ? crossTimeframe : consolidationTimeframe;
 
   useEffect(() => () => {
     activeScan.current?.abort();
     activeScan.current = null;
   }, []);
 
-  async function run(targetMode = mode, targetRegion = region, targetTimeframe = timeframe) {
+  async function run(targetMode = mode, targetRegion = region,
+    targetTimeframe = targetMode === 'golden-cross' ? crossTimeframe : consolidationTimeframe) {
     if (loading || activeScan.current) return;
 
     const controller = new AbortController();
@@ -245,7 +262,8 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     activeScan.current = controller;
     setRequest({ status: 'starting' });
     try {
-      const scanMode = targetMode === 'consolidation' ? `consolidation-${targetTimeframe}` : targetMode;
+      const scanMode = targetMode === 'consolidation' || targetMode === 'golden-cross'
+        ? `${targetMode}-${targetTimeframe}` : targetMode;
       const data = await requestScanResult(scanMode, targetRegion, language, controller, (status) => {
         setRequest(current => current.status === status ? current : { status });
       });
@@ -260,6 +278,11 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         || data.confirmationTimeframe !== 'weekly' || !Array.isArray(data.results)
         || (data.region != null && data.region !== targetRegion))) {
         throw new Error('Hasil pemindaian Falling Wedge belum lengkap. Coba lagi.');
+      }
+      if (targetMode === 'golden-cross' && (data.mode !== scanMode || data.timeframe !== targetTimeframe
+        || data.region !== targetRegion || !Array.isArray(data.results)
+        || !Number.isSafeInteger(data.checked) || !Number.isSafeInteger(data.scanned))) {
+        throw new Error('Hasil pemindaian Golden Cross belum lengkap. Coba lagi.');
       }
       setLastResult({
         mode: targetMode, region: targetRegion, timeframe: targetTimeframe,
@@ -290,16 +313,15 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
 
   function changeTimeframe(next) {
     if (loading || activeScan.current || next === timeframe) return;
-    setTimeframe(next);
+    if (isCross) setCrossTimeframe(next);
+    else setConsolidationTimeframe(next);
     if (request.status === 'success' || request.status === 'error') run(mode, region, next);
   }
 
   const watched = useMemo(() => new Set(watchlist.map((entry) => entry.symbol)), [watchlist]);
-  const isConsolidation = mode === 'consolidation';
-  const isWedge = mode === 'falling-wedge';
   const finished = request.status === 'success';
   const matchingRegion = lastResult?.region === region;
-  const scopeMatches = isConsolidation ? matchingRegion && lastResult?.timeframe === timeframe : !isWedge || matchingRegion;
+  const scopeMatches = usesTimeframe ? matchingRegion && lastResult?.timeframe === timeframe : !isWedge || matchingRegion;
   const result = lastResult?.mode === mode && scopeMatches ? lastResult.data : null;
   const results = Array.isArray(result?.results) ? result.results : [];
   const ai = result?.ai;
@@ -307,7 +329,8 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   const scanScope = [t(result?.universe), scopeCount].filter(Boolean).join(' · ');
   const resultSummary = isConsolidation ? t(results.length === 1 ? '1 kandidat konsolidasi ditemukan' : '{0} kandidat konsolidasi ditemukan', countFormat.format(results.length))
     : isWedge ? t(results.length === 1 ? '1 Falling Wedge terkonfirmasi ditemukan' : '{0} Falling Wedge terkonfirmasi ditemukan', countFormat.format(results.length))
-      : t('{0}{1} kandidat ditampilkan', scanScope ? `${scanScope} · ` : '', results.length);
+      : isCross ? t(results.length === 1 ? '1 sinyal ditemukan' : '{0} sinyal ditemukan', countFormat.format(results.length))
+        : t('{0}{1} kandidat ditampilkan', scanScope ? `${scanScope} · ` : '', results.length);
   const resultTitle = finished ? 'Hasil scan matematis' : 'Hasil scan sebelumnya';
   const scanLabel = 'Pemindaian';
   const phase = {
@@ -316,10 +339,6 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     running: { action: 'Memindai…', status: `${scanLabel} sedang berjalan.` },
   }[request.status];
   const loading = Boolean(phase);
-  const description = isConsolidation
-    ? 'Cari saham yang masih bergerak di antara zona support dan resistance.'
-    : isWedge ? 'Cari pola Falling Wedge harian dengan breakout bervolume dan konfirmasi penutupan pekan.'
-      : 'Pindai resistance 50 sesi, konsolidasi, dan volume dari data harga.';
   const actions = { idle: 'Jalankan scan', success: 'Pindai ulang' };
   const action = phase?.action ?? (request.status === 'error' ? 'Coba lagi' : actions[request.status]);
   const statusLabel = finished ? `${scanLabel} selesai. ${resultSummary}.` : phase?.status;
@@ -329,10 +348,10 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
       <section className="research-panel recommend-panel research-config motion-enter" aria-labelledby="breakout-scanner-title">
         <header className="page-heading recommend-heading section-accent">
           <h1 id="breakout-scanner-title">{t("Rekomendasi")}</h1>
-          <p>{t(description)}</p>
+          <p>{t(modeDescriptions[mode])}</p>
         </header>
         <form
-          className={`research-controls${isConsolidation ? ' research-controls--consolidation' : ''}`}
+          className={`research-controls${usesTimeframe ? ' research-controls--timeframe' : ''}`}
           onSubmit={(event) => { event.preventDefault(); run(); }}
         >
           <fieldset className="research-mode">
@@ -342,6 +361,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
                 { value: 'scan', label: 'Scan matematis' },
                 { value: 'consolidation', label: 'Konsolidasi' },
                 { value: 'falling-wedge', label: 'Falling Wedge Pattern' },
+                { value: 'golden-cross', label: 'Golden Cross' },
               ].map(({ value, label }) => (
                 <button
                   key={value}
@@ -360,11 +380,11 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
               {regions.map(({ value, label }) => <option key={value} value={value}>{t(label)}</option>)}
             </select>
           </label>
-          {isConsolidation && (
+          {usesTimeframe && (
             <label className="research-field">
               {t("Timeframe")}
               <select value={timeframe} onChange={(event) => changeTimeframe(event.target.value)} disabled={loading}>
-                {Object.entries(consolidationTimeframes).map(([value, label]) => (
+                {Object.entries(timeframes).map(([value, label]) => (
                   <option key={value} value={value}>{t(label)}</option>
                 ))}
               </select>
@@ -379,7 +399,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
             {t('Volume breakout di atas rata-rata {0} sesi sebelumnya.', countFormat.format(wedgeVolumeLookback))}
           </p>}
         </form>
-        {(isConsolidation || isWedge) && loading ? (
+        {(usesTimeframe || isWedge) && loading ? (
           <p className="consolidation-scan-phase" role="status">{t(phase.status)} {t('Cakupan tersedia setelah pemindaian selesai.')}</p>
         ) : <p className="visually-hidden" role="status">{t(statusLabel)}</p>}
 
@@ -393,6 +413,10 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
       )}
       {result && isWedge && (
         <FallingWedgeResults key={region} result={result} stale={!finished} watched={watched} disabled={disabled} onAdd={onAdd} />
+      )}
+      {result && isCross && (
+        <GoldenCrossResults result={result} method={crossMethod} onMethodChange={setCrossMethod}
+          stale={!finished} watched={watched} disabled={disabled} onAdd={onAdd} />
       )}
       {result && mode === 'scan' && (
         <section className="research-panel recommend-panel" aria-labelledby="research-results-title">

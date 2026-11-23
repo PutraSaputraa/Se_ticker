@@ -670,7 +670,7 @@
 
 .research-controls {
   display: grid;
-  grid-template-columns: minmax(18rem, 23rem) minmax(10rem, 1fr) max-content;
+  grid-template-columns: minmax(18rem, 27rem) minmax(10rem, 1fr) max-content;
   align-items: end;
   gap: 0.75rem;
   margin-top: 0.875rem;
@@ -680,8 +680,8 @@
   background: var(--surface-muted);
 }
 
-.research-controls--consolidation {
-  grid-template-columns: minmax(18rem, 23rem) minmax(9rem, 1fr) minmax(8rem, 10rem) max-content;
+.research-controls--timeframe {
+  grid-template-columns: minmax(18rem, 27rem) minmax(9rem, 1fr) minmax(8rem, 10rem) max-content;
 }
 
 .research-mode {
@@ -755,7 +755,8 @@
 
 .research-mode .candle-timeframe {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
   gap: 0.15rem;
   padding: 0.125rem;
   border-radius: 0.625rem;
@@ -1012,7 +1013,11 @@
   .research-controls { grid-template-columns: minmax(0, 1fr); }
 }
 
+@container (max-width: 34rem) {
+  .research-mode .candle-timeframe { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @container (width < 49rem) {
-  .research-controls--consolidation { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .research-controls--consolidation :is(.research-mode, .scan-button) { grid-column: 1 / -1; }
+  .research-controls--timeframe { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .research-controls--timeframe :is(.research-mode, .scan-button) { grid-column: 1 / -1; }
 }
