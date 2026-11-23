@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { findActiveConsolidation } from '../netlify/functions/shared/consolidationLogic.js';
+import { consolidationCloses, findActiveConsolidation } from '../netlify/functions/shared/consolidationLogic.js';
 
 const cycle = [90, 95, 100, 105, 110, 105, 100, 95, 90, 85, 80, 85];
 
@@ -46,4 +46,21 @@ test('ayunan yang berkerumun di resistance dihitung satu kali', () => {
 test('tren satu arah dan riwayat yang terlalu pendek dilewati', () => {
   assert.equal(scanDaily(Array.from({ length: 120 }, (_, index) => 60 + index)), null);
   assert.equal(scanDaily([...cycle, ...cycle, ...cycle]), null);
+});
+
+test('seri penutupan mengikuti jendela kandidat dan melewati bar yang tidak valid', () => {
+  const prices = [...Array.from({ length: 10 }, () => cycle).flat(), 95];
+  const bars = candles(prices).map((bar, index) => ({
+    ...bar, date: new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10),
+  }));
+  // Bars used by the chart and detector share the same validity checks.
+  bars[30].low = null;
+  const index = bars.length - 1;
+  const range = findActiveConsolidation(bars, index, 'daily');
+  assert.equal(range.duration, 120);
+  const series = consolidationCloses([...bars, { date: '2026-12-01', high: 111, low: 106, close: 109 }], index, range.duration);
+  assert.equal(series.length, 120);
+  assert.deepEqual(series[0], [bars[0].date, 90]);
+  assert.deepEqual(series.at(-1), [bars[index].date, 95]);
+  assert.ok(series.every(([date]) => date !== bars[30].date));
 });

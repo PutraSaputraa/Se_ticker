@@ -11,6 +11,23 @@ function validPriceBar(bar) {
     && bar.low > 0 && bar.close >= bar.low && bar.close <= bar.high;
 }
 
+// Position spans the two outer edges. Keep values outside 0–100 for callers
+// inspecting a close that falls beyond the detected range.
+export function consolidationPositionPct(close, supportLow, resistanceHigh) {
+  return (close - supportLow) / (resistanceHigh - supportLow) * 100;
+}
+
+export function consolidationCloses(sessions, index, duration) {
+  const closes = [];
+  // The selected window is the last duration valid bars through the evaluation
+  // bar. Older bars can confirm pivots and are outside this analysis window.
+  for (let cursor = index; cursor >= 0 && closes.length < duration; cursor -= 1) {
+    const bar = sessions[cursor];
+    if (validPriceBar(bar)) closes.push([bar.date, bar.close]);
+  }
+  return closes.reverse();
+}
+
 function typicalTrueRange(bars) {
   const ranges = bars.map(({ high, low }, index) => {
     const previousClose = bars[index - 1]?.close;
@@ -117,7 +134,7 @@ export function findActiveConsolidation(sessions, index, timeframe) {
           resistance: { low: resistance.low, high: resistance.high, touches: resistanceTouches },
           duration,
           insideRatio,
-          positionPct: ((latest.close - support.low) / width) * 100,
+          positionPct: consolidationPositionPct(latest.close, support.low, resistance.high),
         };
       }
     }

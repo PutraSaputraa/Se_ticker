@@ -7,7 +7,7 @@ import {
   readSessions,
 } from './sessionLogic.js';
 import { analyzeBaseBreakout } from './breakoutLogic.js';
-import { findActiveConsolidation } from './consolidationLogic.js';
+import { consolidationCloses, findActiveConsolidation } from './consolidationLogic.js';
 import { getUniverse, universeRegions } from './universe.js';
 import { fetchFundamentals } from './fundamentals.js';
 import { fetchGrowthInputs, fillSalesComparisons, growthValues } from './growth.js';
@@ -138,6 +138,7 @@ async function scanRegion(region, mode) {
   const consolidation = consolidationScans.get(mode);
   let cursor = 0;
   let checked = 0;
+  const referenceSessions = new Set();
   const picks = [];
 
   async function worker() {
@@ -160,6 +161,7 @@ async function scanRegion(region, mode) {
           const { date, close } = sessions[index];
           if (!Number.isFinite(close)) continue;
           checked += 1;
+          referenceSessions.add(date);
           const range = findActiveConsolidation(sessions, index, consolidation.timeframe);
           if (range) {
             picks.push({
@@ -170,6 +172,7 @@ async function scanRegion(region, mode) {
               date,
               close,
               ...range,
+              closes: consolidationCloses(sessions, index, range.duration),
             });
           }
           continue;
@@ -192,7 +195,7 @@ async function scanRegion(region, mode) {
 
   await Promise.all(Array.from({ length: Math.min(fetchConcurrency, symbols.length) }, worker));
   if (mode === 'growth') await fillSalesComparisons(picks);
-  return { picks, scanned: symbols.length, universeName: name, checked };
+  return { picks, scanned: symbols.length, universeName: name, checked, referenceSessions };
 }
 
 async function scanMath(regions, mode) {
@@ -208,7 +211,8 @@ async function scanMath(regions, mode) {
     const picks = rows.sort((a, b) =>
       b.insideRatio - a.insideRatio || b.duration - a.duration || a.symbol.localeCompare(b.symbol));
     const checked = results.reduce((sum, result) => sum + result.checked, 0);
-    return { picks, scanned, universeName, checked };
+    const referenceSessions = [...new Set(results.flatMap(result => [...result.referenceSessions]))].sort();
+    return { picks, scanned, universeName, checked, referenceSessions };
   }
   const picks = mode === 'screener' || mode === 'growth'
     ? rows.sort((a, b) => a.symbol.localeCompare(b.symbol))
@@ -396,13 +400,13 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
     };
   }
 
-  const { picks, scanned, universeName, checked } = await scanMath(regions, mode);
+  const { picks, scanned, universeName, checked, referenceSessions } = await scanMath(regions, mode);
   const consolidation = consolidationScans.get(mode);
   if (consolidation) {
     if (!checked) throw new Error('Data harga konsolidasi belum tersedia.');
     return {
       mode, language, region: regionParam, universe: universeName, timeframe: consolidation.timeframe,
-      scanned, checked, results: picks,
+      scanned, checked, referenceSessions, results: picks,
     };
   }
   if (mode === 'growth') {

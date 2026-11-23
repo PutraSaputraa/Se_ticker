@@ -167,6 +167,13 @@ test('job konsolidasi bulanan menilai bulan terakhir yang selesai di bursa', asy
       return new Response(null, { status: 202 });
     }
     priceRequests.push(url);
+    if (url.pathname.endsWith('/300750.SZ')) {
+      return Response.json({ chart: { result: [{
+        meta: { symbol: '300750.SZ', exchangeTimezoneName: 'Asia/Shanghai', currency: 'CNY' },
+        timestamp: [Date.UTC(2026, 4, 1) / 1000],
+        indicators: { quote: [{ open: [79], high: [82], low: [78], close: [80] }] },
+      }] } });
+    }
     if (!url.pathname.endsWith('/000333.SZ')) return new Response(null, { status: 404 });
     return Response.json({ chart: { result: [{
       meta: { symbol: '000333.SZ', exchangeTimezoneName: 'Asia/Shanghai', currency: 'CNY' },
@@ -189,12 +196,16 @@ test('job konsolidasi bulanan menilai bulan terakhir yang selesai di bursa', asy
   assert.equal(status, 'done');
   assert.equal(result.timeframe, 'monthly');
   assert.equal(result.language, 'en');
-  assert.equal(result.checked, 1);
+  assert.equal(result.checked, 2);
   assert.equal(result.scanned, priceRequests.length);
+  assert.deepEqual(result.referenceSessions, ['2026-05', '2026-06']);
   assert.equal(result.ai, undefined);
   assert.ok(priceRequests.every(url => url.hostname === 'query1.finance.yahoo.com'
     && url.searchParams.get('interval') === '1mo' && url.searchParams.get('range') === '5y'));
   assert.equal(result.results.length, 1);
   assert.equal(result.results[0].date, '2026-06');
   assert.equal(result.results[0].close, 77);
+  assert.equal(result.results[0].closes.length, result.results[0].duration);
+  assert.deepEqual(result.results[0].closes.at(-1), ['2026-06', 77]);
+  assert.deepEqual(result.results[0].closes.map(([, close]) => close), closes.slice(0, 22).slice(-result.results[0].duration));
 });

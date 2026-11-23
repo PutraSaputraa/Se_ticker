@@ -1,20 +1,19 @@
-import { localizedDateFormat, localizedNumberFormat } from './i18n.js';
+import { localizedNumberFormat } from './i18n.js';
 import useTranslation from './useTranslation.js';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { defaultBreakoutParams } from '../netlify/functions/shared/breakoutLogic.js';
+import ConsolidationResults from './components/ConsolidationResults.jsx';
 import TableScroll from './components/TableScroll.jsx';
 import TickerLink from './components/TickerLink.jsx';
 import ResearchRequestStatus, { ResearchProgress } from './components/ResearchRequestStatus.jsx';
 import UpdatedValue from './components/UpdatedValue.jsx';
 import { formatDateCompact, formatPct } from './format.js';
+import { consolidationTimeframes } from './consolidationView.js';
 
 import { requestScanResult } from './scanRequest.js';
 const { volumeMinRatio, volumeLookback } = defaultBreakoutParams;
 const ratioFormat = localizedNumberFormat({ maximumFractionDigits: 2 });
 const countFormat = localizedNumberFormat();
-const positionFormat = localizedNumberFormat({ maximumFractionDigits: 1 });
-const monthFormat = localizedDateFormat({ year: 'numeric', month: 'short', timeZone: 'UTC' });
-const consolidationTimeframes = { daily: 'Harian', monthly: 'Bulanan' };
 
 const regions = [
   { value: 'auto', label: 'Semua bursa' },
@@ -236,60 +235,6 @@ function ScanResultHeading({ title, results, scope, formatDate }) {
   );
 }
 
-function formatMonth(month) {
-  return monthFormat.format(new Date(`${month}-01T00:00:00Z`));
-}
-
-function ConsolidationCard({ pick, monthly, inWatchlist, disabled, onAdd, formatPrice }) {
-  const { t } = useTranslation();
-  const { support, resistance, currency } = pick;
-
-  function formatZone({ low, high }) {
-    const bottom = formatPrice(low, currency);
-    const top = formatPrice(high, currency);
-    return bottom === top ? bottom : `${bottom}–${top}`;
-  }
-
-  return (
-    <li className="consolidation-card">
-      <div className="consolidation-card-heading">
-        <div>
-          <TickerLink symbol={pick.symbol} />
-          {pick.name && <p className="research-company">{pick.name}</p>}
-          <p className="research-cell-note">
-            {t(pick.universe)} · <time dateTime={pick.date}>{monthly ? formatMonth(pick.date) : formatDateCompact(pick.date)}</time>
-          </p>
-        </div>
-        <WatchAction symbol={pick.symbol} inWatchlist={inWatchlist} disabled={disabled} onAdd={onAdd} />
-      </div>
-      <dl className="consolidation-zones">
-        <div>
-          <dt>{t("Zona support")}</dt>
-          <dd><strong>{formatZone(support)}</strong></dd>
-          <dd className="consolidation-touches">{t("{0} pantulan", countFormat.format(support.touches))}</dd>
-        </div>
-        <div>
-          <dt>{t("Zona resistance")}</dt>
-          <dd><strong>{formatZone(resistance)}</strong></dd>
-          <dd className="consolidation-touches">{t("{0} pantulan", countFormat.format(resistance.touches))}</dd>
-        </div>
-      </dl>
-      <div className="consolidation-track" aria-hidden="true" style={{ '--range-position': `${pick.positionPct}%` }} />
-      <dl className="consolidation-details">
-        <div>
-          <dt>{t("Harga tutup")}</dt>
-          <dd><strong>{formatPrice(pick.close, currency)}</strong></dd>
-          <dd>{t("{0}% dari support", positionFormat.format(pick.positionPct))}</dd>
-        </div>
-        <div>
-          <dt>{t("Durasi range")}</dt>
-          <dd>{t(monthly ? "{0} bulan" : "{0} sesi", countFormat.format(pick.duration))}</dd>
-        </div>
-      </dl>
-    </li>
-  );
-}
-
 export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPrice, formatDate }) {
   const { t, language } = useTranslation();
   const [mode, setMode] = useState('scan');
@@ -319,7 +264,14 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
       if (targetMode === 'consolidation' && data.mode !== scanMode) {
         throw new Error('Pemindaian konsolidasi gagal. Coba lagi nanti.');
       }
-      setLastResult({ mode: targetMode, data: { ...data, language: data.language ?? language } });
+      if (targetMode === 'consolidation' && (data.timeframe !== targetTimeframe || !Array.isArray(data.results)
+        || (data.region != null && data.region !== targetRegion))) {
+        throw new Error('Hasil pemindaian konsolidasi belum lengkap. Coba lagi.');
+      }
+      setLastResult({
+        mode: targetMode, region: targetRegion, timeframe: targetTimeframe,
+        data: { ...data, language: data.language ?? language },
+      });
       setRequest({ status: 'success' });
     } catch (error) {
       if (activeScan.current === controller) {
@@ -349,25 +301,18 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     if (request.status === 'success' || request.status === 'error') run(mode, region, next);
   }
 
-  const watched = new Set(watchlist.map((entry) => entry.symbol));
+  const watched = useMemo(() => new Set(watchlist.map((entry) => entry.symbol)), [watchlist]);
   const isConsolidation = mode === 'consolidation';
   const finished = request.status === 'success';
-  const result = lastResult?.mode === mode && (!isConsolidation || finished) ? lastResult.data : null;
-  const results = result?.results ?? [];
+  const sameConsolidationScope = isConsolidation && lastResult?.region === region && lastResult?.timeframe === timeframe;
+  const result = lastResult?.mode === mode && (!isConsolidation || sameConsolidationScope) ? lastResult.data : null;
+  const results = Array.isArray(result?.results) ? result.results : [];
   const ai = result?.ai;
-  const scopeCount = isConsolidation
-    ? Number.isFinite(result?.checked) && t('{0} dari {1} saham diperiksa', countFormat.format(result.checked), countFormat.format(result.scanned))
-    : Number.isFinite(result?.scanned) && t('{0} saham dalam cakupan', countFormat.format(result.scanned));
-  const scanScope = [
-    isConsolidation && t(consolidationTimeframes[result?.timeframe]),
-    t(result?.universe),
-    scopeCount,
-  ].filter(Boolean).join(' · ');
-  const resultSummary = result && t('{0}{1} kandidat ditampilkan', scanScope ? `${scanScope} · ` : '', results.length);
-  const resultTitle = isConsolidation
-    ? 'Konsolidasi aktif'
-    : (finished ? 'Hasil scan matematis' : 'Hasil scan sebelumnya');
-  const monthly = result?.timeframe === 'monthly';
+  const scopeCount = Number.isFinite(result?.scanned) && t('{0} saham dalam cakupan', countFormat.format(result.scanned));
+  const scanScope = [t(result?.universe), scopeCount].filter(Boolean).join(' · ');
+  const resultSummary = isConsolidation ? t(results.length === 1 ? '1 kandidat konsolidasi ditemukan' : '{0} kandidat konsolidasi ditemukan', countFormat.format(results.length))
+    : t('{0}{1} kandidat ditampilkan', scanScope ? `${scanScope} · ` : '', results.length);
+  const resultTitle = finished ? 'Hasil scan matematis' : 'Hasil scan sebelumnya';
   const scanLabel = 'Pemindaian';
   const phase = {
     starting: { action: 'Menyiapkan…', status: `${scanLabel} sedang disiapkan.` },
@@ -432,16 +377,21 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
             {loading && <ResearchProgress />}
           </button>
         </form>
-        <p className="visually-hidden" role="status">{t(statusLabel)}</p>
+        {isConsolidation && loading ? (
+          <p className="consolidation-scan-phase" role="status">{t(phase.status)} {t('Cakupan tersedia setelah pemindaian selesai.')}</p>
+        ) : <p className="visually-hidden" role="status">{t(statusLabel)}</p>}
 
         {request.status === 'error' && (
           <ResearchRequestStatus title={t("{0} gagal", t(scanLabel))} message={t(request.message)} />
         )}
       </section>
 
-      {result && (
+      {result && isConsolidation && (
+        <ConsolidationResults key={region + ':' + timeframe} result={result} stale={!finished} watched={watched} disabled={disabled} onAdd={onAdd} />
+      )}
+      {result && !isConsolidation && (
         <section className="research-panel recommend-panel" aria-labelledby="research-results-title">
-          <ScanResultHeading title={t(resultTitle)} results={results} scope={scanScope} formatDate={monthly ? formatMonth : formatDate} />
+          <ScanResultHeading title={t(resultTitle)} results={results} scope={scanScope} formatDate={formatDate} />
           {ai?.summary && (
             <div className="research-summary">
               <h3>{t("Catatan AI atas hasil scan")}</h3>
@@ -453,22 +403,8 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           )}
           {results.length === 0 ? (
             <p className="research-empty">
-              {isConsolidation ? t("Belum ada saham dengan konsolidasi aktif pada timeframe ini.") : t("Belum ada saham yang memenuhi kriteria scan pada sesi ini.")}
+              {t("Belum ada saham yang memenuhi kriteria scan pada sesi ini.")}
             </p>
-          ) : isConsolidation ? (
-            <ul className="consolidation-list" role="list">
-              {results.map((pick) => (
-                <ConsolidationCard
-                  key={pick.symbol}
-                  pick={pick}
-                  monthly={monthly}
-                  inWatchlist={watched.has(pick.symbol)}
-                  disabled={disabled}
-                  onAdd={onAdd}
-                  formatPrice={formatPrice}
-                />
-              ))}
-            </ul>
           ) : (
             <ScanResults
               results={results}
