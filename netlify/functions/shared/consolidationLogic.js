@@ -1,5 +1,8 @@
+import { completedMarketWeekFriday, marketWeekFriday } from './sessionLogic.js';
+
 const settings = {
   daily: { lookbacks: [40, 60, 90, 120, 150, 180], pivotRadius: 2 },
+  weekly: { lookbacks: [8, 12, 18, 24, 30, 36], pivotRadius: 1 },
   monthly: { lookbacks: [12, 15, 18, 21, 24, 30], pivotRadius: 1 },
 };
 
@@ -9,6 +12,29 @@ const minTouches = 2;
 function validPriceBar(bar) {
   return [bar?.high, bar?.low, bar?.close].every(Number.isFinite)
     && bar.low > 0 && bar.close >= bar.low && bar.close <= bar.high;
+}
+
+export function consolidationWeeks(sessions, completedIndex, marketDay) {
+  const completedDate = sessions[completedIndex]?.date;
+  const cutoff = completedMarketWeekFriday(marketDay, completedDate);
+  if (!cutoff) return [];
+
+  const weeks = new Map();
+  for (const bar of sessions) {
+    if (bar.date > cutoff) break;
+    const friday = marketWeekFriday(bar.date);
+    if (!friday || bar.date > friday) continue;
+    if (!weeks.has(friday)) weeks.set(friday, []);
+    weeks.get(friday).push(bar);
+  }
+
+  return Array.from(weeks.values(), bars => {
+    const { date, close } = bars.at(-1);
+    // Keep invalid weeks as gaps so an incomplete reference cannot silently
+    // turn an older close into the latest weekly close.
+    if (date > completedDate || !bars.every(validPriceBar)) return { date, close: null };
+    return { date, close, high: Math.max(...bars.map(bar => bar.high)), low: Math.min(...bars.map(bar => bar.low)) };
+  });
 }
 
 // Position spans the two outer edges. Keep values outside 0–100 for callers

@@ -1,4 +1,4 @@
-import { dayMilliseconds, volumeLookback } from './sessionLogic.js';
+import { completedMarketWeekFriday, dayMilliseconds, volumeLookback } from './sessionLogic.js';
 
 const patternWindows = [120, 90, 60, 45, 30, 20];
 const pivotRadius = 2;
@@ -15,15 +15,9 @@ function validVolume(volume) {
 // Yahoo equity scan universes trade in Monday–Friday market weeks. Resample the
 // same daily bars so the 1D breakout and 1W close share an exchange-local clock.
 export function latestCompletedWedgeWeek(sessions, completedIndex, marketDay) {
-  if (typeof marketDay !== 'string' || !sessions[completedIndex]) return null;
-  const today = new Date(marketDay + 'T00:00:00Z');
-  if (!Number.isFinite(today.getTime())) return null;
-  const weekday = (today.getUTCDay() + 6) % 7;
-  const fridayClosed = weekday === 4 && sessions[completedIndex].date === marketDay;
-  const daysSinceStart = weekday + (weekday >= 5 || fridayClosed ? 0 : 7);
-  const monday = today.getTime() - daysSinceStart * dayMilliseconds;
-  const start = new Date(monday).toISOString().slice(0, 10);
-  const friday = new Date(monday + 4 * dayMilliseconds).toISOString().slice(0, 10);
+  const friday = completedMarketWeekFriday(marketDay, sessions[completedIndex]?.date);
+  if (!friday) return null;
+  const start = new Date(Date.parse(friday + 'T00:00:00Z') - 4 * dayMilliseconds).toISOString().slice(0, 10);
   const endIndex = sessions.findLastIndex(({ date }) => date >= start && date <= friday);
   // If the final reported bar is incomplete, an earlier bar cannot replace it.
   if (endIndex < 0 || endIndex > completedIndex || !validDailyBar(sessions[endIndex])) return null;

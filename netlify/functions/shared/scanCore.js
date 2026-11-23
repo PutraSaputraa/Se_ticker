@@ -8,7 +8,7 @@ import {
   volumeLookback,
 } from './sessionLogic.js';
 import { analyzeBaseBreakout } from './breakoutLogic.js';
-import { consolidationCloses, findActiveConsolidation } from './consolidationLogic.js';
+import { consolidationCloses, consolidationWeeks, findActiveConsolidation } from './consolidationLogic.js';
 import { findFallingWedge, latestCompletedWedgeWeek } from './fallingWedgeLogic.js';
 import { getUniverse, universeRegions } from './universe.js';
 import { fetchFundamentals } from './fundamentals.js';
@@ -22,6 +22,7 @@ const webSearchTimeoutMs = 15_000;
 const maxScanResults = 10;
 const consolidationScans = new Map([
   ['consolidation-daily', { timeframe: 'daily', range: '1y', interval: '1d' }],
+  ['consolidation-weekly', { timeframe: 'weekly', range: '1y', interval: '1d' }],
   ['consolidation-monthly', { timeframe: 'monthly', range: '5y', interval: '1mo' }],
 ]);
 
@@ -179,8 +180,10 @@ async function scanRegion(region, mode) {
           continue;
         }
         if (consolidation) {
-          const { sessions, index } = evaluated;
-          const { date, close } = sessions[index];
+          const weekly = consolidation.timeframe === 'weekly';
+          const sessions = weekly ? consolidationWeeks(evaluated.sessions, evaluated.index, evaluated.marketDay) : evaluated.sessions;
+          const index = weekly ? sessions.length - 1 : evaluated.index;
+          const { date, close } = sessions[index] ?? {};
           if (!Number.isFinite(close)) continue;
           checked += 1;
           referenceSessions.add(date);

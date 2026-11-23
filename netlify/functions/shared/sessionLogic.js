@@ -5,6 +5,23 @@ export const dayMilliseconds = 86_400_000;
 export const volumeLookback = 50;
 export const chartLookback = 20;
 
+export function marketWeekFriday(date) {
+  const day = new Date(`${date}T00:00:00Z`);
+  if (!Number.isFinite(day.getTime())) return null;
+  const weekday = (day.getUTCDay() + 6) % 7;
+  day.setUTCDate(day.getUTCDate() + 4 - weekday);
+  return day.toISOString().slice(0, 10);
+}
+
+// Use exchange-local dates. The current week needs a verified Friday close
+// or a date after Friday, including weeks that end early for a holiday.
+export function completedMarketWeekFriday(marketDay, lastCompletedDate) {
+  const friday = marketWeekFriday(marketDay);
+  if (!friday || !lastCompletedDate) return null;
+  if (marketDay > friday || (marketDay === friday && lastCompletedDate === friday)) return friday;
+  return new Date(Date.parse(friday + 'T00:00:00Z') - 7 * dayMilliseconds).toISOString().slice(0, 10);
+}
+
 export function readSessions(timestamps, quote, marketDate) {
   const sessions = new Map();
 

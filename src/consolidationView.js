@@ -2,7 +2,7 @@ import { consolidationPositionPct } from '../netlify/functions/shared/consolidat
 import { formatDate, formatDateCompact, formatPrice, priceDecimals } from './format.js';
 import { localizedDateFormat, localizedNumberFormat, t } from './i18n.js';
 
-export const consolidationTimeframes = { daily: 'Harian', monthly: 'Bulanan' };
+export const consolidationTimeframes = { daily: 'Harian', weekly: 'Mingguan', monthly: 'Bulanan' };
 export const locationBounds = { support: 20, resistance: 80 };
 export const locationLabels = {
   support: 'Dekat support',

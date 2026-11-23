@@ -13,13 +13,15 @@ import useTranslation from '../useTranslation.js';
 
 const glossary = {
   consolidation: ['Konsolidasi', 'Harga bergerak dalam rentang yang relatif tetap sesuai kriteria pemindai.'],
-  close: ['Harga tutup acuan', 'Harga penutupan pada sesi atau bulan terakhir yang sudah selesai saat pemindaian.'],
+  close: ['Harga tutup acuan', 'Harga penutupan pada sesi, pekan, atau bulan terakhir yang sudah selesai saat pemindaian.'],
   support: ['Zona support', 'Area harga tempat penurunan sebelumnya cenderung mendapat respons pembelian. Support dapat ditembus.'],
   resistance: ['Zona resistance', 'Area harga tempat kenaikan sebelumnya cenderung mendapat tekanan penjualan. Resistance dapat ditembus.'],
   position: ['Posisi harga', 'Persentase menunjukkan posisi harga tutup dari batas bawah support (0%) ke batas atas resistance (100%). Angka ini hanya mengukur letak harga.'],
   reactions: ['Reaksi terdeteksi', 'Pemindai mengelompokkan titik balik di sekitar tiap zona. Titik balik berikutnya dihitung sebagai reaksi baru bila di antaranya harga tutup sempat bergerak kembali ke dalam rentang sejauh seperempat jarak antara kedua zona.'],
-  duration: ['Durasi rentang', 'Durasi harian menghitung sesi perdagangan dengan data valid. Durasi bulanan menghitung candle bulanan yang sudah selesai dengan data valid.'],
+  duration: ['Durasi rentang', 'Durasi menghitung candle yang sudah selesai dan datanya valid. Satu candle mewakili satu sesi, pekan, atau bulan sesuai timeframe.'],
 };
+
+const durationUnits = { daily: '{0} sesi', weekly: '{0} pekan', monthly: '{0} bulan' };
 
 export function ConsolidationHelp({ label, topics }) {
   const { t } = useTranslation();
@@ -103,7 +105,7 @@ export function ConsolidationZones({ pick }) {
 
 export function consolidationDuration(pick, timeframe, t) {
   if (!validCount(pick.duration) || pick.duration === 0) return t('Tidak tersedia');
-  return t(timeframe === 'monthly' ? '{0} bulan' : '{0} sesi', countFormat.format(pick.duration));
+  return t(durationUnits[timeframe] ?? durationUnits.daily, countFormat.format(pick.duration));
 }
 
 export function pricePositionText(position, t) {

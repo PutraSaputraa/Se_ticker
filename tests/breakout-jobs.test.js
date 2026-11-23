@@ -239,3 +239,63 @@ test('job falling wedge preserves the third method and reports missing market da
   });
   assert.ok(quoteRequests > 0);
 });
+
+test('job konsolidasi mingguan menggabungkan sesi dan baru menilai breakout setelah pekan tutup', async (t) => {
+  const dayMs = 86_400_000;
+  const fridayEnd = Date.parse('2026-11-20T07:00:00Z');
+  const fridayOpen = Date.parse('2026-11-20T01:30:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now: fridayEnd - 60_000 });
+  const cycle = [76, 81, 83, 77, 69, 73];
+  const bar = (time, close, wick) => ({ timestamp: time / 1000, open: close, high: close + wick, low: close - wick, close });
+  const bars = Array.from({ length: 30 }, (_, index) => {
+    const friday = fridayOpen - (30 - index) * 7 * dayMs;
+    const close = cycle[index % cycle.length];
+    return [bar(friday - 3 * dayMs, close, 2), bar(friday, close, 1)];
+  }).flat();
+  bars.push(bar(fridayOpen - 3 * dayMs, 75, 1), bar(fridayOpen, 95, 1));
+  const quotes = Object.fromEntries(['open', 'high', 'low', 'close'].map(key => [key, bars.map(row => row[key])]));
+  let body;
+  const requests = [];
+  mockJobStore(t, (url, init) => {
+    if (url.pathname.endsWith('/breakout-scan-background')) {
+      body = init.body;
+      return new Response(null, { status: 202 });
+    }
+    requests.push(url);
+    if (!url.pathname.endsWith('/000333.SZ')) return new Response(null, { status: 404 });
+    return Response.json({ chart: { result: [{
+      meta: {
+        symbol: '000333.SZ', currency: 'CNY', exchangeTimezoneName: 'Asia/Shanghai',
+        currentTradingPeriod: { regular: { end: fridayEnd / 1000 } },
+        regularMarketTime: Math.min(fridayEnd, Date.now()) / 1000,
+      },
+      timestamp: bars.map(row => row.timestamp), indicators: { quote: [quotes] },
+    }] } });
+  });
+
+  const started = await breakoutStart(new Request(
+    `${functionsUrl}breakout-start?mode=consolidation-weekly&region=sz`, { method: 'POST' },
+  ));
+  assert.equal(started.status, 202);
+  const { jobId } = await started.json();
+  await breakoutWorker(new Request(`${functionsUrl}breakout-scan-background`, { method: 'POST', body }));
+  const { status, result } = await (await readJob(jobId)).json();
+  assert.equal(status, 'done');
+  assert.equal(result.mode, 'consolidation-weekly');
+  assert.equal(result.timeframe, 'weekly');
+  assert.equal(result.checked, 1);
+  assert.deepEqual(result.referenceSessions, ['2026-11-13']);
+  assert.equal(result.results.length, 1);
+  const [pick] = result.results;
+  assert.equal(pick.resistance.high, 85);
+  assert.equal(pick.support.low, 67);
+  assert.equal(pick.closes.length, pick.duration);
+  assert.deepEqual(pick.closes.at(-1), ['2026-11-13', 73]);
+
+  t.mock.timers.setTime(fridayEnd + 60_000);
+  const closed = await runScan('consolidation-weekly', 'sz');
+  assert.deepEqual(closed.referenceSessions, ['2026-11-20']);
+  assert.deepEqual(closed.results, []);
+  assert.ok(requests.every(url => url.hostname === 'query1.finance.yahoo.com'
+    && url.searchParams.get('interval') === '1d' && url.searchParams.get('range') === '1y'));
+});

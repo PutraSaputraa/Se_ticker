@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { consolidationCloses, findActiveConsolidation } from '../netlify/functions/shared/consolidationLogic.js';
+import { consolidationCloses, consolidationWeeks, findActiveConsolidation } from '../netlify/functions/shared/consolidationLogic.js';
 
 const cycle = [90, 95, 100, 105, 110, 105, 100, 95, 90, 85, 80, 85];
 
@@ -63,4 +63,18 @@ test('seri penutupan mengikuti jendela kandidat dan melewati bar yang tidak vali
   assert.deepEqual(series[0], [bars[0].date, 90]);
   assert.deepEqual(series.at(-1), [bars[index].date, 95]);
   assert.ok(series.every(([date]) => date !== bars[30].date));
+});
+
+test('pekan libur memakai sesi terakhir dan data Jumat yang rusak tidak digantikan', () => {
+  const previous = { date: '2025-12-26', high: 101, low: 96, close: 98 };
+  const monday = { date: '2025-12-29', high: 109, low: 90, close: 97 };
+  const wednesday = { date: '2025-12-31', high: 106, low: 93, close: 104 };
+  const daily = [previous, monday, wednesday];
+  assert.deepEqual(consolidationWeeks(daily, 2, '2026-01-02'), [previous]);
+  assert.deepEqual(consolidationWeeks(daily, 2, '2026-01-03'), [previous,
+    { date: wednesday.date, high: monday.high, low: monday.low, close: wednesday.close },
+  ]);
+
+  daily.push({ date: '2026-01-02', high: 110, low: 95, close: null });
+  assert.deepEqual(consolidationWeeks(daily, 2, '2026-01-03').at(-1), { date: '2026-01-02', close: null });
 });
