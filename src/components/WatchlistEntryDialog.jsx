@@ -103,8 +103,11 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
             <p className="research-form-help" id={hintId}>{t("PNG, JPG, atau WebP hingga")} {maxImageSizeLabel}{t(". Unggahan disimpan sebagai WebP.")}</p>
           </>
         ) : (
-          <label className="research-field">{t("Catatan")}<textarea rows={5} maxLength={maxWatchlistNotesLength} value={notes} disabled={disabled || saving}
-              onChange={(event) => setNotes(event.target.value)} />
+          <label className="research-field">{t("Catatan")}
+            <span className="watchlist-note-editor" data-notes={notes}>
+              <textarea rows={5} maxLength={maxWatchlistNotesLength} value={notes} disabled={disabled || saving}
+                onChange={(event) => setNotes(event.target.value)} />
+            </span>
           </label>
         )}
         {error && <p className="watchlist-dialog-error" role="alert">{t(error)}</p>}

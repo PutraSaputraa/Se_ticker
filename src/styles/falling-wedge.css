@@ -14,6 +14,11 @@
 .wedge-analysis .candle-chart { min-width: 0; }
 .wedge-analysis .candle-chart-head h2 { font-size: 1rem; }
 .wedge-analysis .candle-chart-head .stock-muted { margin-block-start: 0.2rem; }
+.wedge-analysis .candle-grid {
+  grid-template-rows: clamp(10.5rem, min(31cqi, 33dvh), 22rem) clamp(2.5rem, 7dvh, 3.75rem) auto;
+  margin-block-start: 0.55rem;
+}
+.wedge-analysis :is(.candle-legend, .candle-readout) { margin-block-start: 0.55rem; }
 .wedge-analysis .candle-trend { stroke-width: 2; pointer-events: none; }
 .wedge-analysis .candle-trend--resistance { stroke: var(--support); }
 .wedge-analysis .candle-trend--support { stroke: var(--positive); stroke-dasharray: 5 3; }

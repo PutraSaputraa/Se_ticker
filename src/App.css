@@ -15,6 +15,14 @@ html {
   html { overflow-y: auto; }
 }
 
+html:has(dialog:modal) { overflow-y: hidden; }
+
+dialog:modal {
+  max-block-size: calc(100dvh - 1.5rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
 :root {
   color-scheme: light;
   font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;

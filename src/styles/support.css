@@ -103,7 +103,6 @@
 
 .support-dialog {
   width: min(30rem, calc(100% - 2rem));
-  max-height: calc(100% - 2rem);
   padding: clamp(1rem, 4vw, 1.5rem);
   border: 1px solid var(--border);
   border-radius: var(--workspace-card-radius);

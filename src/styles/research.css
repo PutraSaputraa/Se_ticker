@@ -417,7 +417,6 @@
 
 .watchlist-dialog {
   width: min(36rem, calc(100% - 1.5rem));
-  max-height: calc(100dvh - 1.5rem);
   padding: var(--workspace-card-padding);
   border: 1px solid var(--border);
   border-radius: var(--workspace-card-radius);
@@ -427,9 +426,44 @@
 }
 
 .watchlist-dialog::backdrop { background: var(--backdrop); }
+.watchlist-dialog:has(textarea) { width: min(51rem, calc(100% - 1.5rem)); }
 .watchlist-dialog form { display: grid; gap: 0.75rem; }
 .watchlist-dialog h2 { font-size: 1.125rem; overflow-wrap: anywhere; }
-.watchlist-dialog textarea { resize: vertical; }
+.watchlist-note-editor {
+  display: grid;
+  min-inline-size: 0;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.watchlist-dialog .watchlist-note-editor textarea,
+.watchlist-note-editor::after {
+  grid-area: 1 / 1;
+  min-block-size: 8rem;
+  max-block-size: max(8rem, calc(100dvh - 12rem));
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+}
+
+.watchlist-dialog .watchlist-note-editor textarea {
+  field-sizing: content;
+  resize: vertical;
+}
+
+@supports not (field-sizing: content) {
+  .watchlist-note-editor::after {
+    content: attr(data-notes) " ";
+    box-sizing: border-box;
+    min-inline-size: 0;
+    overflow: hidden;
+    border: 1px solid transparent;
+    visibility: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+}
+
 .watchlist-dialog img {
   max-width: 100%;
   max-height: 48dvh;

@@ -403,12 +403,15 @@
   margin-inline-start: auto;
 }
 
-.journal-screenshot-dialog { width: min(66rem, calc(100% - 2rem)); }
+.journal-screenshot-dialog {
+  width: fit-content;
+  min-width: min(20rem, calc(100% - 2rem));
+  max-width: min(66rem, calc(100% - 2rem));
+}
 .journal-position-value-dialog { width: min(26rem, calc(100% - 2rem)); }
 
 .journal-screenshot-dialog,
 .journal-position-value-dialog {
-  max-height: calc(100dvh - 2rem);
   padding: var(--workspace-card-padding);
   border: 1px solid var(--border);
   border-radius: var(--workspace-card-radius);
@@ -427,12 +430,21 @@
 .journal-position-value-dialog .scan-button { min-height: 2.75rem; }
 .journal-position-value-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
 
+.journal-screenshot-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
 .journal-screenshot-dialog .journal-section-header { flex-wrap: nowrap; }
-.journal-screenshot-dialog > :not(:first-child) { margin-top: 0.875rem; }
+.journal-screenshot-dialog .journal-section-header > button { flex: none; }
+.journal-screenshot-dialog > :not(img) { flex: none; }
 .journal-screenshot-dialog img {
   display: block;
-  max-width: 100%;
-  margin-inline: auto;
+  align-self: center;
+  min-block-size: 0;
+  max-inline-size: 100%;
+  max-block-size: max(6rem, calc(100dvh - 8rem));
+  object-fit: contain;
 }
 
 .journal-ticker-field .ticker-suggestions {
