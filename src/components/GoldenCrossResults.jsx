@@ -21,6 +21,10 @@ const comparison = [
   ['Karakter', 'Konfirmasi tren', 'Lebih responsif'],
 ];
 
+function crossPrice(value, currency, digits) {
+  return formatPrice(value, currency, currency === 'USD' && value < 1 ? 6 : digits);
+}
+
 function CrossReference() {
   const { t } = useTranslation();
   return (
@@ -61,12 +65,12 @@ function CrossList({ method, title, picks, watched, disabled, onAdd }) {
             </div>
             <div className="scan-item-price">
               <span>{t('Harga tutup')}</span>
-              <strong>{formatPrice(pick.close, pick.currency)}</strong>
+              <strong>{crossPrice(pick.close, pick.currency)}</strong>
             </div>
           </div>
           <dl className="scan-item-metrics">
-            <div><dt>{method} 50</dt><dd>{formatPrice(pick.fast, pick.currency, 4)}</dd></div>
-            <div><dt>{method} 200</dt><dd>{formatPrice(pick.slow, pick.currency, 4)}</dd></div>
+            <div><dt>{method} 50</dt><dd>{crossPrice(pick.fast, pick.currency, 4)}</dd></div>
+            <div><dt>{method} 200</dt><dd>{crossPrice(pick.slow, pick.currency, 4)}</dd></div>
           </dl>
           <div className="cross-list-footer">
             <div className="cross-list-date">
@@ -89,7 +93,7 @@ function CrossTable({ method, title, picks, watched, disabled, onAdd }) {
         <table className="fund-table research-table cross-table">
           <thead>
             <tr>
-              <th scope="col">{t('Saham')}</th>
+              <th scope="col">Ticker</th>
               <th scope="col">{t('Tanggal sinyal')}</th>
               <th scope="col" className="num">{t('Harga tutup')}</th>
               <th scope="col" className="num">{method} 50</th>
@@ -105,9 +109,9 @@ function CrossTable({ method, title, picks, watched, disabled, onAdd }) {
                   {pick.name && <span className="research-cell-note">{pick.name}</span>}
                 </th>
                 <td><time dateTime={pick.date}>{formatDateCompact(pick.date)}</time></td>
-                <td className="num">{formatPrice(pick.close, pick.currency)}</td>
-                <td className="num">{formatPrice(pick.fast, pick.currency, 4)}</td>
-                <td className="num">{formatPrice(pick.slow, pick.currency, 4)}</td>
+                <td className="num">{crossPrice(pick.close, pick.currency)}</td>
+                <td className="num">{crossPrice(pick.fast, pick.currency, 4)}</td>
+                <td className="num">{crossPrice(pick.slow, pick.currency, 4)}</td>
                 <td className="num"><ScannerWatchAction symbol={pick.symbol} inWatchlist={watched.has(pick.symbol)} disabled={disabled} onAdd={onAdd} /></td>
               </tr>
             ))}
@@ -144,7 +148,7 @@ function CrossGroup({ method, direction, picks, watched, disabled, onAdd }) {
 export default function GoldenCrossResults({ result, method, onMethodChange, stale, watched, disabled, onAdd }) {
   const { t } = useTranslation();
   const picks = result.results.filter(pick => pick.method === method);
-  const coverage = t('{0} dari {1} saham diperiksa', countFormat.format(result.checked), countFormat.format(result.scanned));
+  const coverage = t('{0} dari {1} aset diperiksa', countFormat.format(result.checked), countFormat.format(result.scanned));
 
   return (
     <section className="research-panel recommend-panel cross-results" aria-labelledby="cross-results-title">
@@ -165,7 +169,7 @@ export default function GoldenCrossResults({ result, method, onMethodChange, sta
       </header>
       {stale && <p className="consolidation-stale">{t('Menampilkan hasil pemindaian sebelumnya untuk pilihan ini.')}</p>}
       {result.checked === 0 ? (
-        <p className="research-empty">{t('Data harga belum cukup. Pemindaian membutuhkan minimal 201 candle yang sudah tutup per saham.')}</p>
+        <p className="research-empty">{t('Data harga belum cukup. Pemindaian membutuhkan minimal 201 candle yang sudah tutup per aset.')}</p>
       ) : directions.map(direction => (
         <CrossGroup key={direction.signal} method={method} direction={direction}
           picks={picks.filter(pick => pick.signal === direction.signal)} watched={watched} disabled={disabled} onAdd={onAdd} />

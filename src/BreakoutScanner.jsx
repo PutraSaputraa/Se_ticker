@@ -30,6 +30,12 @@ const regions = [
   { value: 'sz', label: 'Shenzhen' },
 ];
 
+const goldenCrossMarkets = [
+  { value: 'auto', label: 'Semua bursa saham' },
+  { value: 'crypto', label: 'Kripto' },
+  ...regions.slice(1),
+];
+
 const modeDescriptions = {
   scan: 'Pindai resistance 50 sesi, konsolidasi, dan volume dari data harga.',
   consolidation: 'Cari saham yang masih bergerak di antara zona support dan resistance.',
@@ -234,7 +240,8 @@ function ScanResultHeading({ title, results, scope, formatDate }) {
 export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPrice, formatDate }) {
   const { t, language } = useTranslation();
   const [mode, setMode] = useState('scan');
-  const [region, setRegion] = useState('auto');
+  const [stockRegion, setStockRegion] = useState('auto');
+  const [crossCrypto, setCrossCrypto] = useState(false);
   const [consolidationTimeframe, setConsolidationTimeframe] = useState('daily');
   const [crossTimeframe, setCrossTimeframe] = useState('daily');
   const [crossMethod, setCrossMethod] = useState('SMA');
@@ -244,6 +251,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   const isConsolidation = mode === 'consolidation';
   const isWedge = mode === 'falling-wedge';
   const isCross = mode === 'golden-cross';
+  const region = isCross && crossCrypto ? 'crypto' : stockRegion;
   const timeframes = isCross ? goldenCrossTimeframes : consolidationTimeframes;
   const usesTimeframe = isConsolidation || isCross;
   const timeframe = isCross ? crossTimeframe : consolidationTimeframe;
@@ -253,8 +261,11 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     activeScan.current = null;
   }, []);
 
-  async function run(targetMode = mode, targetRegion = region,
-    targetTimeframe = targetMode === 'golden-cross' ? crossTimeframe : consolidationTimeframe) {
+  async function run(
+    targetMode = mode,
+    targetRegion = targetMode === 'golden-cross' && crossCrypto ? 'crypto' : stockRegion,
+    targetTimeframe = targetMode === 'golden-cross' ? crossTimeframe : consolidationTimeframe,
+  ) {
     if (loading || activeScan.current) return;
 
     const controller = new AbortController();
@@ -302,12 +313,13 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   function changeMode(next) {
     if (loading || activeScan.current || next === mode) return;
     setMode(next);
-    if (request.status === 'success' || request.status === 'error') run(next, region);
+    if (request.status === 'success' || request.status === 'error') run(next);
   }
 
   function changeRegion(next) {
     if (loading || activeScan.current || next === region) return;
-    setRegion(next);
+    if (isCross) setCrossCrypto(next === 'crypto');
+    if (next !== 'crypto') setStockRegion(next);
     if (request.status === 'success' || request.status === 'error') run(mode, next);
   }
 
@@ -376,8 +388,8 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
               ))}
             </div>
           </fieldset>
-          <label className="research-field">{t("Bursa")}<select value={region} onChange={(event) => changeRegion(event.target.value)} disabled={loading}>
-              {regions.map(({ value, label }) => <option key={value} value={value}>{t(label)}</option>)}
+          <label className="research-field">{t(isCross ? 'Pasar' : 'Bursa')}<select value={region} onChange={(event) => changeRegion(event.target.value)} disabled={loading}>
+              {(isCross ? goldenCrossMarkets : regions).map(({ value, label }) => <option key={value} value={value}>{t(label)}</option>)}
             </select>
           </label>
           {usesTimeframe && (
@@ -397,6 +409,9 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
           {isWedge && <p className="research-form-help">
             {t('Analisis 1D · Konfirmasi 1W')}{' · '}
             {t('Volume breakout di atas rata-rata {0} sesi sebelumnya.', countFormat.format(wedgeVolumeLookback))}
+          </p>}
+          {region === 'crypto' && <p className="research-form-help">
+            {t(timeframe === 'weekly' ? 'Candle mingguan kripto tutup Senin pukul 00.00 UTC.' : 'Candle harian kripto tutup pukul 00.00 UTC.')}
           </p>}
         </form>
         {(usesTimeframe || isWedge) && loading ? (

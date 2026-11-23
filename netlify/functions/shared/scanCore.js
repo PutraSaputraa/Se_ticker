@@ -10,8 +10,8 @@ import {
 import { analyzeBaseBreakout } from './breakoutLogic.js';
 import { consolidationCloses, consolidationWeeks, findActiveConsolidation } from './consolidationLogic.js';
 import { findFallingWedge, latestCompletedWedgeWeek } from './fallingWedgeLogic.js';
-import { findMovingAverageCrosses } from './movingAverageCross.js';
-import { getUniverse, universeRegions } from './universe.js';
+import { completedCryptoCloses, findMovingAverageCrosses } from './movingAverageCross.js';
+import { cryptoUniverse, getUniverse, universeRegions } from './universe.js';
 import { fetchFundamentals } from './fundamentals.js';
 import { fetchGrowthInputs, fillSalesComparisons, growthValues } from './growth.js';
 import { screenerRow } from './screener.js';
@@ -54,12 +54,20 @@ const researchKeywords = {
 
 function regionsFor(region) {
   if (region === 'auto') return universeRegions;
-  return [universeRegions.includes(region) ? region : 'auto'];
+  return [region === 'crypto' || universeRegions.includes(region) ? region : 'auto'];
+}
+
+function getScanUniverse(region) {
+  return region === 'crypto' ? cryptoUniverse : getUniverse(region);
+}
+
+export function scanRegionError(mode, region) {
+  return region === 'crypto' && !crossScans.has(mode) ? 'Pilih metode Golden Cross untuk memindai kripto.' : null;
 }
 
 export function scanWaitMs(mode, region) {
   const yahooWaitMs = mode === 'research' ? 0 : regionsFor(region).reduce((total, market) => {
-    const batches = Math.ceil(getUniverse(market).symbols.length / fetchConcurrency);
+    const batches = Math.ceil(getScanUniverse(market).symbols.length / fetchConcurrency);
     return total + batches * fetchTimeoutMs;
   }, 0);
   if (mode === 'growth') return yahooWaitMs + regionsFor(region).length * fetchTimeoutMs + 30_000;
@@ -76,7 +84,7 @@ const kenariHeaders = (apiKey) => ({
   'Content-Type': 'application/json',
 });
 
-async function fetchPriceSessions(symbol, range, interval = '1d') {
+async function fetchPriceSessions(symbol, range, { interval = '1d', cryptoDay } = {}) {
   const query = new URLSearchParams({ range, interval });
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`;
 
@@ -92,15 +100,15 @@ async function fetchPriceSessions(symbol, range, interval = '1d') {
   const quote = result?.indicators?.quote?.[0];
   if (!Array.isArray(timestamps) || timestamps.length === 0 || !quote) return null;
 
-  const timeZone = result.meta?.exchangeTimezoneName || 'UTC';
+  const timeZone = cryptoDay ? 'UTC' : result.meta?.exchangeTimezoneName;
   const monthly = interval === '1mo';
   const marketDate = new Intl.DateTimeFormat('sv-SE', {
-    timeZone, year: 'numeric', month: '2-digit', day: monthly ? undefined : '2-digit',
+    timeZone: timeZone || 'UTC', year: 'numeric', month: '2-digit', day: monthly ? undefined : '2-digit',
   });
   const sessions = readSessions(timestamps, quote, marketDate);
-  // Yahoo can append an intramonth snapshot. Evaluate only months that have ended in the exchange time zone.
-  const marketPeriod = marketDate.format(Date.now());
-  const index = monthly
+  // Exclude the current month or the open UTC crypto day.
+  const marketPeriod = cryptoDay ?? marketDate.format(Date.now());
+  const index = monthly || cryptoDay
     ? sessions.findLastIndex(({ date }) => date < marketPeriod)
     : latestCompletedIndex(sessions, result.meta, marketDate);
   if (index < 0) return null;
@@ -113,7 +121,7 @@ async function fetchPriceSessions(symbol, range, interval = '1d') {
     symbol: typeof result.meta?.symbol === 'string' && result.meta.symbol.trim() ? result.meta.symbol : symbol,
     name: name ?? null,
     currency: typeof result.meta?.currency === 'string' ? result.meta.currency : null,
-    marketDay: interval === '1d' && result.meta?.exchangeTimezoneName ? marketPeriod : null,
+    marketDay: interval === '1d' && timeZone ? marketPeriod : null,
     sessions,
     index,
   };
@@ -143,7 +151,8 @@ function toPick(evaluated, analysis) {
 }
 
 async function scanRegion(region, mode) {
-  const { name, symbols, currency } = getUniverse(region);
+  const { name, symbols, currency } = getScanUniverse(region);
+  const cryptoDay = region === 'crypto' ? new Date().toISOString().slice(0, 10) : null;
   const consolidation = consolidationScans.get(mode);
   const crossScan = crossScans.get(mode);
   const priceScan = consolidation ?? crossScan;
@@ -165,7 +174,7 @@ async function scanRegion(region, mode) {
           continue;
         }
         const evaluated = await fetchPriceSessions(
-          symbol, priceScan?.range ?? (mode === 'screener' || fallingWedge ? '1y' : '9mo'), priceScan?.interval,
+          symbol, priceScan?.range ?? (mode === 'screener' || fallingWedge ? '1y' : '9mo'), { interval: priceScan?.interval, cryptoDay },
         );
         if (!evaluated) continue;
         if (fallingWedge) {
@@ -188,8 +197,14 @@ async function scanRegion(region, mode) {
         }
         if (priceScan) {
           const weekly = priceScan.timeframe === 'weekly';
-          const sessions = weekly ? consolidationWeeks(evaluated.sessions, evaluated.index, evaluated.marketDay) : evaluated.sessions;
-          const index = weekly ? sessions.length - 1 : evaluated.index;
+          let { sessions, index } = evaluated;
+          if (cryptoDay) {
+            sessions = completedCryptoCloses(sessions, cryptoDay, priceScan.timeframe);
+            index = sessions.length - 1;
+          } else if (weekly) {
+            sessions = consolidationWeeks(sessions, index, evaluated.marketDay);
+            index = sessions.length - 1;
+          }
           const { date, close } = sessions[index] ?? {};
           if (!Number.isFinite(close)) continue;
           const instrument = { symbol: evaluated.symbol, name: evaluated.name, currency: evaluated.currency ?? currency, universe: name, date, close };
@@ -407,6 +422,8 @@ async function runResearch(apiKey, regions, language) {
 
 // Menjalankan scan/riset penuh dan mengembalikan objek hasil (tanpa Response).
 export async function runScan(mode, regionParam, requestedLanguage = 'id') {
+  const invalidRegion = scanRegionError(mode, regionParam);
+  if (invalidRegion) throw new Error(invalidRegion);
   const language = requestedLanguage === 'en' ? 'en' : 'id';
   const apiKey = process.env.KENARI_API_KEY?.trim() ?? '';
   const regions = regionsFor(regionParam);

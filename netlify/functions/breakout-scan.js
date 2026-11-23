@@ -1,4 +1,4 @@
-import { runScan, scanMode } from './shared/scanCore.js';
+import { runScan, scanMode, scanRegionError } from './shared/scanCore.js';
 
 const scanError = 'Pemindaian breakout gagal. Coba lagi nanti.';
 
@@ -17,6 +17,8 @@ export default async function breakoutScan(request) {
     const params = new URL(request.url).searchParams;
     const mode = scanMode(params.get('mode'));
     const region = params.get('region') ?? 'auto';
+    const invalidRegion = scanRegionError(mode, region);
+    if (invalidRegion) return Response.json({ error: invalidRegion }, { status: 400 });
     const result = await runScan(mode, region, params.get('lang'));
     return Response.json(result);
   } catch {

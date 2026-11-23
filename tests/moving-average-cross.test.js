@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { findMovingAverageCrosses } from '../netlify/functions/shared/movingAverageCross.js';
+import { completedCryptoCloses, findMovingAverageCrosses } from '../netlify/functions/shared/movingAverageCross.js';
 
 const evaluate = closes => findMovingAverageCrosses(closes.map(close => ({ close })), closes.length - 1);
 const directions = picks => picks.map(({ method, signal }) => [method, signal]);
@@ -35,4 +35,22 @@ test('the scanner requires 201 valid completed candles and excludes later bars',
 
   const sessions = [...history, 100, 150].map(close => ({ close }));
   assert.deepEqual(findMovingAverageCrosses(sessions, 200), []);
+});
+
+test('crypto closes keep gaps in the calendar and use completed Sundays for weekly averages', () => {
+  const sessions = [
+    { date: '2026-11-08', close: 80 },
+    { date: '2026-11-21', close: 100 },
+    { date: '2026-11-22', close: 110 },
+    { date: '2026-11-23', close: 120 },
+  ];
+  assert.deepEqual(completedCryptoCloses(sessions, '2026-11-23', 'daily').slice(-3), [
+    { date: '2026-11-20', close: null }, ...sessions.slice(1, 3),
+  ]);
+  assert.deepEqual(completedCryptoCloses(sessions, '2026-11-22', 'weekly'), [
+    sessions[0], { date: '2026-11-15', close: null },
+  ]);
+  assert.deepEqual(completedCryptoCloses(sessions, '2026-11-23', 'weekly'), [
+    sessions[0], { date: '2026-11-15', close: null }, sessions[2],
+  ]);
 });

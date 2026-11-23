@@ -1,5 +1,5 @@
 import { getStore } from '@netlify/blobs';
-import { scanMode, scanWaitMs } from './shared/scanCore.js';
+import { scanMode, scanRegionError, scanWaitMs } from './shared/scanCore.js';
 
 const dispatchError = 'Pekerja pemindaian belum bisa dimulai. Coba lagi.';
 
@@ -17,6 +17,8 @@ export default async function breakoutStart(request) {
     const params = new URL(request.url).searchParams;
     const mode = scanMode(params.get('mode'));
     const region = params.get('region') ?? 'auto';
+    const invalidRegion = scanRegionError(mode, region);
+    if (invalidRegion) return Response.json({ error: invalidRegion }, { status: 400 });
     const language = params.get('lang') === 'en' ? 'en' : 'id';
 
     const jobId = crypto.randomUUID();

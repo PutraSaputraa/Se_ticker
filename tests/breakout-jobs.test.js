@@ -3,9 +3,11 @@ import { test } from 'node:test';
 import { setImmediate } from 'node:timers/promises';
 import { setEnvironmentContext } from '@netlify/blobs';
 import breakoutStart from '../netlify/functions/breakout-start.js';
+import breakoutScan from '../netlify/functions/breakout-scan.js';
 import breakoutStatus from '../netlify/functions/breakout-status.js';
 import breakoutWorker from '../netlify/functions/breakout-scan-background.js';
 import { runScan } from '../netlify/functions/shared/scanCore.js';
+import { cryptoUniverse } from '../netlify/functions/shared/universe.js';
 
 const functionsUrl = 'https://test.example/.netlify/functions/';
 setEnvironmentContext({
@@ -359,4 +361,75 @@ test('Golden Cross jobs scan both averages on the last completed daily or weekly
   ]);
   assert.deepEqual((await runJob('daily')).results, []);
   assert.deepEqual(ranges, new Set(['5y', '10y']));
+});
+
+test('crypto Golden Cross jobs use weekend closes and wait for Monday 00:00 UTC to complete the week', async (t) => {
+  const dayMs = 86_400_000;
+  const monday = Date.parse('2026-11-23T00:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now: monday - 60_000 });
+  const historyLength = 205 * 7;
+  const timestamps = Array.from({ length: historyLength + 1 }, (_, index) => (monday - (historyLength - index) * dayMs) / 1000);
+  const requests = [];
+  let workerBody;
+  mockJobStore(t, (url, init) => {
+    if (url.pathname.endsWith('/breakout-scan-background')) {
+      workerBody = init.body;
+      return new Response(null, { status: 202 });
+    }
+    const symbol = url.pathname.split('/').at(-1);
+    requests.push(symbol);
+    if (symbol !== 'BTC-USD' && symbol !== 'ETH-USD') return new Response(null, { status: 404 });
+    const weekend = symbol === 'BTC-USD' ? [150, 150, 25] : [100, 50, 300];
+    const close = [...Array(historyLength - 2).fill(100), ...weekend];
+    return Response.json({ chart: { result: [{
+      meta: { symbol, currency: 'USD', exchangeTimezoneName: 'UTC' },
+      timestamp: timestamps, indicators: { quote: [{ close, high: close, low: close, open: close }] },
+    }] } });
+  });
+
+  const mode = 'golden-cross-weekly';
+  const started = await breakoutStart(new Request(`${functionsUrl}breakout-start?mode=${mode}&region=crypto`, { method: 'POST' }));
+  assert.equal(started.status, 202);
+  const { jobId, waitMs } = await started.json();
+  assert.equal(waitMs, 54_000);
+  await breakoutWorker(new Request(`${functionsUrl}breakout-scan-background`, { method: 'POST', body: workerBody }));
+  const { status, result } = await (await readJob(jobId)).json();
+  assert.equal(status, 'done');
+  assert.equal(result.mode, mode);
+  assert.equal(result.region, 'crypto');
+  assert.equal(result.universe, 'Kripto');
+  assert.equal(result.checked, 2);
+  assert.deepEqual(requests, cryptoUniverse.symbols);
+  assert.deepEqual(result.referenceSessions, ['2026-11-15']);
+  assert.deepEqual(result.results, []);
+
+  const signals = payload => payload.results.map(({ symbol, method, signal, date }) => [symbol, method, signal, date]);
+  assert.deepEqual(signals(await runScan('golden-cross-daily', 'crypto')), [
+    ['BTC-USD', 'SMA', 'golden', '2026-11-21'], ['BTC-USD', 'EMA', 'golden', '2026-11-21'],
+  ]);
+  t.mock.timers.setTime(monday);
+  const closedWeek = await runScan(mode, 'crypto');
+  assert.deepEqual(closedWeek.referenceSessions, ['2026-11-22']);
+  assert.deepEqual(signals(closedWeek), [
+    ['BTC-USD', 'SMA', 'golden', '2026-11-22'], ['BTC-USD', 'EMA', 'golden', '2026-11-22'],
+    ['ETH-USD', 'SMA', 'death', '2026-11-22'], ['ETH-USD', 'EMA', 'death', '2026-11-22'],
+  ]);
+  assert.deepEqual(signals(await runScan('golden-cross-daily', 'crypto')), [
+    ['ETH-USD', 'SMA', 'death', '2026-11-22'], ['ETH-USD', 'EMA', 'death', '2026-11-22'],
+  ]);
+});
+
+test('stock universes stay separate from the crypto Golden Cross universe', async (t) => {
+  const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 404 }));
+  const query = 'mode=consolidation-daily&region=crypto';
+  const start = await breakoutStart(new Request(`${functionsUrl}breakout-start?${query}`, { method: 'POST' }));
+  const sync = await breakoutScan(new Request(`${functionsUrl}breakout-scan?${query}`));
+  assert.equal(start.status, 400);
+  assert.equal(sync.status, 400);
+  assert.equal(fetch.mock.callCount(), 0);
+
+  await runScan('golden-cross-daily', 'auto');
+  const requested = fetch.mock.calls.map(({ arguments: [url] }) => new URL(url).pathname.split('/').at(-1));
+  assert.ok(requested.includes('BBCA.JK') && requested.includes('AAPL'));
+  assert.ok(cryptoUniverse.symbols.every(symbol => !requested.includes(symbol)));
 });

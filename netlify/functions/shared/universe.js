@@ -101,3 +101,12 @@ export function getUniverse(region) {
 }
 
 export const universeRegions = Object.keys(universes);
+
+export const cryptoUniverse = {
+  name: 'Kripto',
+  currency: 'USD',
+  symbols: [
+    'BTC-USD', 'ETH-USD', 'SOL-USD', 'BNB-USD', 'XRP-USD',
+    'ADA-USD', 'DOGE-USD', 'AVAX-USD', 'LINK-USD', 'LTC-USD',
+  ],
+};
