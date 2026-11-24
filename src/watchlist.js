@@ -7,6 +7,7 @@ export const watchlistCategories = {
   'falling-wedge': 'Falling Wedge',
   'golden-cross': 'Golden Cross',
   'death-cross': 'Death Cross',
+  quantitative: 'Kuantitatif',
 };
 const categoryIds = Object.keys(watchlistCategories);
 

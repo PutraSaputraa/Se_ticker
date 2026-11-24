@@ -811,6 +811,7 @@ export const english = {
   "Bandingkan harga penutupan, volume, dan kriteria Stage 2.": "Compare closing prices, volume, and Stage 2 criteria.",
   "Daftar pantauan": "Watchlist",
   "Kategori pantauan": "Watchlist categories",
+  "Kuantitatif": "Quantitative",
   "Ubah": "Edit",
   "Ubah kategori": "Edit categories",
   "Ubah kategori {0}": "Edit categories for {0}",

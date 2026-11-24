@@ -132,7 +132,10 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice, volumeScale
                 <ScanVolume ratio={pick.volumeRatio} scale={volumeScale} />
               </td>
               <td>{pick.date ? <time dateTime={pick.date}>{formatDateCompact(pick.date)}</time> : t("Tidak tersedia")}</td>
-              <td className="num"><WatchAction symbol={pick.symbol} entry={watched.get(pick.symbol)} disabled={disabled} onAdd={onAdd} /></td>
+              <td className="num">
+                <WatchAction symbol={pick.symbol} entry={watched.get(pick.symbol)} category="quantitative"
+                  disabled={disabled} onAdd={onAdd} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -179,7 +182,8 @@ function ScanListItem({ pick, watchlistEntry, disabled, onAdd, formatPrice, form
           {pick.universe && <div><dt>{t("Cakupan")}</dt><dd>{t(pick.universe)}</dd></div>}
         </dl>
         {pick.aiNote && <p className="research-scan-note"><strong>{t("Catatan AI")}</strong><br />{pick.aiNote}</p>}
-        <WatchAction symbol={pick.symbol} entry={watchlistEntry} disabled={disabled} onAdd={onAdd} />
+        <WatchAction symbol={pick.symbol} entry={watchlistEntry} category="quantitative"
+          disabled={disabled} onAdd={onAdd} />
       </details>
     </li>
   );

@@ -78,22 +78,24 @@ test('watchlist keeps supported categories and adds scan categories to the same 
     { symbol: 'AAPL', priceToWatch: null, rating: 5, categories: ['golden-cross'] },
     { symbol: 'NVDA', priceToWatch: null },
   ]);
-  const watched = addSymbol(addSymbol(initial, 'AAPL', 'falling-wedge'), 'QCOM', 'death-cross');
+  const watched = addSymbol(addSymbol(initial, 'AAPL', 'quantitative'), 'QCOM', 'quantitative');
   assert.deepEqual(watched, [
-    { ...initial[0], categories: ['falling-wedge', 'golden-cross'] }, initial[1],
-    { symbol: 'QCOM', priceToWatch: null, categories: ['death-cross'] },
+    { ...initial[0], categories: ['golden-cross', 'quantitative'] }, initial[1],
+    { symbol: 'QCOM', priceToWatch: null, categories: ['quantitative'] },
   ]);
   assert.equal(hasWatchlistCategory(watched[0], 'golden-cross'), true);
-  assert.equal(hasWatchlistCategory(watched[1], 'falling-wedge'), false);
-  assert.equal(addSymbol(watched, 'AAPL', 'falling-wedge'), watched);
+  assert.equal(hasWatchlistCategory(watched[1], 'quantitative'), false);
+  assert.equal(addSymbol(watched, 'AAPL', 'quantitative'), watched);
   assert.equal(addSymbol(watched, 'AAPL'), watched);
 });
 
 test('manual category edits preserve categories added after opening the editor', () => {
   const initial = [{ symbol: 'AAPL', priceToWatch: 120, categories: ['consolidation', 'golden-cross'] }];
   const latest = addSymbol(initial, 'AAPL', 'falling-wedge');
-  const edited = setWatchlistCategories(latest, 'AAPL', initial[0].categories, ['golden-cross', 'death-cross']);
-  assert.deepEqual(edited, [{ symbol: 'AAPL', priceToWatch: 120, categories: ['falling-wedge', 'golden-cross', 'death-cross'] }]);
+  const edited = setWatchlistCategories(latest, 'AAPL', initial[0].categories, ['golden-cross', 'death-cross', 'quantitative']);
+  assert.deepEqual(edited, [{
+    symbol: 'AAPL', priceToWatch: 120, categories: ['falling-wedge', 'golden-cross', 'death-cross', 'quantitative'],
+  }]);
   assert.deepEqual(setWatchlistCategories(edited, 'AAPL', edited[0].categories, []), [{ symbol: 'AAPL', priceToWatch: 120 }]);
   assert.deepEqual(setWatchlistCategories([], 'AAPL', [], ['golden-cross']), []);
 });
