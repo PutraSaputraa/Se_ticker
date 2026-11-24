@@ -578,7 +578,7 @@ function StockDetail({ symbol, account }) {
         </article>
       )}
       {categoryEntry && (
-        <WatchlistEntryDialog entry={categoryEntry} mode="categories" account={account} disabled={watchlistDisabled}
+        <WatchlistEntryDialog entry={categoryEntry} companyName={quote?.name} mode="categories" account={account} disabled={watchlistDisabled}
           onClose={() => setCategoryEntry(null)} />
       )}
     </div>

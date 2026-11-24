@@ -105,10 +105,10 @@ export default function WatchlistPage({ account, uid }) {
                 `${symbol} · ${rating} bintang tersimpan`,
               )
             }
-            onEditEntry={(entry, mode, trigger) => {
+            onEditEntry={(entry, mode, trigger, companyName) => {
               editorTrigger.current = trigger;
               editorSymbol.current = entry.symbol;
-              setEditor({ entry, mode });
+              setEditor({ entry, mode, companyName });
             }}
           />
         ) : account.ready ? (

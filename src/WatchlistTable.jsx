@@ -285,10 +285,13 @@ function WatchlistNotes({ entry, onEdit, disabled }) {
 
   if (!notes) {
     return (
-      <button type="button" className="watchlist-note-add" disabled={disabled} aria-haspopup="dialog"
-        aria-label={`${t('Tambah catatan')} ${symbol}`} onClick={(event) => onEdit(entry, 'notes', event.currentTarget)}>
-        + {t('Tambah catatan')}
-      </button>
+      <>
+        <p className="watchlist-detail-muted">{t('Belum ada catatan.')}</p>
+        <button type="button" className="watchlist-note-add" disabled={disabled} aria-haspopup="dialog"
+          aria-label={`${t('Tambah catatan')} ${symbol}`} onClick={(event) => onEdit(entry, 'notes', event.currentTarget)}>
+          + {t('Tambah catatan')}
+        </button>
+      </>
     );
   }
 
@@ -386,7 +389,9 @@ const WatchlistRow = memo(function WatchlistRow({
                 <section className="watchlist-volume-details">
                   <h3>{t('Pemeriksaan volume')}</h3>
                   {Number.isFinite(quote?.buyTrigger?.minimumVolume) && (
-                    <p>{t('Ambang {0}', formatVolume(quote.buyTrigger.minimumVolume))} · {t('1,4× rata-rata 50 sesi')}</p>
+                    <p className="watchlist-detail-muted">
+                      {t('Ambang {0}', formatVolume(quote.buyTrigger.minimumVolume))} · {t('1,4× rata-rata 50 sesi')}
+                    </p>
                   )}
                   {checks.some((check) => check?.date) ? <ul>{checks.filter((check) => check?.date).map((check) => (
                     <li key={check.date}>
@@ -394,29 +399,31 @@ const WatchlistRow = memo(function WatchlistRow({
                       <span>{formatVolume(check.volume, { includeUnit: false })}</span>
                       <CheckBadgeMini passed={check.meetsThreshold} />
                     </li>
-                  ))}</ul> : <p>{t('Belum tersedia')}</p>}
+                  ))}</ul> : <p className="watchlist-detail-muted">{t('Belum tersedia')}</p>}
                 </section>
                 <section className="watchlist-notes">
                   <h3>{t('Catatan')}</h3>
                   <WatchlistNotes entry={entry} onEdit={onEditEntry} disabled={disabled} />
                 </section>
                 <section className="watchlist-category-details">
-                  <div>
+                  <div className="watchlist-category-heading">
                     <h3>{t('Kategori pantauan')}</h3>
-                    {categories.length ? (
-                      <ul className="watchlist-category-tags" role="list">
-                        {categories.map(category => <li key={category} className="research-badge">{t(watchlistCategories[category])}</li>)}
-                      </ul>
-                    ) : <p>{t('Belum ada kategori')}</p>}
+                    <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
+                      aria-label={t('Ubah kategori {0}', symbol)} onClick={event => onEditEntry(entry, 'categories', event.currentTarget, quote?.name)}>
+                      <WorkspaceIcon name="edit" size={16} /> {t('Ubah')}
+                    </button>
                   </div>
-                  <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
-                    aria-label={t('Ubah kategori {0}', symbol)} onClick={event => onEditEntry(entry, 'categories', event.currentTarget)}>
-                    {t('Ubah kategori')}
-                  </button>
+                  {categories.length ? (
+                    <ul className="watchlist-category-tags" role="list">
+                      {categories.map(category => <li key={category} className="research-badge">{t(watchlistCategories[category])}</li>)}
+                    </ul>
+                  ) : <p className="watchlist-detail-muted">{t('Belum ada kategori yang dipilih.')}</p>}
                 </section>
-                <div className="watchlist-detail-actions watchlist-image">
+                <div className="watchlist-detail-actions">
                   <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
-                    aria-label={`${t(imageAction)} ${symbol}`} onClick={(event) => onEditEntry(entry, 'image', event.currentTarget)}>{t(imageAction)}</button>
+                    aria-label={`${t(imageAction)} ${symbol}`} onClick={(event) => onEditEntry(entry, 'image', event.currentTarget)}>
+                    <WorkspaceIcon name="image" size={16} /> {t(imageAction)}
+                  </button>
                   <button type="button" className="research-remove" disabled={disabled}
                     aria-label={t('Hapus {0} dari daftar', symbol)} onClick={() => onRemove(symbol)}>{t('Hapus')}</button>
                 </div>

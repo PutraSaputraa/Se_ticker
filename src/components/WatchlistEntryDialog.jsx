@@ -3,15 +3,17 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { imageContentTypes, imageFileError, maxImageSizeLabel } from '../imageFile.js';
 import { maxWatchlistNotesLength, watchlistCategories } from '../watchlist.js';
 import { downloadWatchlistImage } from '../watchlistImage.js';
+import WorkspaceIcon from './WorkspaceIcon.jsx';
 
 const submitLabels = { categories: 'Simpan kategori', image: 'Unggah gambar', notes: 'Simpan catatan' };
 
-export default function WatchlistEntryDialog({ entry, mode, account, uid, disabled, onClose, onSaved }) {
+export default function WatchlistEntryDialog({ entry, companyName, mode, account, uid, disabled, onClose, onSaved }) {
   const { t } = useTranslation();
   const dialog = useRef(null);
   const submitting = useRef(false);
   const titleId = useId();
   const hintId = useId();
+  const contextId = useId();
   const imageMode = mode === 'image';
   const categoryMode = mode === 'categories';
   const { symbol, imageId, categories: savedCategories = [], notes: savedNotes = '' } = entry;
@@ -21,7 +23,8 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
   const [preview, setPreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const title = categoryMode ? t('Kategori pantauan {0}', symbol) : `${t(imageMode ? 'Gambar' : 'Catatan')} ${symbol}`;
+  const company = typeof companyName === 'string' ? companyName.trim() : '';
+  const context = company && company !== symbol ? `${symbol} · ${company}` : symbol;
   const categoriesChanged = savedCategories.length !== categories.length || categories.some(category => !savedCategories.includes(category));
   const canSubmit = imageMode ? Boolean(file) : categoryMode ? categoriesChanged : notes.trim() !== savedNotes;
 
@@ -59,15 +62,31 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
     setError(message);
   }
 
+  async function closeDialog() {
+    const element = dialog.current;
+    if (!element?.open || element.hasAttribute('data-closing')) return;
+    if (categoryMode) {
+      element.setAttribute('data-closing', '');
+      const animation = element.getAnimations?.().find(item => item.animationName === 'watchlist-category-exit');
+      if (animation) await animation.finished.catch(() => {});
+    }
+    if (element.isConnected) element.close();
+  }
+
+  function handleCancel(event) {
+    if (submitting.current || categoryMode) event.preventDefault();
+    if (categoryMode && !submitting.current) closeDialog();
+  }
+
   async function save(operation, failureMessage, successMessage) {
-    if (disabled || submitting.current) return;
+    if (disabled || submitting.current || dialog.current?.hasAttribute('data-closing')) return;
     submitting.current = true;
     setSaving(true);
     setError('');
     try {
       if (!await operation()) throw new Error(failureMessage);
+      await closeDialog();
       onSaved?.(successMessage);
-      dialog.current?.close();
     } catch (failure) {
       setError(failure.message || failureMessage);
     } finally {
@@ -90,10 +109,22 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
   }
 
   return (
-    <dialog ref={dialog} className="watchlist-dialog" aria-labelledby={titleId} onClose={onClose}
-      onCancel={(event) => { if (submitting.current) event.preventDefault(); }}>
+    <dialog ref={dialog} className={`watchlist-dialog${categoryMode ? ' watchlist-dialog--categories' : ''}`}
+      aria-labelledby={titleId} aria-describedby={categoryMode ? `${contextId} ${hintId}` : undefined}
+      onClose={onClose} onCancel={handleCancel}>
       <form onSubmit={handleSubmit} aria-busy={saving}>
-        <h2 id={titleId}>{title}</h2>
+        {categoryMode ? (
+          <header className="watchlist-category-dialog-heading">
+            <div>
+              <h2 id={titleId}>{t('Ubah kategori')}</h2>
+              <p id={contextId}>{context}</p>
+            </div>
+            <button type="button" className="research-watch watchlist-category-close" aria-label={t('Tutup')}
+              disabled={saving} onClick={closeDialog}>
+              <WorkspaceIcon name="close" size={19} />
+            </button>
+          </header>
+        ) : <h2 id={titleId}>{t(imageMode ? 'Gambar' : 'Catatan')} {symbol}</h2>}
         {imageMode && (
           <>
             {preview?.url && (
@@ -115,17 +146,22 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
           </>
         )}
         {categoryMode && (
-          <fieldset className="watchlist-category-options" disabled={disabled || saving}>
-            <legend className="visually-hidden">{t('Kategori pantauan')}</legend>
-            {Object.entries(watchlistCategories).map(([category, label]) => (
-              <label key={category}>
-                <input type="checkbox" checked={categories.includes(category)} onChange={() => setCategories(current => (
-                  current.includes(category) ? current.filter(value => value !== category) : [...current, category]
-                ))} />
-                {t(label)}
-              </label>
-            ))}
-          </fieldset>
+          <>
+            <fieldset className="watchlist-category-options" disabled={disabled || saving}>
+              <legend className="visually-hidden">{t('Kategori pantauan')}</legend>
+              {Object.entries(watchlistCategories).map(([category, label], index) => (
+                <label key={category}>
+                  <input type="checkbox" autoFocus={index === 0} checked={categories.includes(category)} onChange={() => setCategories(current => (
+                    current.includes(category) ? current.filter(value => value !== category) : [...current, category]
+                  ))} />
+                  {t(label)}
+                </label>
+              ))}
+            </fieldset>
+            <p id={hintId} className="watchlist-category-hint">
+              {t('Kategori adalah label pilihanmu di Pantauan. Gunakan Scanner untuk memeriksa sinyal terkini.')}
+            </p>
+          </>
         )}
         {mode === 'notes' && (
           <label className="research-field">{t("Catatan")}
@@ -136,18 +172,23 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
           </label>
         )}
         {error && <p className="watchlist-dialog-error" role="alert">{t(error)}</p>}
-        {saving && <p className="research-form-help" role="status">{t("Menyimpan perubahan…")}</p>}
+        {saving && <p className={categoryMode ? 'visually-hidden' : 'research-form-help'} role="status">{t("Menyimpan perubahan…")}</p>}
         <div className="watchlist-dialog-actions">
+          {categoryMode && (
+            <button type="button" className="research-watch" disabled={saving} onClick={closeDialog}>{t('Batal')}</button>
+          )}
           {(!imageMode || !imageId || file) && (
             <button type="submit" className="scan-button" disabled={disabled || saving || !canSubmit}>
-              {t(submitLabels[mode])}
+              {t(categoryMode && saving ? 'Menyimpan…' : submitLabels[mode])}
             </button>
           )}
           {imageMode && imageId && (
             <button type="button" className="research-remove" disabled={disabled || saving}
               onClick={() => save(() => account.saveWatchlistImage(symbol, imageId, null), 'Gambar gagal dihapus. Coba lagi.', `Gambar ${symbol} dihapus`)}>{t("Hapus gambar")}</button>
           )}
-          <button type="button" className="research-watch" disabled={saving} onClick={() => dialog.current.close()}>{t("Tutup")}</button>
+          {!categoryMode && (
+            <button type="button" className="research-watch" disabled={saving} onClick={closeDialog}>{t('Tutup')}</button>
+          )}
         </div>
       </form>
     </dialog>
