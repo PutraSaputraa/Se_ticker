@@ -265,7 +265,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  min-height: var(--touch-size);
+  min-height: var(--nav-item-height);
   padding: 0.42rem 0.72rem;
   border: 1px solid transparent;
   border-radius: 999px;
@@ -322,6 +322,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .workspace-nav-mobile { display: none; }
 
 .workspace-bar {
+  --nav-item-height: var(--touch-size);
   position: sticky;
   top: 0;
   z-index: 8;
@@ -467,16 +468,18 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 
 :is(.workspace-bar, .auth-brand-row) .language-switcher { border-color: var(--nav-edge); background: color-mix(in srgb, var(--nav-current) 62%, transparent); }
 :is(.workspace-bar, .auth-brand-row) .language-switcher button { --focus: var(--nav-focus); color: var(--nav-muted); }
-:is(.workspace-bar, .auth-brand-row) .language-switcher button:hover { color: var(--nav-text); }
+.auth-brand-row .language-switcher button:hover { color: var(--nav-text); }
 :is(.workspace-bar, .auth-brand-row) .language-switcher button[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--nav-accent) 45%, transparent);
   background: color-mix(in srgb, var(--nav-accent) 17%, transparent);
   color: var(--nav-accent);
 }
 
-.workspace-bar .language-switcher { background: color-mix(in srgb, var(--nav-current) 62%, transparent); }
-.workspace-bar .language-switcher button { min-width: var(--touch-size); min-height: var(--touch-size); }
-.workspace-bar .language-switcher button:hover:not([aria-pressed="true"]) { background: var(--nav-hover); }
+.workspace-bar .language-switcher {
+  padding: 0;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--nav-edge);
+}
 
 @media (max-width: 23rem) {
   .workspace-bar-inner { gap: 0.25rem; padding-block: 0.45rem; }
@@ -555,22 +558,41 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
 }
 
+.workspace-bar :is(.language-switcher button, .theme-toggle) {
+  min-width: var(--nav-item-height);
+  min-height: var(--nav-item-height);
+  transition-duration: var(--motion-fast);
+}
 .workspace-bar .theme-toggle { color: var(--nav-muted); }
+.workspace-bar .theme-toggle-icon { transition: color var(--motion-fast) var(--motion-ease); }
+.workspace-bar .theme-toggle[aria-pressed="true"] .theme-toggle-icon { color: var(--nav-accent); }
 .workspace-bar .account-menu summary {
   color: var(--nav-text);
   font-weight: 600;
 }
 
-:is(.workspace-bar, .auth-brand-row) :is(.theme-toggle:hover, .account-menu summary:hover) {
+@media (hover: hover) {
+  .workspace-bar :is(.language-switcher button, .theme-toggle):hover:not(:active, :disabled, [aria-disabled="true"]) {
+    transform: translateY(var(--motion-action-lift));
+  }
+  .workspace-bar .language-switcher button:hover:not([aria-pressed="true"]),
+  .workspace-bar .theme-toggle:hover {
+    background: var(--nav-hover);
+    color: var(--nav-text);
+  }
+  .workspace-bar .language-switcher button[aria-pressed="true"]:hover {
+    background: color-mix(in srgb, var(--nav-accent) 23%, transparent);
+  }
+}
+
+.auth-brand-row .theme-toggle:hover,
+:is(.workspace-bar, .auth-brand-row) .account-menu summary:hover {
   background: var(--nav-hover);
   border-color: color-mix(in srgb, var(--nav-accent) 30%, var(--nav-edge));
   color: var(--nav-text);
 }
 
-.workspace-bar :is(
-  .theme-toggle[aria-pressed="true"],
-  .account-menu[open] summary
-) {
+.workspace-bar .account-menu[open] summary {
   border-color: color-mix(in srgb, var(--nav-accent) 45%, transparent);
   background: color-mix(in srgb, var(--nav-accent) 14%, transparent);
   color: var(--nav-accent);
@@ -1117,11 +1139,11 @@ a.symbol-badge:hover { text-decoration: underline; }
 
 @media (max-width: 58rem) {
   :root { scroll-padding-block-end: calc(4.3rem + env(safe-area-inset-bottom)); }
+  .workspace-bar { --nav-item-height: 3.1rem; }
   .workspace-nav-name { display: none; }
   .workspace-nav-mobile { display: inline; }
   .workspace-bar-inner { grid-template-columns: minmax(0, 1fr) auto; min-height: 3.75rem; }
   .workspace-nav {
-    --nav-item-height: 3.1rem;
     --nav-padding: 0.32rem;
     --mobile-nav-height: calc(var(--nav-item-height) + 2 * var(--nav-padding) + 1px + env(safe-area-inset-bottom));
     position: fixed;
@@ -1140,7 +1162,6 @@ a.symbol-badge:hover { text-decoration: underline; }
     justify-content: center;
     gap: 0.18rem;
     padding: 0.31rem 0.12rem;
-    min-height: var(--nav-item-height);
     font-size: 0.76rem;
     line-height: 1.25;
     text-align: center;
