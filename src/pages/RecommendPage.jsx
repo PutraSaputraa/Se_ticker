@@ -1,6 +1,5 @@
 import BreakoutScanner from '../BreakoutScanner.jsx';
 import { formatDate, formatPrice } from '../format.js';
-import { addSymbol } from '../watchlist.js';
 import '../styles/research.css';
 
 export default function RecommendPage({ account }) {
@@ -14,9 +13,7 @@ export default function RecommendPage({ account }) {
         disabled={watchlistDisabled}
         formatPrice={formatPrice}
         formatDate={formatDate}
-        onAdd={(symbol) =>
-          account.update((current) => ({ ...current, watchlist: addSymbol(current.watchlist, symbol) }))
-        }
+        onAdd={account.addWatchlistSymbol}
       />
     </div>
   );

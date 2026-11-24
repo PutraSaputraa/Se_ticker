@@ -14,6 +14,7 @@ export default function WatchlistPage({ account, uid }) {
   const [editor, setEditor] = useState(null);
   const editorTrigger = useRef(null);
   const editorSymbol = useRef(null);
+  const listTitle = useRef(null);
   const [confirmation, setConfirmation] = useState(null);
   const { watchlist } = account;
   const watchlistDisabled = !account.ready || account.pending;
@@ -27,16 +28,21 @@ export default function WatchlistPage({ account, uid }) {
   const result = sync === 'ready' && confirmation;
 
   useLayoutEffect(() => {
-    if (editor || watchlistDisabled) return;
     const trigger = editorTrigger.current;
-    const fallback = [...document.querySelectorAll('[data-watchlist-symbol]')].find((node) => node.dataset.watchlistSymbol === editorSymbol.current)?.querySelector('.watchlist-disclosure');
-    editorTrigger.current = null;
-    editorSymbol.current = null;
+    if (editor || watchlistDisabled || !trigger) return;
     if (document.activeElement === document.body) {
-      const target = trigger?.isConnected && !trigger.disabled ? trigger : fallback;
+      const row = [...document.querySelectorAll('[data-watchlist-symbol]')]
+        .find((node) => node.dataset.watchlistSymbol === editorSymbol.current);
+      const fallback = row?.querySelector('.watchlist-disclosure');
+      const target = trigger.isConnected && !trigger.disabled ? trigger : fallback ?? listTitle.current;
       target?.focus({ preventScroll: true });
     }
-  }, [editor, watchlistDisabled]);
+    // A category change can remove the focused row when the watchlist snapshot arrives.
+    if (document.activeElement !== trigger) {
+      editorTrigger.current = null;
+      editorSymbol.current = null;
+    }
+  }, [editor, watchlistDisabled, watchlist]);
 
   useEffect(() => {
     if (!confirmation) return;
@@ -73,7 +79,7 @@ export default function WatchlistPage({ account, uid }) {
 
       <section className="research-panel watchlist-panel" aria-label={t("Daftar pantauan")}>
         <div className="research-panel-heading watchlist-toolbar motion-enter motion-enter--after">
-          <h2>{t("Daftar pantauan")}</h2>
+          <h2 ref={listTitle} tabIndex={-1}>{t("Daftar pantauan")}</h2>
           <span className="research-sync" data-state={result ? result.error ? 'error' : 'saved' : sync} role="status">
             {sync === 'ready' && !result?.error && <WorkspaceIcon name="check" size={15} />}
             {result ? t(result.message) : t(syncLabel)}

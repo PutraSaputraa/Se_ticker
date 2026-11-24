@@ -7,6 +7,7 @@ import TickerLink from './components/TickerLink.jsx';
 import UpdatedValue from './components/UpdatedValue.jsx';
 import { formatDateCompact, formatVolume } from './format.js';
 import { getStage2Score } from './stage2Score.js';
+import { hasWatchlistCategory, watchlistCategories } from './watchlist.js';
 import { strongWatchStage2, watchPriceStatus, watchVolumePass } from './watchlistSignals.js';
 
 // Skor Trend Template Minervini per simbol (analyze.js tanpa RS agar cepat).
@@ -324,7 +325,7 @@ const WatchlistRow = memo(function WatchlistRow({
   const [expanded, setExpanded] = useState(false);
   const [visited, setVisited] = useState(false);
   const detailsId = useId();
-  const { symbol, priceToWatch, rating, imageId } = entry;
+  const { symbol, priceToWatch, rating, imageId, categories = [] } = entry;
   const quote = row?.status === 'success' ? row.quote : null;
   const direction = quote ? priceDirections[Math.sign(quote.close - quote.open)] : null;
   const decimals = quote ? (['JPY', 'IDR'].includes(quote.currency) ? 0 : 2) : (symbol.endsWith('.JK') ? 0 : 2);
@@ -399,6 +400,20 @@ const WatchlistRow = memo(function WatchlistRow({
                   <h3>{t('Catatan')}</h3>
                   <WatchlistNotes entry={entry} onEdit={onEditEntry} disabled={disabled} />
                 </section>
+                <section className="watchlist-category-details">
+                  <div>
+                    <h3>{t('Kategori pantauan')}</h3>
+                    {categories.length ? (
+                      <ul className="watchlist-category-tags" role="list">
+                        {categories.map(category => <li key={category} className="research-badge">{t(watchlistCategories[category])}</li>)}
+                      </ul>
+                    ) : <p>{t('Belum ada kategori')}</p>}
+                  </div>
+                  <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
+                    aria-label={t('Ubah kategori {0}', symbol)} onClick={event => onEditEntry(entry, 'categories', event.currentTarget)}>
+                    {t('Ubah kategori')}
+                  </button>
+                </section>
                 <div className="watchlist-detail-actions watchlist-image">
                   <button type="button" className="research-watch" disabled={disabled} aria-haspopup="dialog"
                     aria-label={`${t(imageAction)} ${symbol}`} onClick={(event) => onEditEntry(entry, 'image', event.currentTarget)}>{t(imageAction)}</button>
@@ -415,10 +430,11 @@ const WatchlistRow = memo(function WatchlistRow({
 });
 
 const stateRank = { breakout: 0, near: 1, none: 2, unavailable: 3, loading: 3 };
-const signalFilters = {
+const filterLabels = {
   stars: '5 bintang',
   stage: 'Stage 2 ≥ 7/8',
   volume: 'Lolos ambang volume',
+  ...watchlistCategories,
 };
 const sortLabels = {
   rating: 'Bintang tertinggi',
@@ -451,7 +467,8 @@ export default function WatchlistTable({ entries, formatPrice, onRemove, onSetWa
         : row?.status === 'error' ? 'unavailable' : 'loading';
       const matches = { stars: entry.rating === 5, stage: strongWatchStage2(trend), volume: volumePass === true };
       const waitingFor = { stars: false, stage: trend === undefined, volume: state === 'loading' };
-      if (flags.some((flag) => !matches[flag] && !waitingFor[flag])) continue;
+      const passesFilter = flag => matches[flag] ?? hasWatchlistCategory(entry, flag);
+      if (flags.some((flag) => !passesFilter(flag) && !waitingFor[flag])) continue;
       if (status !== 'all' && status !== state && state !== 'loading') continue;
       if (flags.some((flag) => waitingFor[flag]) || (status !== 'all' && state === 'loading')) {
         pending = true;
@@ -488,7 +505,7 @@ export default function WatchlistTable({ entries, formatPrice, onRemove, onSetWa
       <div className="watchlist-filters">
         <div className="watchlist-filter-options" role="group" aria-label={t("Filter pantauan")}>
           <button ref={allButton} type="button" aria-pressed={!filtered} onClick={clearFilters}>{t("Semua saham")}</button>
-          {Object.entries(signalFilters).map(([flag, label]) => (
+          {Object.entries(filterLabels).map(([flag, label]) => (
             <button type="button" key={flag} aria-pressed={flags.includes(flag)} onClick={() => setFlags((current) => (
               current.includes(flag) ? current.filter((value) => value !== flag) : [...current, flag]
             ))}>{t(label)}</button>

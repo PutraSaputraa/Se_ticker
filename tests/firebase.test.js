@@ -15,7 +15,7 @@ import { mergeLegacyData, normalizeAccountData, updateAccountData } from '../src
 import { addTrade, closeTrade, positionPnlUsd } from '../src/journal.js';
 import { journalSetupsCollection } from '../src/journalSetups.js';
 import { closeWalletPosition, openWalletPosition, recordWalletCash, summarizeWallet } from '../src/wallet.js';
-import { addSymbol, removeSymbol, setPriceToWatch } from '../src/watchlist.js';
+import { addSymbol, removeSymbol, setPriceToWatch, setWatchlistCategories } from '../src/watchlist.js';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) {
   throw new Error('Jalankan pengujian melalui Firebase Emulator Suite. Lihat README.');
@@ -117,6 +117,21 @@ test('impor data lama aman diulang dan mempertahankan harga pantauan di akun', a
   assert.equal(watchlist.filter(({ symbol }) => symbol === 'NVDA').length, 1);
   assert.equal(watchlist.find(({ symbol }) => symbol === 'BBCA.JK').priceToWatch, 9000);
   assert.deepEqual(history, ['BBCA.JK', 'NVDA', 'AAPL']);
+});
+
+test('a manual edit and a scanner can update categories for one ticker concurrently', async () => {
+  await updateAccountData(owner.db, uid, (current) => ({ ...current, watchlist: addSymbol(current.watchlist, 'AAPL', 'consolidation') }));
+  await Promise.all([
+    updateAccountData(owner.db, uid, (current) => ({
+      ...current,
+      watchlist: setWatchlistCategories(current.watchlist, 'AAPL', ['consolidation'], ['golden-cross', 'death-cross']),
+    })),
+    updateAccountData(secondDevice.db, uid, (current) => ({ ...current, watchlist: addSymbol(current.watchlist, 'AAPL', 'falling-wedge') })),
+  ]);
+  const snapshot = await getDocFromServer(doc(secondDevice.db, 'users', uid));
+  assert.deepEqual(snapshot.data().watchlist.filter(({ symbol }) => symbol === 'AAPL'), [{
+    symbol: 'AAPL', priceToWatch: null, categories: ['falling-wedge', 'golden-cross', 'death-cross'],
+  }]);
 });
 
 test('edit harga yang terlambat tidak menghidupkan kembali ticker yang sudah dihapus', async () => {

@@ -104,15 +104,16 @@ function CrossReference() {
   );
 }
 
-function CrossActions({ pick, inWatchlist, disabled, onAdd, onInspect }) {
+function CrossActions({ pick, watchlistEntry, disabled, onAdd, onInspect }) {
   const { t } = useTranslation();
+  const category = pick.signal === 'golden' ? 'golden-cross' : 'death-cross';
   return (
     <div className="cross-actions">
       <button type="button" className="research-watch" aria-haspopup="dialog" aria-label={t('Lihat grafik {0}', pick.symbol)}
         onClick={event => onInspect({ pick, trigger: event.currentTarget })}>
         {t('Lihat grafik')}
       </button>
-      <ScannerWatchAction symbol={pick.symbol} inWatchlist={inWatchlist} disabled={disabled} onAdd={onAdd} />
+      <ScannerWatchAction symbol={pick.symbol} entry={watchlistEntry} category={category} disabled={disabled} onAdd={onAdd} />
     </div>
   );
 }
@@ -142,7 +143,7 @@ function CrossList({ method, title, picks, watched, disabled, onAdd, onInspect }
               <span>{t('Tanggal sinyal')}</span>
               <time dateTime={pick.date}>{formatDateCompact(pick.date)}</time>
             </div>
-            <CrossActions pick={pick} inWatchlist={watched.has(pick.symbol)} disabled={disabled} onAdd={onAdd} onInspect={onInspect} />
+            <CrossActions pick={pick} watchlistEntry={watched.get(pick.symbol)} disabled={disabled} onAdd={onAdd} onInspect={onInspect} />
           </div>
         </li>
       ))}
@@ -177,7 +178,9 @@ function CrossTable({ method, title, picks, watched, disabled, onAdd, onInspect 
                 <td className="num">{crossPrice(pick.close, pick.currency)}</td>
                 <td className="num">{crossPrice(pick.fast, pick.currency, 4)}</td>
                 <td className="num">{crossPrice(pick.slow, pick.currency, 4)}</td>
-                <td className="num"><CrossActions pick={pick} inWatchlist={watched.has(pick.symbol)} disabled={disabled} onAdd={onAdd} onInspect={onInspect} /></td>
+                <td className="num">
+                  <CrossActions pick={pick} watchlistEntry={watched.get(pick.symbol)} disabled={disabled} onAdd={onAdd} onInspect={onInspect} />
+                </td>
               </tr>
             ))}
           </tbody>

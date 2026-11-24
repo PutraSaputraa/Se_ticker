@@ -3,7 +3,7 @@ import { doc, getDocFromServer, onSnapshot } from 'firebase/firestore';
 import { auth } from './firebase.js';
 import { db } from './firestore.js';
 import { AccountChangeError, normalizeAccountData, updateAccountData } from './accountData.js';
-import { removeSymbol, setWatchlistImage, setWatchlistNotes } from './watchlist.js';
+import { addSymbol, removeSymbol, setWatchlistCategories, setWatchlistImage, setWatchlistNotes } from './watchlist.js';
 import { deleteWatchlistImage, uploadWatchlistImage } from './watchlistImage.js';
 
 function dataError(error) {
@@ -72,6 +72,17 @@ export default function useAccountData(uid) {
     return (await readAccountFromServer()).journal.some((trade) => trade.id === id);
   }
 
+  function addWatchlistSymbol(symbol, category) {
+    return update((current) => ({ ...current, watchlist: addSymbol(current.watchlist, symbol, category) }));
+  }
+
+  function saveWatchlistCategories(symbol, previous, selected) {
+    return update((current) => {
+      requireWatchlistEntry(current.watchlist, symbol);
+      return { ...current, watchlist: setWatchlistCategories(current.watchlist, symbol, previous, selected) };
+    });
+  }
+
   function saveWatchlistNotes(symbol, previousNotes, value) {
     const notes = value.trim();
     return update((current) => {
@@ -131,6 +142,8 @@ export default function useAccountData(uid) {
     retry: () => setAttempt((value) => value + 1),
     update,
     hasJournalTrade,
+    addWatchlistSymbol,
+    saveWatchlistCategories,
     saveWatchlistNotes,
     saveWatchlistImage,
     removeWatchlistSymbol,

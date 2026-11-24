@@ -2,6 +2,13 @@ import { imageIdPattern } from './imageFile.js';
 
 const storageKey = 'cek-saham:watchlist';
 export const maxWatchlistNotesLength = 2000;
+export const watchlistCategories = {
+  consolidation: 'Konsolidasi',
+  'falling-wedge': 'Falling Wedge',
+  'golden-cross': 'Golden Cross',
+  'death-cross': 'Death Cross',
+};
+const categoryIds = Object.keys(watchlistCategories);
 
 function normalizeRating(rating) {
   return Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : null;
@@ -20,7 +27,14 @@ function normalizeEntry(entry) {
     const rating = normalizeRating(entry.rating);
     const notes = typeof entry.notes === 'string' ? entry.notes.slice(0, maxWatchlistNotesLength).trim() : '';
     const imageId = typeof entry.imageId === 'string' && imageIdPattern.test(entry.imageId) ? entry.imageId : null;
-    return { symbol, priceToWatch, ...(rating !== null && { rating }), ...(notes && { notes }), ...(imageId && { imageId }) };
+    const categories = Array.isArray(entry.categories) ? categoryIds.filter(category => entry.categories.includes(category)) : [];
+    return {
+      symbol, priceToWatch,
+      ...(rating !== null && { rating }),
+      ...(notes && { notes }),
+      ...(imageId && { imageId }),
+      ...(categories.length > 0 && { categories }),
+    };
   }
   return null;
 }
@@ -56,10 +70,18 @@ export function clearLegacyWatchlist() {
   }
 }
 
-export function addSymbol(list, symbol) {
-  return list.some((entry) => entry.symbol === symbol)
-    ? list
-    : [...list, { symbol, priceToWatch: null }];
+export function hasWatchlistCategory(entry, category) {
+  return entry?.categories?.includes(category) ?? false;
+}
+
+export function addSymbol(list, symbol, category) {
+  const entry = list.find((item) => item.symbol === symbol);
+  const validCategory = categoryIds.includes(category);
+  if (!entry) {
+    return [...list, { symbol, priceToWatch: null, ...(validCategory && { categories: [category] }) }];
+  }
+  if (!validCategory || hasWatchlistCategory(entry, category)) return list;
+  return setWatchlistCategories(list, symbol, [], [category]);
 }
 
 export function removeSymbol(list, symbol) {
@@ -78,6 +100,17 @@ export function setWatchlistRating(list, symbol, value) {
   return list.map((entry) =>
     entry.symbol === symbol ? { ...entry, rating } : entry,
   );
+}
+
+export function setWatchlistCategories(list, symbol, previous, selected) {
+  // Apply the editor's changes to the latest entry, which may include categories from another device.
+  const added = selected.filter(category => !previous.includes(category));
+  const removed = previous.filter(category => !selected.includes(category));
+  return list.map((entry) => {
+    if (entry.symbol !== symbol) return entry;
+    const retained = (entry.categories ?? []).filter(category => !removed.includes(category));
+    return normalizeEntry({ ...entry, categories: [...retained, ...added] });
+  });
 }
 
 export function setWatchlistNotes(list, symbol, notes) {

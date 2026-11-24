@@ -1,8 +1,10 @@
 import useTranslation from '../useTranslation.js';
 import { useEffect, useId, useRef, useState } from 'react';
 import { imageContentTypes, imageFileError, maxImageSizeLabel } from '../imageFile.js';
-import { maxWatchlistNotesLength } from '../watchlist.js';
+import { maxWatchlistNotesLength, watchlistCategories } from '../watchlist.js';
 import { downloadWatchlistImage } from '../watchlistImage.js';
+
+const submitLabels = { categories: 'Simpan kategori', image: 'Unggah gambar', notes: 'Simpan catatan' };
 
 export default function WatchlistEntryDialog({ entry, mode, account, uid, disabled, onClose, onSaved }) {
   const { t } = useTranslation();
@@ -11,12 +13,17 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
   const titleId = useId();
   const hintId = useId();
   const imageMode = mode === 'image';
-  const { symbol, imageId, notes: savedNotes = '' } = entry;
+  const categoryMode = mode === 'categories';
+  const { symbol, imageId, categories: savedCategories = [], notes: savedNotes = '' } = entry;
   const [notes, setNotes] = useState(savedNotes);
+  const [categories, setCategories] = useState(savedCategories);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const title = categoryMode ? t('Kategori pantauan {0}', symbol) : `${t(imageMode ? 'Gambar' : 'Catatan')} ${symbol}`;
+  const categoriesChanged = savedCategories.length !== categories.length || categories.some(category => !savedCategories.includes(category));
+  const canSubmit = imageMode ? Boolean(file) : categoryMode ? categoriesChanged : notes.trim() !== savedNotes;
 
   useEffect(() => {
     if (!dialog.current.open) dialog.current.showModal();
@@ -59,7 +66,7 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
     setError('');
     try {
       if (!await operation()) throw new Error(failureMessage);
-      onSaved(successMessage);
+      onSaved?.(successMessage);
       dialog.current?.close();
     } catch (failure) {
       setError(failure.message || failureMessage);
@@ -71,19 +78,23 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
 
   function handleSubmit(event) {
     event.preventDefault();
+    if (!canSubmit) return;
     if (imageMode) {
-      if (file) save(() => account.saveWatchlistImage(symbol, imageId, file), 'Gambar gagal disimpan. Coba lagi.', `Gambar ${symbol} tersimpan`);
-    } else if (notes.trim() !== savedNotes) {
-      save(() => account.saveWatchlistNotes(symbol, savedNotes, notes), 'Catatan gagal disimpan. Coba lagi.', `Catatan ${symbol} tersimpan`);
+      return save(() => account.saveWatchlistImage(symbol, imageId, file), 'Gambar gagal disimpan. Coba lagi.', `Gambar ${symbol} tersimpan`);
     }
+    if (categoryMode) {
+      return save(() => account.saveWatchlistCategories(symbol, savedCategories, categories),
+        'Kategori gagal disimpan. Coba lagi.', `Kategori ${symbol} tersimpan`);
+    }
+    return save(() => account.saveWatchlistNotes(symbol, savedNotes, notes), 'Catatan gagal disimpan. Coba lagi.', `Catatan ${symbol} tersimpan`);
   }
 
   return (
     <dialog ref={dialog} className="watchlist-dialog" aria-labelledby={titleId} onClose={onClose}
       onCancel={(event) => { if (submitting.current) event.preventDefault(); }}>
       <form onSubmit={handleSubmit} aria-busy={saving}>
-        <h2 id={titleId}>{imageMode ? t("Gambar") : t("Catatan")} {symbol}</h2>
-        {imageMode ? (
+        <h2 id={titleId}>{title}</h2>
+        {imageMode && (
           <>
             {preview?.url && (
               <img src={preview.url} alt={file ? t("Pratinjau gambar {0}", symbol) : t("Gambar pantauan {0}", symbol)}
@@ -102,7 +113,21 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
             </label>
             <p className="research-form-help" id={hintId}>{t("PNG, JPG, atau WebP hingga")} {maxImageSizeLabel}{t(". Unggahan disimpan sebagai WebP.")}</p>
           </>
-        ) : (
+        )}
+        {categoryMode && (
+          <fieldset className="watchlist-category-options" disabled={disabled || saving}>
+            <legend className="visually-hidden">{t('Kategori pantauan')}</legend>
+            {Object.entries(watchlistCategories).map(([category, label]) => (
+              <label key={category}>
+                <input type="checkbox" checked={categories.includes(category)} onChange={() => setCategories(current => (
+                  current.includes(category) ? current.filter(value => value !== category) : [...current, category]
+                ))} />
+                {t(label)}
+              </label>
+            ))}
+          </fieldset>
+        )}
+        {mode === 'notes' && (
           <label className="research-field">{t("Catatan")}
             <span className="watchlist-note-editor" data-notes={notes}>
               <textarea rows={5} maxLength={maxWatchlistNotesLength} value={notes} disabled={disabled || saving}
@@ -114,9 +139,8 @@ export default function WatchlistEntryDialog({ entry, mode, account, uid, disabl
         {saving && <p className="research-form-help" role="status">{t("Menyimpan perubahan…")}</p>}
         <div className="watchlist-dialog-actions">
           {(!imageMode || !imageId || file) && (
-            <button type="submit" className="scan-button"
-              disabled={disabled || saving || (imageMode ? !file : notes.trim() === savedNotes)}>
-              {imageMode ? t("Unggah gambar") : t("Simpan catatan")}
+            <button type="submit" className="scan-button" disabled={disabled || saving || !canSubmit}>
+              {t(submitLabels[mode])}
             </button>
           )}
           {imageMode && imageId && (

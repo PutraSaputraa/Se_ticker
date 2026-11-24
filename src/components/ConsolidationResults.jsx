@@ -13,16 +13,19 @@ import {
   validCount,
 } from '../consolidationView.js';
 import useTranslation from '../useTranslation.js';
+import { hasWatchlistCategory, watchlistCategories } from '../watchlist.js';
 import ConsolidationAnalysis from './ConsolidationAnalysis.jsx';
 import {
   ConsolidationHelp, ConsolidationZones, LocationBadge, SessionTime,
   consolidationDuration, consolidationExplanation, pricePositionText,
 } from './ConsolidationInfo.jsx';
+import ScannerWatchAction from './ScannerWatchAction.jsx';
 import TickerLink from './TickerLink.jsx';
 import WorkspaceIcon from './WorkspaceIcon.jsx';
 import '../styles/consolidation.css';
 
 const noResults = [];
+const watchCategory = 'consolidation';
 const locationFilters = ['all', 'support', 'middle', 'resistance'];
 const trackBoundaries = {
   '--support-side': locationBounds.support + '%',
@@ -119,7 +122,7 @@ function RangePosition({ position }) {
   );
 }
 
-function ConsolidationCard({ row, timeframe, watched, saving, disabled, onAdd, onInspect }) {
+function ConsolidationCard({ row, timeframe, watchlistEntry, saving, disabled, onAdd, onInspect }) {
   const { t } = useTranslation();
   const { pick, position } = row;
   const { symbol } = pick;
@@ -132,12 +135,8 @@ function ConsolidationCard({ row, timeframe, watched, saving, disabled, onAdd, o
           {pick.name && <p className="research-company">{pick.name}</p>}
           {pick.universe && <p className="consolidation-muted">{t(pick.universe)}</p>}
         </div>
-        <button type="button" className={'research-watch' + (watched ? ' research-watch--added' : '')}
-          disabled={disabled || saving || watched} aria-busy={saving || undefined}
-          aria-label={t(watched ? '{0} sudah dipantau' : saving ? 'Menyimpan {0} ke Pantauan' : 'Pantau {0}', symbol)}
-          onClick={() => onAdd(symbol)}>
-          {t(watched ? 'Dipantau' : saving ? 'Menyimpan…' : 'Pantau')}
-        </button>
+        <ScannerWatchAction symbol={symbol} entry={watchlistEntry} category={watchCategory}
+          disabled={disabled} saving={saving} onAdd={onAdd} />
       </div>
       <div className="consolidation-price">
         <span>{t('Harga tutup acuan')}</span>
@@ -178,7 +177,8 @@ export default function ConsolidationResults({ result, stale, watched, disabled,
   const activeLocation = hasOutside || location !== 'outside' ? location : 'all';
   const visible = useMemo(() => selectConsolidationCandidates(candidates, activeLocation, sort), [candidates, activeLocation, sort]);
   const canReset = activeLocation !== 'all' || sort !== 'default';
-  const syncing = watchRequest?.status === 'saved' && !watched.has(watchRequest.symbol);
+  const isWatching = symbol => hasWatchlistCategory(watched.get(symbol), watchCategory);
+  const syncing = watchRequest?.status === 'saved' && !isWatching(watchRequest.symbol);
 
   useEffect(() => {
     if (activeLocation !== location) setLocation(activeLocation);
@@ -191,11 +191,11 @@ export default function ConsolidationResults({ result, stale, watched, disabled,
   }, [watchRequest]);
 
   async function addWatch(symbol) {
-    if (disabled || adding.current || watched.has(symbol) || (syncing && watchRequest.symbol === symbol)) return;
+    if (disabled || adding.current || isWatching(symbol) || (syncing && watchRequest.symbol === symbol)) return;
     adding.current = true;
     setWatchRequest({ symbol, status: 'pending' });
     try {
-      const saved = await onAdd(symbol);
+      const saved = await onAdd(symbol, watchCategory);
       setWatchRequest({ symbol, status: saved ? 'saved' : 'error' });
     } catch {
       setWatchRequest({ symbol, status: 'error' });
@@ -239,7 +239,8 @@ export default function ConsolidationResults({ result, stale, watched, disabled,
       )}
       {watchRequest && watchRequest.status !== 'pending' && (
         <p className="research-sync consolidation-watch-feedback" data-state={watchRequest.status} role={watchRequest.status === 'error' ? 'alert' : 'status'}>
-          {t(watchRequest.status === 'saved' ? '{0} ditambahkan ke Pantauan.' : '{0} gagal ditambahkan ke Pantauan. Coba lagi.', watchRequest.symbol)}
+          {t(watchRequest.status === 'saved' ? '{0} ditambahkan ke kategori {1}.' : '{0} gagal ditambahkan ke kategori {1}. Coba lagi.',
+            watchRequest.symbol, t(watchlistCategories[watchCategory]))}
         </p>
       )}
       {picks.length > candidates.length && <p className="consolidation-muted">
@@ -249,7 +250,7 @@ export default function ConsolidationResults({ result, stale, watched, disabled,
         <ul className="consolidation-list" role="list" aria-label={t('Kandidat konsolidasi')}>
           {visible.map((row) => (
             <ConsolidationCard key={row.pick.symbol} row={row} timeframe={result.timeframe}
-              watched={watched.has(row.pick.symbol)} disabled={disabled}
+              watchlistEntry={watched.get(row.pick.symbol)} disabled={disabled}
               saving={watchRequest?.symbol === row.pick.symbol && (watchRequest.status === 'pending' || syncing)}
               onAdd={addWatch} onInspect={setSelection} />
           ))}

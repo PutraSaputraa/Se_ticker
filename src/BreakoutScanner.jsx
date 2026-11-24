@@ -123,7 +123,7 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice, volumeScale
                 <ScanVolume ratio={pick.volumeRatio} scale={volumeScale} />
               </td>
               <td>{pick.date ? <time dateTime={pick.date}>{formatDateCompact(pick.date)}</time> : t("Tidak tersedia")}</td>
-              <td className="num"><WatchAction symbol={pick.symbol} inWatchlist={watched.has(pick.symbol)} disabled={disabled} onAdd={onAdd} /></td>
+              <td className="num"><WatchAction symbol={pick.symbol} entry={watched.get(pick.symbol)} disabled={disabled} onAdd={onAdd} /></td>
             </tr>
           ))}
         </tbody>
@@ -132,7 +132,7 @@ function ScanTable({ results, watched, disabled, onAdd, formatPrice, volumeScale
   );
 }
 
-function ScanListItem({ pick, inWatchlist, disabled, onAdd, formatPrice, formatDate, volumeScale }) {
+function ScanListItem({ pick, watchlistEntry, disabled, onAdd, formatPrice, formatDate, volumeScale }) {
   const { t } = useTranslation();
   return (
     <li className="scan-list-item">
@@ -170,7 +170,7 @@ function ScanListItem({ pick, inWatchlist, disabled, onAdd, formatPrice, formatD
           {pick.universe && <div><dt>{t("Cakupan")}</dt><dd>{t(pick.universe)}</dd></div>}
         </dl>
         {pick.aiNote && <p className="research-scan-note"><strong>{t("Catatan AI")}</strong><br />{pick.aiNote}</p>}
-        <WatchAction symbol={pick.symbol} inWatchlist={inWatchlist} disabled={disabled} onAdd={onAdd} />
+        <WatchAction symbol={pick.symbol} entry={watchlistEntry} disabled={disabled} onAdd={onAdd} />
       </details>
     </li>
   );
@@ -203,7 +203,7 @@ function ScanResults({ results, watched, disabled, onAdd, formatPrice, formatDat
           <ScanListItem
             key={pick.symbol}
             pick={pick}
-            inWatchlist={watched.has(pick.symbol)}
+            watchlistEntry={watched.get(pick.symbol)}
             disabled={disabled}
             onAdd={onAdd}
             formatPrice={formatPrice}
@@ -338,7 +338,7 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
     if (request.status === 'success' || request.status === 'error') run(mode, region, next);
   }
 
-  const watched = useMemo(() => new Set(watchlist.map((entry) => entry.symbol)), [watchlist]);
+  const watched = useMemo(() => new Map(watchlist.map((entry) => [entry.symbol, entry])), [watchlist]);
   const finished = request.status === 'success';
   const matchingRegion = lastResult?.region === region;
   const scopeMatches = usesTimeframe ? matchingRegion && lastResult?.timeframe === timeframe : !isWedge || matchingRegion;

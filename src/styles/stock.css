@@ -163,6 +163,9 @@
   line-height: 1.4;
 }
 
+.stock-watch { display: grid; gap: 0.4rem; min-width: 0; }
+.stock-watch-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+
 .stock-identity .watch-toggle {
   padding-inline: 1rem;
   white-space: nowrap;

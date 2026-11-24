@@ -6,6 +6,7 @@ import CandlestickChart from '../CandlestickChart.jsx';
 import MinerviniPanel from '../components/MinerviniPanel.jsx';
 import TableScroll from '../components/TableScroll.jsx';
 import UpdatedValue from '../components/UpdatedValue.jsx';
+import WatchlistEntryDialog from '../components/WatchlistEntryDialog.jsx';
 import {
   formatCompactNumber,
   formatDate,
@@ -15,7 +16,7 @@ import {
   formatVolume,
 } from '../format.js';
 import { suggestTickerAlternatives } from '../tickers.js';
-import { addSymbol } from '../watchlist.js';
+import { watchlistCategories } from '../watchlist.js';
 import '../styles/stock.css';
 
 const serviceError = 'Layanan harga tidak dapat diakses. Coba lagi.';
@@ -235,10 +236,12 @@ function StockDetail({ symbol, account }) {
   const [chartData, setChartData] = useState({ status: 'idle' });
   const [chartAttempt, setChartAttempt] = useState(0);
   const [minervini, setMinervini] = useState({ status: 'loading' });
+  const [categoryEntry, setCategoryEntry] = useState(null);
 
   const { watchlist } = account;
   const watchlistDisabled = !account.ready || account.pending;
-  const inWatchlist = watchlist.some((entry) => entry.symbol === symbol);
+  const watchlistEntry = watchlist.find((entry) => entry.symbol === symbol);
+  const inWatchlist = Boolean(watchlistEntry);
   const quote = result.status === 'success' ? result.quote : null;
 
   useEffect(() => {
@@ -312,10 +315,7 @@ function StockDetail({ symbol, account }) {
 
   function toggleWatchlist() {
     if (inWatchlist) return account.removeWatchlistSymbol(symbol);
-    account.update((current) => ({
-      ...current,
-      watchlist: addSymbol(current.watchlist, symbol),
-    }));
+    return account.addWatchlistSymbol(symbol);
   }
 
   useEffect(() => {
@@ -407,15 +407,26 @@ function StockDetail({ symbol, account }) {
                 <h1>{quote.name}</h1>
                 <p className="stock-muted">{t("Sesi acuan ·")} <time dateTime={quote.date}>{formatDate(quote.date)}</time></p>
               </div>
-              <button
-                type="button"
-                className={`watch-toggle${inWatchlist ? ' watch-toggle--active' : ''}`}
-                onClick={toggleWatchlist}
-                aria-pressed={inWatchlist}
-                disabled={watchlistDisabled}
-              >
-                {inWatchlist ? t("✓ Dipantau") : t("+ Pantau")}
-              </button>
+              <div className="stock-watch">
+                <div className="stock-watch-actions">
+                  <button
+                    type="button"
+                    className={`watch-toggle${inWatchlist ? ' watch-toggle--active' : ''}`}
+                    onClick={toggleWatchlist}
+                    aria-pressed={inWatchlist}
+                    disabled={watchlistDisabled}
+                  >
+                    {inWatchlist ? t("✓ Dipantau") : t("+ Pantau")}
+                  </button>
+                  {inWatchlist && (
+                    <button type="button" className="research-watch" disabled={watchlistDisabled} aria-haspopup="dialog"
+                      onClick={() => setCategoryEntry(watchlistEntry)}>{t('Ubah kategori')}</button>
+                  )}
+                </div>
+                {watchlistEntry?.categories?.length > 0 && (
+                  <p className="stock-muted">{watchlistEntry.categories.map(category => t(watchlistCategories[category])).join(' · ')}</p>
+                )}
+              </div>
             </div>
             <div className="stock-quote">
               <div className="stock-quote-heading">
@@ -565,6 +576,10 @@ function StockDetail({ symbol, account }) {
 
           <FundamentalsTable fundamentals={quote.fundamentals} />
         </article>
+      )}
+      {categoryEntry && (
+        <WatchlistEntryDialog entry={categoryEntry} mode="categories" account={account} disabled={watchlistDisabled}
+          onClose={() => setCategoryEntry(null)} />
       )}
     </div>
   );

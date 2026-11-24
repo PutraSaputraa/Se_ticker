@@ -124,7 +124,8 @@ export default function FallingWedgeResults({ result, stale, watched, disabled, 
                   {pick.name && <p className="research-company">{pick.name}</p>}
                   {pick.universe && <p className="consolidation-muted">{t(pick.universe)}</p>}
                 </div>
-                <ScannerWatchAction symbol={pick.symbol} inWatchlist={watched.has(pick.symbol)} disabled={disabled} onAdd={onAdd} />
+                <ScannerWatchAction symbol={pick.symbol} entry={watched.get(pick.symbol)} category="falling-wedge"
+                  disabled={disabled} onAdd={onAdd} />
               </div>
               <div className="consolidation-price">
                 <span>{t('Harga tutup breakout 1D')}</span>

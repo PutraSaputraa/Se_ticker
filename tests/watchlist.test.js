@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  addSymbol,
+  hasWatchlistCategory,
   normalizeWatchlist,
   removeSymbol,
   setPriceToWatch,
+  setWatchlistCategories,
   setWatchlistImage,
   setWatchlistNotes,
   setWatchlistRating,
@@ -41,14 +44,19 @@ test('rating dan harga pantauan bisa diubah sendiri, dan rating terlambat tidak 
 });
 
 test('catatan dan gambar tetap tersimpan saat harga atau bintang ticker berubah', () => {
-  const initial = normalizeWatchlist(['NVDA', { symbol: 'BBCA.JK', priceToWatch: 9000, rating: 2 }]);
+  const initial = normalizeWatchlist(['NVDA', {
+    symbol: 'BBCA.JK', priceToWatch: 9000, rating: 2, categories: ['consolidation'],
+  }]);
   const noted = setWatchlistNotes(initial, 'BBCA.JK', '  Pantau volume\nDekat resistance  ');
   const attached = setWatchlistImage(noted, 'BBCA.JK', 'image-1');
   const repriced = setPriceToWatch(attached, 'BBCA.JK', 9200);
   const updated = normalizeWatchlist(setWatchlistRating(repriced, 'BBCA.JK', 5));
   assert.deepEqual(updated, [
     { symbol: 'NVDA', priceToWatch: null },
-    { symbol: 'BBCA.JK', priceToWatch: 9200, rating: 5, notes: 'Pantau volume\nDekat resistance', imageId: 'image-1' },
+    {
+      symbol: 'BBCA.JK', priceToWatch: 9200, rating: 5, notes: 'Pantau volume\nDekat resistance',
+      imageId: 'image-1', categories: ['consolidation'],
+    },
   ]);
   const withoutImage = setWatchlistImage(updated, 'BBCA.JK', null);
   assert.equal(withoutImage[1].imageId, undefined);
@@ -59,6 +67,35 @@ test('catatan dan gambar tetap tersimpan saat harga atau bintang ticker berubah'
   const removed = removeSymbol(updated, 'BBCA.JK');
   assert.deepEqual(setWatchlistNotes(removed, 'BBCA.JK', 'Catatan terlambat'), removed);
   assert.deepEqual(setWatchlistImage(removed, 'BBCA.JK', 'image-2'), removed);
+});
+
+test('watchlist keeps supported categories and adds scan categories to the same ticker', () => {
+  const initial = normalizeWatchlist([
+    { symbol: 'AAPL', rating: 5, categories: ['golden-cross', 'custom', 'golden-cross'] },
+    { symbol: 'NVDA', categories: 'falling-wedge' },
+  ]);
+  assert.deepEqual(initial, [
+    { symbol: 'AAPL', priceToWatch: null, rating: 5, categories: ['golden-cross'] },
+    { symbol: 'NVDA', priceToWatch: null },
+  ]);
+  const watched = addSymbol(addSymbol(initial, 'AAPL', 'falling-wedge'), 'QCOM', 'death-cross');
+  assert.deepEqual(watched, [
+    { ...initial[0], categories: ['falling-wedge', 'golden-cross'] }, initial[1],
+    { symbol: 'QCOM', priceToWatch: null, categories: ['death-cross'] },
+  ]);
+  assert.equal(hasWatchlistCategory(watched[0], 'golden-cross'), true);
+  assert.equal(hasWatchlistCategory(watched[1], 'falling-wedge'), false);
+  assert.equal(addSymbol(watched, 'AAPL', 'falling-wedge'), watched);
+  assert.equal(addSymbol(watched, 'AAPL'), watched);
+});
+
+test('manual category edits preserve categories added after opening the editor', () => {
+  const initial = [{ symbol: 'AAPL', priceToWatch: 120, categories: ['consolidation', 'golden-cross'] }];
+  const latest = addSymbol(initial, 'AAPL', 'falling-wedge');
+  const edited = setWatchlistCategories(latest, 'AAPL', initial[0].categories, ['golden-cross', 'death-cross']);
+  assert.deepEqual(edited, [{ symbol: 'AAPL', priceToWatch: 120, categories: ['falling-wedge', 'golden-cross', 'death-cross'] }]);
+  assert.deepEqual(setWatchlistCategories(edited, 'AAPL', edited[0].categories, []), [{ symbol: 'AAPL', priceToWatch: 120 }]);
+  assert.deepEqual(setWatchlistCategories([], 'AAPL', [], ['golden-cross']), []);
 });
 
 test('watchlist volume uses either verified session and leaves unavailable data unclassified', () => {

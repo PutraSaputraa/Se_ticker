@@ -429,6 +429,35 @@
 .watchlist-dialog:has(textarea) { width: min(51rem, calc(100% - 1.5rem)); }
 .watchlist-dialog form { display: grid; gap: 0.75rem; }
 .watchlist-dialog h2 { font-size: 1.125rem; overflow-wrap: anywhere; }
+.watchlist-category-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.watchlist-category-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: var(--touch-size);
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--field);
+  font-size: 0.875rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.watchlist-category-options label:has(input:enabled) { cursor: pointer; }
+.watchlist-category-options label:has(input:checked) {
+  border-color: var(--action-text);
+  background: var(--workspace-action-soft);
+}
+.watchlist-category-options input { flex: none; margin: 0; accent-color: var(--workspace-action); }
+
 .watchlist-note-editor {
   display: grid;
   min-inline-size: 0;
@@ -591,6 +620,15 @@
 .watchlist-volume-details ul { display: grid; gap: 0.4rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
 .watchlist-volume-details li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2rem 0.7rem; }
 .watchlist-volume-details li span { font-variant-numeric: tabular-nums; }
+.watchlist-category-details {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+}
+.watchlist-category-details p { color: var(--muted); font-size: 0.875rem; }
+.watchlist-category-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
 .watchlist-detail-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .watchlist-disclosure { position: relative; display: inline-flex; align-items: center; gap: 0.25rem; }
 .watchlist-disclosure svg { transition: transform var(--motion-standard) var(--motion-ease); }
