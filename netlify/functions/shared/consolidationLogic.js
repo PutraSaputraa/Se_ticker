@@ -1,4 +1,4 @@
-import { completedMarketWeekFriday, cryptoWeeks, marketWeekFriday } from './sessionLogic.js';
+import { completedMarketWeekFriday, cryptoWeeks, marketWeekFriday, summarizeWeeklyCandle } from './sessionLogic.js';
 
 const settings = {
   daily: { lookbacks: [40, 60, 90, 120, 150, 180], pivotRadius: 2 },
@@ -14,13 +14,14 @@ function validPriceBar(bar) {
     && bar.low > 0 && bar.close >= bar.low && bar.close <= bar.high;
 }
 
-function summarizeWeek(bars) {
+function summarizeWeek(bars, includeOhlcv = false) {
   const { date, close } = bars.at(-1);
   if (!bars.every(validPriceBar)) return { date, close: null };
+  if (includeOhlcv) return summarizeWeeklyCandle(bars);
   return { date, close, high: Math.max(...bars.map(bar => bar.high)), low: Math.min(...bars.map(bar => bar.low)) };
 }
 
-export function consolidationWeeks(sessions, completedIndex, marketDay) {
+export function consolidationWeeks(sessions, completedIndex, marketDay, { includeOhlcv = false } = {}) {
   const completedDate = sessions[completedIndex]?.date;
   const cutoff = completedMarketWeekFriday(marketDay, completedDate);
   if (!cutoff) return [];
@@ -38,12 +39,12 @@ export function consolidationWeeks(sessions, completedIndex, marketDay) {
     const { date } = bars.at(-1);
     // Keep invalid weeks as gaps so an incomplete reference cannot silently
     // turn an older close into the latest weekly close.
-    return date > completedDate ? { date, close: null } : summarizeWeek(bars);
+    return date > completedDate ? { date, close: null } : summarizeWeek(bars, includeOhlcv);
   });
 }
 
 export function cryptoConsolidationWeeks(days, endIndex) {
-  return cryptoWeeks(days, endIndex).filter(bars => bars.length === 7).map(summarizeWeek);
+  return cryptoWeeks(days, endIndex).filter(bars => bars.length === 7).map(bars => summarizeWeek(bars));
 }
 
 // Position spans the two outer edges. Keep values outside 0–100 for callers

@@ -9,6 +9,7 @@ import {
   dayMilliseconds,
   latestCompletedIndex,
   readSessions,
+  summarizeWeeklyCandle,
   volumeLookback,
 } from './sessionLogic.js';
 import { analyzeBaseBreakout } from './breakoutLogic.js';
@@ -218,9 +219,14 @@ async function scanRegion(region, mode) {
             if (cryptoDay) {
               const endIndex = completedCryptoWeekIndex(sessions, cryptoDay);
               sessions = consolidation ? cryptoConsolidationWeeks(sessions, endIndex)
-                : cryptoWeeks(sessions, endIndex).map(week => week.at(-1));
+                : cryptoWeeks(sessions, endIndex).map(week => {
+                  // The scanner uses the Sunday close even when the rest of the week is incomplete.
+                  if (week.length === 7) return summarizeWeeklyCandle(week);
+                  const { date, close } = week.at(-1);
+                  return { date, close };
+                });
             } else {
-              sessions = consolidationWeeks(sessions, index, evaluated.marketDay);
+              sessions = consolidationWeeks(sessions, index, evaluated.marketDay, { includeOhlcv: Boolean(crossScan) });
             }
             index = sessions.length - 1;
           }
@@ -228,7 +234,7 @@ async function scanRegion(region, mode) {
           if (!Number.isFinite(close)) continue;
           const instrument = { symbol: evaluated.symbol, name: evaluated.name, currency: evaluated.currency ?? currency, universe: name, date, close };
           if (crossScan) {
-            const signals = findMovingAverageCrosses(sessions, index);
+            const signals = findMovingAverageCrosses(sessions, index, { includeCandles: true });
             if (signals === null) continue;
             for (const signal of signals) picks.push({ ...instrument, ...signal });
           } else {

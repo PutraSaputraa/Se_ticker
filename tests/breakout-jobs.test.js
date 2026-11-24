@@ -310,7 +310,10 @@ test('Golden Cross jobs scan both averages on the last completed daily or weekly
   const timestamps = Array.from({ length: 205 }, (_, index) => (fridayOpen - (205 - index) * 7 * dayMs) / 1000);
   timestamps.push((fridayOpen - dayMs) / 1000, fridayOpen / 1000);
   const closes = [...Array(205).fill(100), 150, 150];
-  const quote = { open: closes, high: closes, low: closes, close: closes };
+  const quote = {
+    open: [...Array(205).fill(100), 130, 145], high: [...Array(205).fill(100), 160, 155],
+    low: [...Array(205).fill(100), 125, 140], close: closes, volume: [...Array(205).fill(100), 400, 600],
+  };
   let body;
   const ranges = new Set();
   mockJobStore(t, (url, init) => {
@@ -348,17 +351,29 @@ test('Golden Cross jobs scan both averages on the last completed daily or weekly
   }
 
   const signals = result => result.results.map(({ symbol, method, signal, date }) => [symbol, method, signal, date]);
-  assert.deepEqual(signals(await runJob('daily')), [
+  const daily = await runJob('daily');
+  assert.deepEqual(signals(daily), [
     ['000333.SZ', 'SMA', 'golden', '2026-11-19'], ['000333.SZ', 'EMA', 'golden', '2026-11-19'],
   ]);
+  for (const { candles, fast, slow } of daily.results) {
+    assert.equal(candles.length, 60);
+    assert.equal(candles[0].slow, null);
+    assert.equal(candles.at(-2).fast, 100);
+    assert.equal(candles.at(-2).slow, 100);
+    assert.deepEqual(candles.at(-1), { date: '2026-11-19', open: 130, high: 160, low: 125, close: 150, volume: 400, fast, slow });
+  }
   const openWeek = await runJob('weekly');
   assert.deepEqual(openWeek.referenceSessions, ['2026-11-13']);
   assert.deepEqual(openWeek.results, []);
 
   t.mock.timers.setTime(fridayEnd + 60_000);
-  assert.deepEqual(signals(await runJob('weekly')), [
+  const weekly = await runJob('weekly');
+  assert.deepEqual(signals(weekly), [
     ['000333.SZ', 'SMA', 'golden', '2026-11-20'], ['000333.SZ', 'EMA', 'golden', '2026-11-20'],
   ]);
+  for (const { candles, fast, slow } of weekly.results) {
+    assert.deepEqual(candles.at(-1), { date: '2026-11-20', open: 130, high: 160, low: 125, close: 150, volume: 1000, fast, slow });
+  }
   assert.deepEqual((await runJob('daily')).results, []);
   assert.deepEqual(ranges, new Set(['5y', '10y']));
 });
@@ -383,7 +398,7 @@ test('crypto Golden Cross jobs use weekend closes and wait for Monday 00:00 UTC 
     const close = [...Array(historyLength - 2).fill(100), ...weekend];
     return Response.json({ chart: { result: [{
       meta: { symbol, currency: 'USD', exchangeTimezoneName: 'UTC' },
-      timestamp: timestamps, indicators: { quote: [{ close, high: close, low: close, open: close }] },
+      timestamp: timestamps, indicators: { quote: [{ close, high: close, low: close, open: close, volume: close.map(() => 20) }] },
     }] } });
   });
 
@@ -414,6 +429,13 @@ test('crypto Golden Cross jobs use weekend closes and wait for Monday 00:00 UTC 
     ['BTC-USD', 'SMA', 'golden', '2026-11-22'], ['BTC-USD', 'EMA', 'golden', '2026-11-22'],
     ['ETH-USD', 'SMA', 'death', '2026-11-22'], ['ETH-USD', 'EMA', 'death', '2026-11-22'],
   ]);
+  for (const { signal, candles, fast, slow } of closedWeek.results) {
+    const isGolden = signal === 'golden';
+    assert.deepEqual(candles.at(-1), {
+      date: '2026-11-22', open: 100, high: isGolden ? 150 : 100, low: isGolden ? 100 : 50,
+      close: isGolden ? 150 : 50, volume: 140, fast, slow,
+    });
+  }
   assert.deepEqual(signals(await runScan('golden-cross-daily', 'crypto')), [
     ['ETH-USD', 'SMA', 'death', '2026-11-22'], ['ETH-USD', 'EMA', 'death', '2026-11-22'],
   ]);

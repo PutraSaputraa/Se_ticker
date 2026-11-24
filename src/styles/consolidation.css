@@ -398,6 +398,14 @@
 }
 .consolidation-analysis :is(h3, p, dl) { min-width: 0; }
 .consolidation-analysis h3 { font-size: 1rem; }
+.consolidation-analysis .candle-chart { min-width: 0; }
+.consolidation-analysis .candle-chart-head h2 { font-size: 1rem; }
+.consolidation-analysis .candle-chart-head .stock-muted { margin-block-start: 0.2rem; }
+.consolidation-analysis .candle-grid {
+  grid-template-rows: clamp(10.5rem, min(31cqi, 33dvh), 22rem) clamp(2.5rem, 7dvh, 3.75rem) auto;
+  margin-block-start: 0.55rem;
+}
+.consolidation-analysis :is(.candle-legend, .candle-readout) { margin-block-start: 0.55rem; }
 .consolidation-analysis-history,
 .consolidation-analysis-facts {
   display: grid;

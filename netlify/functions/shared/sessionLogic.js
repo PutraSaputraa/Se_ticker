@@ -51,6 +51,23 @@ export function cryptoWeeks(days, endIndex) {
   return weeks.reverse();
 }
 
+export function summarizeWeeklyCandle(bars) {
+  const { date, close } = bars.at(-1);
+  const { open } = bars[0];
+  if (!Number.isFinite(open) || !bars.every(bar => [bar.high, bar.low, bar.close].every(Number.isFinite))) {
+    return { date, close };
+  }
+
+  return {
+    date,
+    open,
+    high: Math.max(...bars.map(bar => bar.high)),
+    low: Math.min(...bars.map(bar => bar.low)),
+    close,
+    volume: bars.every(bar => Number.isFinite(bar.volume)) ? bars.reduce((sum, bar) => sum + bar.volume, 0) : null,
+  };
+}
+
 export function readSessions(timestamps, quote, marketDate) {
   const sessions = new Map();
 

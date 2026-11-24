@@ -2,14 +2,18 @@ import { sma } from './minervini.js';
 
 const fastPeriod = 50;
 const slowPeriod = 200;
+const chartLookback = 60;
 
-function latestEmas(closes, period) {
+function emaSeries(closes, period) {
   const weight = 2 / (period + 1);
+  const values = Array(period - 1).fill(null);
   let previous = sma(closes, period - 1, period);
-  for (let index = period; index < closes.length - 1; index += 1) {
+  values.push(previous);
+  for (let index = period; index < closes.length; index += 1) {
     previous += (closes[index] - previous) * weight;
+    values.push(previous);
   }
-  return [previous, previous + (closes.at(-1) - previous) * weight];
+  return values;
 }
 
 function averageOrder(fast, slow) {
@@ -19,7 +23,7 @@ function averageOrder(fast, slow) {
   return Math.abs(difference) <= tolerance ? 0 : Math.sign(difference);
 }
 
-export function findMovingAverageCrosses(sessions, end) {
+export function findMovingAverageCrosses(sessions, end, { includeCandles = false } = {}) {
   // Both the latest and preceding candles need a valid 200-period average.
   let start = end;
   while (start >= 0) {
@@ -31,20 +35,36 @@ export function findMovingAverageCrosses(sessions, end) {
 
   const closes = sessions.slice(start + 1, end + 1).map(({ close }) => close);
   const last = closes.length - 1;
+  const fastEmas = emaSeries(closes, fastPeriod);
+  const slowEmas = emaSeries(closes, slowPeriod);
   const averages = [
     {
       method: 'SMA',
-      fast: [sma(closes, last - 1, fastPeriod), sma(closes, last, fastPeriod)],
-      slow: [sma(closes, last - 1, slowPeriod), sma(closes, last, slowPeriod)],
+      fastAt: index => sma(closes, index, fastPeriod),
+      slowAt: index => sma(closes, index, slowPeriod),
     },
-    { method: 'EMA', fast: latestEmas(closes, fastPeriod), slow: latestEmas(closes, slowPeriod) },
+    { method: 'EMA', fastAt: index => fastEmas[index], slowAt: index => slowEmas[index] },
   ];
 
-  return averages.flatMap(({ method, fast: [previousFast, fast], slow: [previousSlow, slow] }) => {
-    const previous = averageOrder(previousFast, previousSlow);
+  return averages.flatMap(({ method, fastAt, slowAt }) => {
+    const fast = fastAt(last);
+    const slow = slowAt(last);
+    const previous = averageOrder(fastAt(last - 1), slowAt(last - 1));
     const current = averageOrder(fast, slow);
-    if (previous <= 0 && current > 0) return [{ method, signal: 'golden', fast, slow }];
-    if (previous >= 0 && current < 0) return [{ method, signal: 'death', fast, slow }];
-    return [];
+    let signal;
+    if (previous <= 0 && current > 0) signal = 'golden';
+    else if (previous >= 0 && current < 0) signal = 'death';
+    else return [];
+
+    const result = { method, signal, fast, slow };
+    if (includeCandles) {
+      const first = last - chartLookback + 1;
+      result.candles = sessions.slice(end - chartLookback + 1, end + 1).map((bar, offset) => ({
+        ...bar,
+        fast: fastAt(first + offset),
+        slow: slowAt(first + offset),
+      }));
+    }
+    return [result];
   });
 }

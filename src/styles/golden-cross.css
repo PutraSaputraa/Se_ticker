@@ -53,8 +53,17 @@
   background: var(--surface);
 }
 .cross-table thead th:first-child { width: 23%; }
+.cross-table thead th:last-child { width: 12.75rem; }
 .cross-table .num { white-space: normal; overflow-wrap: anywhere; }
 .cross-table tbody th { background: var(--surface); }
+
+.cross-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+.cross-actions .research-watch { white-space: nowrap; }
 
 .cross-group .cross-list {
   margin: 0;
@@ -74,6 +83,7 @@
 }
 .cross-list-date { display: grid; gap: 0.15rem; font-size: 0.875rem; }
 .cross-list-date span { color: var(--muted); font-size: 0.8125rem; }
+.cross-list-footer .cross-actions { margin-inline-start: auto; }
 
 .cross-empty { margin: 0; padding: 0 0.85rem 0.7rem; }
 
@@ -88,3 +98,32 @@
 }
 .cross-reference tbody th { background: transparent; color: var(--text); }
 .cross-reference tbody tr:last-child th { border-bottom: 0; }
+
+.cross-analysis {
+  --cross-fast-line: #b45309;
+  --cross-slow-line: #245db5;
+  --cross-signal: var(--positive);
+}
+.cross-analysis[data-signal="death"] { --cross-signal: var(--negative); }
+:root[data-theme="dark"] .cross-analysis {
+  --cross-fast-line: #ffad59;
+  --cross-slow-line: #75a9ff;
+}
+
+@media (width > 54rem) {
+  .cross-analysis .consolidation-analysis-body { grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); }
+}
+
+.cross-analysis .candle-reference { fill: color-mix(in srgb, var(--cross-signal) 18%, transparent); }
+.cross-analysis .candle-reference-marker {
+  stroke: var(--cross-signal);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 3;
+}
+.cross-analysis .candle-average-line { stroke-width: 2; }
+.cross-analysis .candle-average-line--fast { stroke: var(--cross-fast-line); }
+.cross-analysis .candle-average-line--slow { stroke: var(--cross-slow-line); stroke-dasharray: 5 3; }
+.cross-analysis .candle-legend--ma-fast::before { border-color: var(--cross-fast-line); border-top-style: solid; }
+.cross-analysis .candle-legend--ma-slow::before { border-color: var(--cross-slow-line); }
+.cross-analysis .candle-legend--reference::before { border-color: var(--cross-signal); border-top-style: dotted; }
+.cross-analysis .candle-readout dl { grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr)); }
