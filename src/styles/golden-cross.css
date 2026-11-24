@@ -126,4 +126,4 @@
 .cross-analysis .candle-legend--ma-fast::before { border-color: var(--cross-fast-line); border-top-style: solid; }
 .cross-analysis .candle-legend--ma-slow::before { border-color: var(--cross-slow-line); }
 .cross-analysis .candle-legend--reference::before { border-color: var(--cross-signal); border-top-style: dotted; }
-.cross-analysis .candle-readout dl { grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr)); }
+.cross-analysis .candle-readout dl { grid-template-columns: repeat(auto-fit, minmax(min(100%, 4.5rem), 1fr)); }

@@ -1,6 +1,6 @@
 import { localizedDateFormat } from './i18n.js';
 import useTranslation from './useTranslation.js';
-import { useEffect, useId, useRef, useState } from 'react';
+import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { formatCompactNumber, formatDateCompact } from './format.js';
 
 const axisDateFormat = localizedDateFormat({
@@ -13,22 +13,54 @@ const defaultRanges = [
   { value: '1d', label: 'Harian' },
   { value: '1wk', label: 'Mingguan' },
 ];
+const noMovingAverages = [];
+const priceFields = [
+  ['open', 'Buka'], ['high', 'Tertinggi'], ['low', 'Terendah'], ['close', 'Tutup'],
+];
 
-function CandleReadout({ id, session, active, isReference, referenceLabel, averages, formatDate, formatPrice, formatVolume }) {
-  const { t } = useTranslation();
+const CandleReadoutSpace = memo(function CandleReadoutSpace({ values }) {
+  // Measure the displayed values at the current width so wrapping cannot move the chart.
+  return Array.from(new Set(values), value => (
+    <span key={value} className="candle-readout-sample" aria-hidden="true">{value}</span>
+  ));
+});
+
+function CandleReadout({
+  id, sessions, index, active, referenceDate, referenceLabel, movingAverages, formatDate, formatPrice, formatVolume,
+}) {
+  const { t, language } = useTranslation();
+  const { dates, fields, hasReference } = useMemo(() => ({
+    dates: sessions.map(({ date }) => formatDate(date)),
+    fields: [
+      ...priceFields.map(([key, label]) => ({ key, label, values: sessions.map(bar => formatPrice(bar[key])) })),
+      { key: 'volume', label: 'Volume', values: sessions.map(({ volume }) => formatVolume(volume)) },
+      ...movingAverages.map(({ kind, label, values }) => ({
+        key: `average-${kind}`, label, values: sessions.map((_, position) => formatPrice(values[position])),
+      })),
+    ],
+    hasReference: sessions.some(({ date }) => date === referenceDate),
+  }), [sessions, movingAverages, referenceDate, formatDate, formatPrice, formatVolume, language]);
+  const date = sessions[index].date;
+
   return (
     <div className={active ? 'candle-readout candle-tooltip' : 'candle-readout'} id={id} role={active ? 'tooltip' : undefined}>
       <div className="candle-readout-date">
-        <time dateTime={session.date}>{formatDate(session.date)}</time>
-        {isReference && <span>{t(referenceLabel)}</span>}
+        <span className="candle-readout-value">
+          <time dateTime={date}>{dates[index]}</time>
+          <CandleReadoutSpace values={dates} />
+        </span>
+        {hasReference && <span className="candle-readout-reference" aria-hidden={date !== referenceDate}>{t(referenceLabel)}</span>}
       </div>
       <dl>
-        <div><dt>{t("Buka")}</dt><dd>{formatPrice(session.open)}</dd></div>
-        <div><dt>{t("Tertinggi")}</dt><dd>{formatPrice(session.high)}</dd></div>
-        <div><dt>{t("Terendah")}</dt><dd>{formatPrice(session.low)}</dd></div>
-        <div><dt>{t("Tutup")}</dt><dd>{formatPrice(session.close)}</dd></div>
-        <div><dt>{t("Volume")}</dt><dd>{formatVolume(session.volume)}</dd></div>
-        {averages.map(({ kind, label, value }) => <div key={kind}><dt>{label}</dt><dd>{formatPrice(value)}</dd></div>)}
+        {fields.map(({ key, label, values }) => (
+          <div key={key}>
+            <dt>{t(label)}</dt>
+            <dd className="candle-readout-value">
+              <span>{values[index]}</span>
+              <CandleReadoutSpace values={values} />
+            </dd>
+          </div>
+        ))}
       </dl>
     </div>
   );
@@ -86,7 +118,7 @@ function ChartHeader({ id, count, timeframe, selectedRange, ranges, onTimeframeC
 export default function CandlestickChart({
   sessions, referenceDate, buyLevel, sellLevel, averageVolume, formatPrice, formatDate, formatVolume,
   timeframe = '1d', selectedRange = timeframe, onTimeframeChange, ranges, loading, error, onRetry,
-  trendLines = [], movingAverages = [], referenceLabel = 'Sesi acuan', highlightHistoricalReference = false, markReference = false,
+  trendLines = [], movingAverages = noMovingAverages, referenceLabel = 'Sesi acuan', highlightHistoricalReference = false, markReference = false,
 }) {
   const { t } = useTranslation();
   const titleId = useId();
@@ -156,7 +188,6 @@ export default function CandlestickChart({
   const maxVolume = Math.max(...sessions.map(({ volume }) => volume ?? 0), hasAverage ? averageVolume : 0) || 1;
   const volumeY = (volume) => 100 * (1 - volume / (maxVolume * 1.06));
   const inspectedIndex = activeIndex ?? sessions.length - 1;
-  const inspected = sessions[inspectedIndex];
   const referenceIndex = highlightHistoricalReference
     ? sessions.findIndex(({ date }) => date === referenceDate)
     : latest.date === referenceDate ? sessions.length - 1 : -1;
@@ -167,7 +198,7 @@ export default function CandlestickChart({
     if (bounds.width === 0) return;
     const slot = Math.floor((event.clientX - bounds.left) * sessions.length / bounds.width);
     const index = Math.max(0, Math.min(sessions.length - 1, slot));
-    setSelection({ sessions, index });
+    setSelection(current => current?.sessions === sessions && current.index === index ? current : { sessions, index });
   }
 
   function inspectKey(event) {
@@ -332,11 +363,12 @@ export default function CandlestickChart({
       )}
       <CandleReadout
         id={readoutId}
-        session={inspected}
+        sessions={sessions}
+        index={inspectedIndex}
         active={tooltipOpen}
-        isReference={inspected.date === referenceDate}
+        referenceDate={referenceDate}
         referenceLabel={referenceLabel}
-        averages={movingAverages.map(({ kind, label, values }) => ({ kind, label, value: values[inspectedIndex] }))}
+        movingAverages={movingAverages}
         formatPrice={formatPrice}
         formatDate={formatDate}
         formatVolume={formatVolume}
