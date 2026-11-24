@@ -110,13 +110,21 @@ function findPattern(bars, breakoutClose, weeklyClose) {
 // Find a high-volume first daily close above a falling wedge during the last
 // finished week. The weekly close must hold the resistance level at breakout.
 export function findFallingWedge(sessions, week) {
+  return evaluateFallingWedge(sessions, week)?.wedge ?? null;
+}
+
+export function evaluateFallingWedge(sessions, week) {
   if (!week) return null;
-  for (let index = week.endIndex; index >= Math.max(week.startIndex, volumeLookback); index -= 1) {
+  const shortestWindow = patternWindows.at(-1);
+  let checked = false;
+  for (let index = week.endIndex; index >= Math.max(week.startIndex, volumeLookback, shortestWindow); index -= 1) {
     const breakout = sessions[index];
     const baseline = sessions.slice(index - volumeLookback, index);
     if (!validDailyBar(breakout) || !validVolume(breakout.volume) || !baseline.every(bar => validVolume(bar.volume))) continue;
     const averageVolume = baseline.reduce((sum, bar) => sum + bar.volume, 0) / volumeLookback;
-    if (averageVolume <= 0 || breakout.volume <= averageVolume) continue;
+    if (averageVolume <= 0 || !sessions.slice(index - shortestWindow, index).every(validDailyBar)) continue;
+    checked = true;
+    if (breakout.volume <= averageVolume) continue;
 
     for (const duration of patternWindows) {
       if (index < duration) continue;
@@ -126,7 +134,7 @@ export function findFallingWedge(sessions, week) {
       const { resistance, support } = pattern;
       const startGap = resistance.start - support.start;
       const endGap = resistance.end - support.end;
-      return {
+      const wedge = {
         date: breakout.date,
         close: breakout.close,
         volume: breakout.volume,
@@ -139,7 +147,8 @@ export function findFallingWedge(sessions, week) {
         confirmation: { date: week.date, close: week.close },
         candles: sessions.slice(startIndex, week.endIndex + 1).filter(validDailyBar),
       };
+      return { wedge };
     }
   }
-  return null;
+  return checked ? { wedge: null } : null;
 }

@@ -1,5 +1,5 @@
-import { getStore } from '@netlify/blobs';
-import { scanMode, scanRegionError, scanWaitMs } from './shared/scanCore.js';
+import { scanMode, scanRegionError, scanScopeTotal, scanWaitMs } from './shared/scanCore.js';
+import { jobHeaders, scanJobs, scanJobDurationMs } from './shared/scanJobs.js';
 
 const dispatchError = 'Pekerja pemindaian belum bisa dimulai. Coba lagi.';
 
@@ -22,8 +22,11 @@ export default async function breakoutStart(request) {
     const language = params.get('lang') === 'en' ? 'en' : 'id';
 
     const jobId = crypto.randomUUID();
-    const store = getStore('breakout-jobs');
-    const job = { status: 'pending', mode, region, language, createdAt: Date.now() };
+    const store = scanJobs();
+    const createdAt = Date.now();
+    const total = scanScopeTotal(mode, region);
+    const progress = total === null ? undefined : { total, processed: 0, checked: 0, failed: 0 };
+    const job = { status: 'pending', mode, region, language, createdAt, deadlineAt: createdAt + scanJobDurationMs, progress };
     const { etag } = await store.setJSON(jobId, job);
 
     try {
@@ -43,9 +46,10 @@ export default async function breakoutStart(request) {
       return Response.json({ error: dispatchError }, { status: 502 });
     }
 
-    return Response.json({ jobId, status: 'pending', waitMs: scanWaitMs(mode, region) }, {
+    const waitMs = Math.min(scanWaitMs(mode, region), scanJobDurationMs + 30_000);
+    return Response.json({ jobId, status: 'pending', progress, waitMs }, {
       status: 202,
-      headers: { 'Cache-Control': 'no-store' },
+      headers: jobHeaders,
     });
   } catch (error) {
     console.error('Gagal membuat job breakout', error.message);

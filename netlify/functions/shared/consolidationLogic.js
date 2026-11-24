@@ -119,6 +119,10 @@ function countReactions(pivots, bars, movedAway) {
 }
 
 export function findActiveConsolidation(sessions, index, timeframe) {
+  return evaluateConsolidation(sessions, index, timeframe)?.range ?? null;
+}
+
+export function evaluateConsolidation(sessions, index, timeframe) {
   const config = Object.hasOwn(settings, timeframe) ? settings[timeframe] : null;
   const latest = sessions[index];
   if (!config || !validPriceBar(latest)) return null;
@@ -127,6 +131,7 @@ export function findActiveConsolidation(sessions, index, timeframe) {
   // Leave the evaluation candle out of the zone calculation.
   const historyStart = Math.max(0, index - longest + 1 - config.pivotRadius);
   const history = sessions.slice(historyStart, index).filter(validPriceBar);
+  if (history.length + 1 < config.lookbacks[0]) return null;
   const { highs, lows } = swingPoints(history, config.pivotRadius);
   let best = null;
   let bestScore = -Infinity;
@@ -176,5 +181,5 @@ export function findActiveConsolidation(sessions, index, timeframe) {
     }
   }
 
-  return best;
+  return { range: best };
 }

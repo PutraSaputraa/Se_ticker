@@ -1,6 +1,6 @@
-// Universe pemindaian breakout per bursa.
-// Mengikuti konvensi selector 'Bursa' di App.jsx — kunci 'auto' memetakan ke
-// universe default yang paling likuid (Indonesia LQ45).
+import { scannerSymbols } from './scannerSymbols.js';
+
+// The smaller universes also serve analysis, backtests, and older scanners.
 //
 // Tiap entri: { name, currency, symbols[] }.
 // Sufiks Yahoo sudah disertakan pada simbol (mis. '.JK', '.T', '.HK').
@@ -101,6 +101,16 @@ export function getUniverse(region) {
 }
 
 export const universeRegions = Object.keys(universes);
+
+const scannerUniverses = Object.fromEntries(universeRegions.map(region => [region, {
+  ...universes[region],
+  name: region === 'auto' ? 'Indonesia' : universes[region].label,
+  symbols: scannerSymbols[region],
+}]));
+
+export function getScannerUniverse(region) {
+  return scannerUniverses[region] ?? scannerUniverses.auto;
+}
 
 export const cryptoUniverse = {
   name: 'Kripto',

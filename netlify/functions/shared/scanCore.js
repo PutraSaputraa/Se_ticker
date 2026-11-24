@@ -13,10 +13,10 @@ import {
   volumeLookback,
 } from './sessionLogic.js';
 import { analyzeBaseBreakout } from './breakoutLogic.js';
-import { consolidationCloses, consolidationWeeks, cryptoConsolidationWeeks, findActiveConsolidation } from './consolidationLogic.js';
-import { cryptoWedgeWeek, findFallingWedge, latestCompletedWedgeWeek } from './fallingWedgeLogic.js';
+import { consolidationCloses, consolidationWeeks, cryptoConsolidationWeeks, evaluateConsolidation } from './consolidationLogic.js';
+import { cryptoWedgeWeek, evaluateFallingWedge, latestCompletedWedgeWeek } from './fallingWedgeLogic.js';
 import { findMovingAverageCrosses } from './movingAverageCross.js';
-import { cryptoUniverse, getUniverse, universeRegions } from './universe.js';
+import { cryptoUniverse, getScannerUniverse, getUniverse, universeRegions } from './universe.js';
 import { fetchFundamentals } from './fundamentals.js';
 import { fetchGrowthInputs, fillSalesComparisons, growthValues } from './growth.js';
 import { screenerRow } from './screener.js';
@@ -62,8 +62,21 @@ function regionsFor(region) {
   return [region === 'crypto' || universeRegions.includes(region) ? region : 'auto'];
 }
 
-function getScanUniverse(region) {
-  return region === 'crypto' ? cryptoUniverse : getUniverse(region);
+function countsTickers(mode) {
+  return mode === 'scan' || mode === 'falling-wedge' || consolidationScans.has(mode) || crossScans.has(mode);
+}
+
+function getScanUniverse(region, mode) {
+  if (region === 'crypto') return cryptoUniverse;
+  return countsTickers(mode) ? getScannerUniverse(region) : getUniverse(region);
+}
+
+function scopeSize(regions, mode) {
+  return regions.reduce((total, region) => total + getScanUniverse(region, mode).symbols.length, 0);
+}
+
+export function scanScopeTotal(mode, region) {
+  return countsTickers(mode) ? scopeSize(regionsFor(region), mode) : null;
 }
 
 export function scanRegionError(mode, region) {
@@ -73,7 +86,7 @@ export function scanRegionError(mode, region) {
 
 export function scanWaitMs(mode, region) {
   const yahooWaitMs = mode === 'research' ? 0 : regionsFor(region).reduce((total, market) => {
-    const batches = Math.ceil(getScanUniverse(market).symbols.length / fetchConcurrency);
+    const batches = Math.ceil(getScanUniverse(market, mode).symbols.length / fetchConcurrency);
     return total + batches * fetchTimeoutMs;
   }, 0);
   if (mode === 'growth') return yahooWaitMs + regionsFor(region).length * fetchTimeoutMs + 30_000;
@@ -90,13 +103,14 @@ const kenariHeaders = (apiKey) => ({
   'Content-Type': 'application/json',
 });
 
-async function fetchPriceSessions(symbol, range, { interval = '1d', cryptoDay } = {}) {
+async function fetchPriceSessions(symbol, range, { interval = '1d', cryptoDay, signal } = {}) {
   const query = new URLSearchParams({ range, interval });
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`;
 
+  const timeout = AbortSignal.timeout(fetchTimeoutMs);
   const response = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
-    signal: AbortSignal.timeout(fetchTimeoutMs),
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
   });
   if (!response.ok) return null;
 
@@ -163,130 +177,150 @@ function toPick(evaluated, analysis) {
   };
 }
 
-async function scanRegion(region, mode) {
-  const { name, symbols, currency } = getScanUniverse(region);
+async function scanRegion(region, mode, signal, recordTicker) {
+  const { name, symbols, currency } = getScanUniverse(region, mode);
   const cryptoDay = region === 'crypto' ? new Date().toISOString().slice(0, 10) : null;
   const consolidation = consolidationScans.get(mode);
   const crossScan = crossScans.get(mode);
   const priceScan = consolidation ?? crossScan;
   const fallingWedge = mode === 'falling-wedge';
   let cursor = 0;
-  let checked = 0;
   const referenceSessions = new Set();
   const picks = [];
 
+  async function scanTicker(symbol) {
+    if (mode === 'growth') {
+      const historyStart = Math.floor(Date.now() / 1000) - 7 * 366 * 86400;
+      const [statements, inputs] = await Promise.all([fetchFundamentals(symbol, false, historyStart), fetchGrowthInputs(symbol)]);
+      picks.push({ symbol, name: inputs.name ?? null, ...growthValues(statements, inputs) });
+      return true;
+    }
+
+    const evaluated = await fetchPriceSessions(
+      symbol, priceScan?.range ?? (mode === 'screener' || fallingWedge ? '1y' : '9mo'),
+      { interval: priceScan?.interval, cryptoDay, signal },
+    );
+    if (!evaluated) return false;
+
+    let { sessions, index } = evaluated;
+    if (cryptoDay && priceScan?.timeframe !== 'monthly') {
+      sessions = completedCryptoDays(sessions, cryptoDay);
+      index = sessions.length - 1;
+    }
+    if (fallingWedge) {
+      const week = cryptoDay
+        ? cryptoWedgeWeek(sessions, completedCryptoWeekIndex(sessions, cryptoDay))
+        : latestCompletedWedgeWeek(sessions, index, evaluated.marketDay);
+      const evaluation = evaluateFallingWedge(sessions, week);
+      if (!evaluation) return false;
+      if (evaluation.wedge) {
+        picks.push({
+          symbol: evaluated.symbol,
+          name: evaluated.name,
+          currency: evaluated.currency ?? currency,
+          universe: name,
+          ...evaluation.wedge,
+        });
+      }
+      referenceSessions.add(week.date);
+      return true;
+    }
+
+    if (priceScan) {
+      if (priceScan.timeframe === 'weekly') {
+        if (cryptoDay) {
+          const endIndex = completedCryptoWeekIndex(sessions, cryptoDay);
+          sessions = consolidation ? cryptoConsolidationWeeks(sessions, endIndex)
+            : cryptoWeeks(sessions, endIndex).map(week => {
+              // The scanner uses the Sunday close even when the rest of the week is incomplete.
+              if (week.length === 7) return summarizeWeeklyCandle(week);
+              const { date, close } = week.at(-1);
+              return { date, close };
+            });
+        } else {
+          sessions = consolidationWeeks(sessions, index, evaluated.marketDay, { includeOhlcv: Boolean(crossScan) });
+        }
+        index = sessions.length - 1;
+      }
+      const { date, close } = sessions[index] ?? {};
+      if (!Number.isFinite(close)) return false;
+      const instrument = { symbol: evaluated.symbol, name: evaluated.name, currency: evaluated.currency ?? currency, universe: name, date, close };
+      if (crossScan) {
+        const signals = findMovingAverageCrosses(sessions, index, { includeCandles: true });
+        if (signals === null) return false;
+        for (const crossSignal of signals) picks.push({ ...instrument, ...crossSignal });
+      } else {
+        const evaluation = evaluateConsolidation(sessions, index, consolidation.timeframe);
+        if (!evaluation) return false;
+        const { range } = evaluation;
+        if (range) picks.push({ ...instrument, ...range, closes: consolidationCloses(sessions, index, range.duration) });
+      }
+      referenceSessions.add(date);
+      return true;
+    }
+
+    if (mode === 'screener') {
+      const statements = await fetchFundamentals(symbol, true);
+      picks.push({ ...screenerRow(evaluated, statements), region, universe: name });
+      return true;
+    }
+
+    const analysis = analyzeBaseBreakout(sessions, index);
+    if (analysis.qualifies) picks.push({ ...toPick(evaluated, analysis), region, universe: name });
+    return !analysis.reason;
+  }
+
   async function worker() {
     while (cursor < symbols.length) {
+      signal?.throwIfAborted();
       const symbol = symbols[cursor];
       cursor += 1;
+      let checked = false;
       try {
-        if (mode === 'growth') {
-          const historyStart = Math.floor(Date.now() / 1000) - 7 * 366 * 86400;
-          const [statements, inputs] = await Promise.all([fetchFundamentals(symbol, false, historyStart), fetchGrowthInputs(symbol)]);
-          picks.push({ symbol, name: inputs.name ?? null, ...growthValues(statements, inputs) });
-          continue;
-        }
-        const evaluated = await fetchPriceSessions(
-          symbol, priceScan?.range ?? (mode === 'screener' || fallingWedge ? '1y' : '9mo'), { interval: priceScan?.interval, cryptoDay },
-        );
-        if (!evaluated) continue;
-        let { sessions, index } = evaluated;
-        if (cryptoDay && priceScan?.timeframe !== 'monthly') {
-          sessions = completedCryptoDays(sessions, cryptoDay);
-          index = sessions.length - 1;
-        }
-        if (fallingWedge) {
-          const week = cryptoDay
-            ? cryptoWedgeWeek(sessions, completedCryptoWeekIndex(sessions, cryptoDay))
-            : latestCompletedWedgeWeek(sessions, index, evaluated.marketDay);
-          if (!week || week.endIndex < volumeLookback) continue;
-          checked += 1;
-          referenceSessions.add(week.date);
-          const wedge = findFallingWedge(sessions, week);
-          if (wedge) {
-            picks.push({
-              symbol: evaluated.symbol,
-              name: evaluated.name,
-              currency: evaluated.currency ?? currency,
-              universe: name,
-              ...wedge,
-            });
-          }
-          continue;
-        }
-        if (priceScan) {
-          if (priceScan.timeframe === 'weekly') {
-            if (cryptoDay) {
-              const endIndex = completedCryptoWeekIndex(sessions, cryptoDay);
-              sessions = consolidation ? cryptoConsolidationWeeks(sessions, endIndex)
-                : cryptoWeeks(sessions, endIndex).map(week => {
-                  // The scanner uses the Sunday close even when the rest of the week is incomplete.
-                  if (week.length === 7) return summarizeWeeklyCandle(week);
-                  const { date, close } = week.at(-1);
-                  return { date, close };
-                });
-            } else {
-              sessions = consolidationWeeks(sessions, index, evaluated.marketDay, { includeOhlcv: Boolean(crossScan) });
-            }
-            index = sessions.length - 1;
-          }
-          const { date, close } = sessions[index] ?? {};
-          if (!Number.isFinite(close)) continue;
-          const instrument = { symbol: evaluated.symbol, name: evaluated.name, currency: evaluated.currency ?? currency, universe: name, date, close };
-          if (crossScan) {
-            const signals = findMovingAverageCrosses(sessions, index, { includeCandles: true });
-            if (signals === null) continue;
-            for (const signal of signals) picks.push({ ...instrument, ...signal });
-          } else {
-            const range = findActiveConsolidation(sessions, index, consolidation.timeframe);
-            if (range) picks.push({ ...instrument, ...range, closes: consolidationCloses(sessions, index, range.duration) });
-          }
-          checked += 1;
-          referenceSessions.add(date);
-          continue;
-        }
-        if (mode === 'screener') {
-          const statements = await fetchFundamentals(symbol, true);
-          picks.push({ ...screenerRow(evaluated, statements), region, universe: name });
-          continue;
-        }
-        if (evaluated.index < 1) continue;
-        const analysis = analyzeBaseBreakout(evaluated.sessions, evaluated.index);
-        if (analysis.qualifies) {
-          picks.push({ ...toPick(evaluated, analysis), region, universe: name });
-        }
+        checked = await scanTicker(symbol);
       } catch {
-        // Abaikan simbol yang gagal di-fetch.
+        // A ticker fetch or evaluation can fail while the rest of the scan continues.
       }
+      signal?.throwIfAborted();
+      recordTicker(checked);
     }
   }
 
   await Promise.all(Array.from({ length: Math.min(fetchConcurrency, symbols.length) }, worker));
+  signal?.throwIfAborted();
   if (mode === 'growth') await fillSalesComparisons(picks);
-  return { picks, scanned: symbols.length, universeName: name, checked, referenceSessions };
+  return { picks, universeName: name, referenceSessions };
 }
 
-async function scanMath(regions, mode) {
+async function scanMath(regions, mode, { signal, onProgress }) {
+  const total = scopeSize(regions, mode);
+  let processed = 0;
+  let checked = 0;
+  function recordTicker(success) {
+    processed += 1;
+    if (success) checked += 1;
+    onProgress?.({ total, processed, checked, failed: processed - checked });
+  }
+
   const results = [];
   for (const region of regions) {
     // eslint-disable-next-line no-await-in-loop
-    results.push(await scanRegion(region, mode));
+    results.push(await scanRegion(region, mode, signal, recordTicker));
   }
   const rows = results.flatMap(result => result.picks);
-  const scanned = results.reduce((sum, result) => sum + result.scanned, 0);
   const universeName = regions.length === 1 ? results[0].universeName : `${regions.length} bursa`;
+  const counts = { scanned: total, checked, failed: processed - checked };
   if (consolidationScans.has(mode) || crossScans.has(mode) || mode === 'falling-wedge') {
     const sort = consolidationScans.has(mode)
       ? (a, b) => b.insideRatio - a.insideRatio || b.duration - a.duration || a.symbol.localeCompare(b.symbol)
       : (a, b) => b.date.localeCompare(a.date) || (mode === 'falling-wedge' && b.volumeRatio - a.volumeRatio) || a.symbol.localeCompare(b.symbol);
-    const checked = results.reduce((sum, result) => sum + result.checked, 0);
     const referenceSessions = [...new Set(results.flatMap(result => [...result.referenceSessions]))].sort();
-    return { picks: rows.sort(sort), scanned, universeName, checked, referenceSessions };
+    return { picks: rows.sort(sort), ...counts, universeName, referenceSessions };
   }
   const picks = mode === 'screener' || mode === 'growth'
     ? rows.sort((a, b) => a.symbol.localeCompare(b.symbol))
     : rows.sort((a, b) => (b.volumeRatio ?? 0) - (a.volumeRatio ?? 0)).slice(0, maxScanResults);
-  return { picks, scanned, universeName };
+  return { picks, ...counts, universeName };
 }
 
 function fmt(price, currency) {
@@ -369,11 +403,12 @@ async function callKenari(apiKey, payload, signal = AbortSignal.timeout(aiTimeou
   return parsed ? { parsed } : { error: unreadableResponse };
 }
 
-async function summarizeMath(apiKey, picks, referenceDate, language) {
+async function summarizeMath(apiKey, picks, referenceDate, language, scanSignal) {
   if (!apiKey) return { summary: '', notes: [], error: noKeyError, configured: false };
+  const timeout = AbortSignal.timeout(aiTimeoutMs);
   const { parsed, error } = await callKenari(apiKey, {
     messages: [{ role: 'user', content: buildSummaryPrompt(picks, referenceDate, language) }],
-  });
+  }, scanSignal ? AbortSignal.any([scanSignal, timeout]) : timeout);
   const summary = typeof parsed?.summary === 'string' ? parsed.summary.trim() : '';
   const notes = Array.isArray(parsed?.notes)
     ? parsed.notes.filter((note) => typeof note?.symbol === 'string' && typeof note?.note === 'string')
@@ -399,11 +434,12 @@ function buildResearchPrompt(regions, sources, language) {
   ].join('\n');
 }
 
-async function runResearch(apiKey, regions, language) {
+async function runResearch(apiKey, regions, language, scanSignal) {
   const empty = { picks: [], summary: '', configured: Boolean(apiKey) };
   if (!apiKey) return { ...empty, error: noKeyError };
 
-  const signal = AbortSignal.timeout(aiTimeoutMs);
+  const timeout = AbortSignal.timeout(aiTimeoutMs);
+  const signal = scanSignal ? AbortSignal.any([scanSignal, timeout]) : timeout;
   const from = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
   const markets = regions.map((region) => researchKeywords[region]).join(' OR ');
   const { data, error: searchError } = await requestKenari(apiKey, 'web/search', {
@@ -446,7 +482,8 @@ async function runResearch(apiKey, regions, language) {
 }
 
 // Menjalankan scan/riset penuh dan mengembalikan objek hasil (tanpa Response).
-export async function runScan(mode, regionParam, requestedLanguage = 'id') {
+export async function runScan(mode, regionParam, requestedLanguage = 'id', { signal, onProgress } = {}) {
+  signal?.throwIfAborted();
   const invalidRegion = scanRegionError(mode, regionParam);
   if (invalidRegion) throw new Error(invalidRegion);
   const language = requestedLanguage === 'en' ? 'en' : 'id';
@@ -455,7 +492,8 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
 
   if (mode === 'research') {
     const universeName = regions.length === 1 ? getUniverse(regions[0]).name : `${regions.length} bursa`;
-    const research = await runResearch(apiKey, regions, language);
+    const research = await runResearch(apiKey, regions, language, signal);
+    signal?.throwIfAborted();
     return {
       mode,
       language,
@@ -471,11 +509,12 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
     };
   }
 
-  const { picks, scanned, universeName, checked, referenceSessions } = await scanMath(regions, mode);
+  const { picks, scanned, universeName, checked, failed, referenceSessions } = await scanMath(regions, mode, { signal, onProgress });
+  signal?.throwIfAborted();
   if (mode === 'falling-wedge') {
     return {
       mode, language, region: regionParam, universe: universeName, timeframe: 'daily', confirmationTimeframe: 'weekly',
-      scanned, checked, referenceSessions, volumeLookback, results: picks,
+      scanned, checked, failed, referenceSessions, volumeLookback, results: picks,
     };
   }
   const consolidation = consolidationScans.get(mode);
@@ -484,7 +523,7 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
     if (consolidation && !checked) throw new Error('Data harga konsolidasi belum tersedia.');
     return {
       mode, language, region: regionParam, universe: universeName, timeframe: priceScan.timeframe,
-      scanned, checked, referenceSessions, results: picks,
+      scanned, checked, failed, referenceSessions, results: picks,
     };
   }
   if (mode === 'growth') {
@@ -499,7 +538,8 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
 
   let ai = { summary: '', notes: [], configured: Boolean(apiKey) };
   if (picks.length > 0) {
-    ai = { ...ai, ...(await summarizeMath(apiKey, picks, referenceDate, language)) };
+    ai = { ...ai, ...(await summarizeMath(apiKey, picks, referenceDate, language, signal)) };
+    signal?.throwIfAborted();
   }
 
   const noteBySymbol = new Map((ai.notes ?? []).map((note) => [note.symbol.toUpperCase(), note.note]));
@@ -515,6 +555,8 @@ export async function runScan(mode, regionParam, requestedLanguage = 'id') {
     date: referenceDate,
     universe: universeName,
     scanned,
+    checked,
+    failed,
     results,
     ai: {
       summary: ai.summary ?? '',

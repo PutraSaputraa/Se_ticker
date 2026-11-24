@@ -14,10 +14,11 @@ import UpdatedValue from './components/UpdatedValue.jsx';
 import { formatDateCompact, formatPct } from './format.js';
 import { consolidationTimeframes } from './consolidationView.js';
 
-import { requestScanResult } from './scanRequest.js';
+import { requestScanResult, requestScanStop } from './scanRequest.js';
 const { volumeMinRatio, volumeLookback } = defaultBreakoutParams;
 const ratioFormat = localizedNumberFormat({ maximumFractionDigits: 2 });
 const countFormat = localizedNumberFormat();
+const percentFormat = localizedNumberFormat({ style: 'percent' });
 
 const regions = [
   { value: 'auto', label: 'Semua bursa' },
@@ -48,6 +49,14 @@ const modeDescriptions = {
   consolidation: 'Cari aset yang masih bergerak di antara zona support dan resistance.',
   'falling-wedge': 'Cari pola Falling Wedge harian dengan breakout bervolume dan konfirmasi penutupan pekan.',
   'golden-cross': 'Cari Golden Cross dan Death Cross SMA serta EMA 50/200 pada candle yang sudah tutup.',
+};
+
+const scanPhases = {
+  starting: { action: 'Menyiapkan…', status: 'Pemindaian sedang disiapkan.' },
+  pending: { action: 'Dalam antrean…', status: 'Pemindaian dalam antrean.' },
+  running: { action: 'Memindai…', status: 'Pemindaian sedang berjalan.' },
+  finishing: { action: 'Menyiapkan hasil…', status: 'Menyiapkan hasil pemindaian.' },
+  stopping: { action: 'Menghentikan…', status: 'Menghentikan pemindaian.' },
 };
 
 function ScanVolume({ ratio, scale }) {
@@ -255,6 +264,8 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   const [request, setRequest] = useState({ status: 'idle' });
   const [lastResult, setLastResult] = useState(null);
   const activeScan = useRef(null);
+  const submitButton = useRef(null);
+  const stopButton = useRef(null);
   const isConsolidation = mode === 'consolidation';
   const isWedge = mode === 'falling-wedge';
   const isCross = mode === 'golden-cross';
@@ -265,83 +276,115 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
   const timeframe = isCross ? crossTimeframe : consolidationTimeframe;
 
   useEffect(() => () => {
-    activeScan.current?.abort();
+    activeScan.current?.controller.abort();
     activeScan.current = null;
   }, []);
 
-  async function run(
-    targetMode = mode,
-    targetRegion = cryptoModes.has(targetMode) && scanCrypto ? 'crypto' : stockRegion,
-    targetTimeframe = targetMode === 'golden-cross' ? crossTimeframe : consolidationTimeframe,
-  ) {
-    if (loading || activeScan.current) return;
+  async function sendStop(scan) {
+    try {
+      await requestScanStop(scan.jobId);
+    } catch {
+      if (activeScan.current !== scan) return;
+      scan.stopRequested = false;
+      setRequest(current => ({
+        ...current, stopRequested: false, stopError: current.status !== 'stopping',
+      }));
+    }
+  }
+
+  function stop() {
+    const scan = activeScan.current;
+    if (!scan || scan.stopRequested || request.status === 'stopping') return;
+    scan.stopRequested = true;
+    setRequest(current => ({ ...current, stopRequested: true, stopError: false }));
+    if (scan.jobId) void sendStop(scan);
+  }
+
+  async function run() {
+    if (activeScan.current) return;
 
     const controller = new AbortController();
-    const { signal } = controller;
-    activeScan.current = controller;
+    const scan = { controller, jobId: null, stopRequested: false };
+    activeScan.current = scan;
     setRequest({ status: 'starting' });
     try {
-      const scanMode = targetMode === 'consolidation' || targetMode === 'golden-cross'
-        ? `${targetMode}-${targetTimeframe}` : targetMode;
-      const data = await requestScanResult(scanMode, targetRegion, language, controller, (status) => {
-        setRequest(current => current.status === status ? current : { status });
+      const scanMode = usesTimeframe ? `${mode}-${timeframe}` : mode;
+      const job = await requestScanResult(scanMode, region, language, controller, (update) => {
+        if (update.jobId) {
+          scan.jobId = update.jobId;
+          if (scan.stopRequested) void sendStop(scan);
+        }
+        setRequest(current => ({
+          ...current, status: update.status, progress: update.progress ?? current.progress,
+          stopError: update.status === 'stopping' ? false : current.stopError,
+        }));
       });
-      if (targetMode === 'consolidation' && data.mode !== scanMode) {
+      if (activeScan.current !== scan) return;
+      if (job.status !== 'done') {
+        setRequest(current => ({
+          status: job.status, message: job.error, progress: job.progress ?? current.progress,
+        }));
+        return;
+      }
+
+      const data = job.result;
+      if (isConsolidation && data.mode !== scanMode) {
         throw new Error('Pemindaian konsolidasi gagal. Coba lagi nanti.');
       }
-      if (targetMode === 'consolidation' && (data.timeframe !== targetTimeframe || !Array.isArray(data.results)
-        || (data.region != null && data.region !== targetRegion))) {
+      if (isConsolidation && (data.timeframe !== timeframe || !Array.isArray(data.results)
+        || (data.region != null && data.region !== region))) {
         throw new Error('Hasil pemindaian konsolidasi belum lengkap. Coba lagi.');
       }
-      if (targetMode === 'falling-wedge' && (data.mode !== scanMode || data.timeframe !== 'daily'
+      if (isWedge && (data.mode !== scanMode || data.timeframe !== 'daily'
         || data.confirmationTimeframe !== 'weekly' || !Array.isArray(data.results)
-        || (data.region != null && data.region !== targetRegion))) {
+        || (data.region != null && data.region !== region))) {
         throw new Error('Hasil pemindaian Falling Wedge belum lengkap. Coba lagi.');
       }
-      if (targetMode === 'golden-cross' && (data.mode !== scanMode || data.timeframe !== targetTimeframe
-        || data.region !== targetRegion || !Array.isArray(data.results)
+      if (isCross && (data.mode !== scanMode || data.timeframe !== timeframe
+        || data.region !== region || !Array.isArray(data.results)
         || !Number.isSafeInteger(data.checked) || !Number.isSafeInteger(data.scanned))) {
         throw new Error('Hasil pemindaian Golden Cross belum lengkap. Coba lagi.');
       }
       setLastResult({
-        mode: targetMode, region: targetRegion, timeframe: targetTimeframe,
+        mode, region, timeframe,
         data: { ...data, language: data.language ?? language },
       });
-      setRequest({ status: 'success' });
+      setRequest({ status: 'success', progress: job.progress });
     } catch (error) {
-      if (activeScan.current === controller) {
-        const message = signal.reason?.name === 'TimeoutError' ? signal.reason.message : error.message;
-        setRequest({ status: 'error', message });
+      if (activeScan.current === scan) {
+        setRequest(current => ({ status: 'error', message: error.message, progress: current.progress }));
       }
     } finally {
-      if (activeScan.current === controller) activeScan.current = null;
+      if (activeScan.current === scan) {
+        activeScan.current = null;
+        if (document.activeElement === stopButton.current) submitButton.current?.focus();
+      }
     }
   }
 
   function changeMode(next) {
-    if (loading || activeScan.current || next === mode) return;
+    if (activeScan.current || next === mode) return;
     setMode(next);
-    if (request.status === 'success' || request.status === 'error') run(next);
+    setRequest({ status: 'idle' });
   }
 
   function changeRegion(next) {
-    if (loading || activeScan.current || next === region) return;
+    if (activeScan.current || next === region) return;
     if (supportsCrypto) setScanCrypto(next === 'crypto');
     if (next !== 'crypto') setStockRegion(next);
-    if (request.status === 'success' || request.status === 'error') run(mode, next);
+    setRequest({ status: 'idle' });
   }
 
   function changeTimeframe(next) {
-    if (loading || activeScan.current || next === timeframe) return;
+    if (activeScan.current || next === timeframe) return;
     if (isCross) setCrossTimeframe(next);
     else setConsolidationTimeframe(next);
-    if (request.status === 'success' || request.status === 'error') run(mode, region, next);
+    setRequest({ status: 'idle' });
   }
 
   const watched = useMemo(() => new Map(watchlist.map((entry) => [entry.symbol, entry])), [watchlist]);
   const finished = request.status === 'success';
-  const matchingRegion = lastResult?.region === region;
-  const scopeMatches = usesTimeframe ? matchingRegion && lastResult?.timeframe === timeframe : !isWedge || matchingRegion;
+  const scopeMatches = lastResult?.region === region && (!usesTimeframe || lastResult?.timeframe === timeframe);
   const result = lastResult?.mode === mode && scopeMatches ? lastResult.data : null;
   const results = Array.isArray(result?.results) ? result.results : [];
   const ai = result?.ai;
@@ -353,15 +396,18 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
         : t('{0}{1} kandidat ditampilkan', scanScope ? `${scanScope} · ` : '', results.length);
   const resultTitle = finished ? 'Hasil scan matematis' : 'Hasil scan sebelumnya';
   const scanLabel = 'Pemindaian';
-  const phase = {
-    starting: { action: 'Menyiapkan…', status: `${scanLabel} sedang disiapkan.` },
-    pending: { action: 'Dalam antrean…', status: `${scanLabel} dalam antrean.` },
-    running: { action: 'Memindai…', status: `${scanLabel} sedang berjalan.` },
-  }[request.status];
+  const progress = request.progress;
+  const stopping = request.stopRequested || request.status === 'stopping';
+  const stopped = request.status === 'cancelled';
+  const finishing = request.status === 'running' && progress && progress.processed === progress.total;
+  const phase = scanPhases[stopping ? 'stopping' : finishing ? 'finishing' : request.status];
   const loading = Boolean(phase);
-  const actions = { idle: 'Jalankan scan', success: 'Pindai ulang' };
-  const action = phase?.action ?? (request.status === 'error' ? 'Coba lagi' : actions[request.status]);
-  const statusLabel = finished ? `${scanLabel} selesai. ${resultSummary}.` : phase?.status;
+  const actions = { success: 'Pindai ulang', error: 'Coba lagi' };
+  const action = phase?.action ?? actions[request.status] ?? 'Jalankan scan';
+  const statusLabel = finished ? t('{0} selesai. {1}.', t(scanLabel), resultSummary)
+    : t(phase?.status ?? (stopped ? 'Pemindaian dihentikan.' : ''));
+  const progressText = progress && t(region === 'crypto' ? '{0} dari {1} aset diproses' : '{0} dari {1} saham diproses',
+    countFormat.format(progress.processed), countFormat.format(progress.total));
 
   return (
     <>
@@ -410,9 +456,8 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
               </select>
             </label>
           )}
-          <button type="submit" className="scan-button" aria-disabled={loading}>
+          <button ref={submitButton} type="submit" className="scan-button" aria-disabled={loading}>
             {t(action)}
-            {loading && <ResearchProgress />}
           </button>
           {isWedge && <p className="research-form-help">
             {t('Analisis 1D · Konfirmasi 1W')}{' · '}
@@ -422,9 +467,42 @@ export default function BreakoutScanner({ watchlist, onAdd, disabled, formatPric
             {t(cryptoCloseLabels[isWedge ? 'weekly' : timeframe])}
           </p>}
         </form>
-        {(usesTimeframe || isWedge) && loading ? (
-          <p className="consolidation-scan-phase" role="status">{t(phase.status)} {t('Cakupan tersedia setelah pemindaian selesai.')}</p>
-        ) : <p className="visually-hidden" role="status">{t(statusLabel)}</p>}
+        {loading && (
+          <div className="scanner-progress-panel">
+            <div className="scanner-progress-content">
+              <div className="scanner-progress-heading">
+                <span role="status">{statusLabel}</span>
+                {progress && <span>{percentFormat.format(Math.floor(100 * progress.processed / progress.total) / 100)}</span>}
+              </div>
+              {progress ? (
+                <>
+                  <progress className="scanner-progress-bar" aria-label={t('Progres pemindaian')}
+                    aria-valuetext={progressText} value={progress.processed} max={progress.total} />
+                  <p className="research-form-help">{progressText}</p>
+                </>
+              ) : <ResearchProgress />}
+            </div>
+            <button ref={stopButton} type="button" className="scanner-stop-button" aria-disabled={stopping} onClick={stop}>
+              {t('Berhenti')}
+            </button>
+          </div>
+        )}
+        {request.stopError && <p className="scanner-stop-error" role="alert">{t('Gagal menghentikan pemindaian. Coba lagi.')}</p>}
+
+        {!loading && (
+          <div role="status">
+            <p className={stopped ? 'scanner-outcome-status' : 'visually-hidden'}>{statusLabel}</p>
+            {progress && (
+              <div className="scanner-outcome">
+                {progress.processed < progress.total && <p className="research-form-help">{progressText}</p>}
+                <dl className="scanner-outcome-counts">
+                  <div><dt>{t('Berhasil diperiksa')}</dt><dd>{countFormat.format(progress.checked)}</dd></div>
+                  <div><dt>{t('Gagal diperiksa')}</dt><dd>{countFormat.format(progress.failed)}</dd></div>
+                </dl>
+              </div>
+            )}
+          </div>
+        )}
 
         {request.status === 'error' && (
           <ResearchRequestStatus title={t("{0} gagal", t(scanLabel))} message={t(request.message)} />

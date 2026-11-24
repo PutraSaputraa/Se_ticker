@@ -5,6 +5,7 @@ import { setEnvironmentContext } from '@netlify/blobs';
 import breakoutStart from '../netlify/functions/breakout-start.js';
 import breakoutScan from '../netlify/functions/breakout-scan.js';
 import breakoutStatus from '../netlify/functions/breakout-status.js';
+import breakoutStop from '../netlify/functions/breakout-stop.js';
 import breakoutWorker from '../netlify/functions/breakout-scan-background.js';
 import { runScan } from '../netlify/functions/shared/scanCore.js';
 import { cryptoUniverse } from '../netlify/functions/shared/universe.js';
@@ -47,6 +48,114 @@ function startResearch() {
 function readJob(jobId) {
   return breakoutStatus(new Request(`${functionsUrl}breakout-status?jobId=${jobId}`));
 }
+
+function stopJob(jobId) {
+  return breakoutStop(new Request(`${functionsUrl}breakout-stop?jobId=${jobId}`, { method: 'POST' }));
+}
+
+function flatHistory(symbol, count = 45) {
+  return Response.json({ chart: { result: [{
+    meta: { symbol, exchangeTimezoneName: 'UTC' },
+    timestamp: Array.from({ length: count }, (_, index) => Date.UTC(2026, 0, index + 1, 12) / 1000),
+    indicators: { quote: [{
+      open: Array(count).fill(100), high: Array(count).fill(101),
+      low: Array(count).fill(99), close: Array(count).fill(100), volume: Array(count).fill(1000),
+    }] },
+  }] } });
+}
+
+test('all-exchanges jobs process 1,000 unique stocks and count checked stocks without signals', async (t) => {
+  let workerBody;
+  const symbols = [];
+  mockJobStore(t, (url, init) => {
+    if (url.pathname.endsWith('/breakout-scan-background')) {
+      workerBody = init.body;
+      return new Response(null, { status: 202 });
+    }
+    const symbol = decodeURIComponent(url.pathname.split('/').at(-1));
+    symbols.push(symbol);
+    if (symbol === 'BBCA.JK' || symbol === 'AAPL') return flatHistory(symbol);
+    if (symbol === 'BBRI.JK') return flatHistory(symbol, 2);
+    return new Response(null, { status: 404 });
+  });
+
+  const start = await breakoutStart(new Request(`${functionsUrl}breakout-start?mode=scan&region=auto`, { method: 'POST' }));
+  const { jobId, progress, waitMs } = await start.json();
+  assert.ok(waitMs < 15 * 60_000);
+  assert.deepEqual(progress, { total: 1000, processed: 0, checked: 0, failed: 0 });
+  assert.deepEqual(await (await readJob(jobId)).json(), { status: 'pending', progress });
+
+  await breakoutWorker(new Request(`${functionsUrl}breakout-scan-background`, { method: 'POST', body: workerBody }));
+  const finished = await (await readJob(jobId)).json();
+  assert.equal(finished.status, 'done');
+  assert.deepEqual(finished.progress, { total: 1000, processed: 1000, checked: 2, failed: 998 });
+  assert.deepEqual([finished.result.scanned, finished.result.checked, finished.result.failed], [1000, 2, 998]);
+  assert.deepEqual(finished.result.results, []);
+  assert.equal(symbols.length, 1000);
+  assert.equal(new Set(symbols).size, 1000);
+  assert.ok(cryptoUniverse.symbols.every(symbol => !symbols.includes(symbol)));
+  assert.equal((await (await stopJob(jobId)).json()).status, 'done');
+});
+
+test('a stopped queued job never starts downloading prices', async (t) => {
+  let workerBody;
+  let priceRequests = 0;
+  mockJobStore(t, (url, init) => {
+    if (url.pathname.endsWith('/breakout-scan-background')) {
+      workerBody = init.body;
+      return new Response(null, { status: 202 });
+    }
+    priceRequests += 1;
+    return new Response(null, { status: 404 });
+  });
+
+  const start = await breakoutStart(new Request(`${functionsUrl}breakout-start?mode=scan&region=us`, { method: 'POST' }));
+  const { jobId, progress } = await start.json();
+  assert.deepEqual(await (await stopJob(jobId)).json(), { status: 'cancelled', progress });
+  await breakoutWorker(new Request(`${functionsUrl}breakout-scan-background`, { method: 'POST', body: workerBody }));
+  assert.deepEqual(await (await readJob(jobId)).json(), { status: 'cancelled', progress });
+  assert.equal(priceRequests, 0);
+});
+
+test('stopping a running scan aborts active requests and preserves actual progress', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const inFlight = Promise.withResolvers();
+  let workerBody;
+  let priceRequests = 0;
+  let abortedRequests = 0;
+  mockJobStore(t, (url, init) => {
+    if (url.pathname.endsWith('/breakout-scan-background')) {
+      workerBody = init.body;
+      return new Response(null, { status: 202 });
+    }
+    priceRequests += 1;
+    if (priceRequests === 1) return flatHistory('AAPL');
+    if (priceRequests === 2) return new Response(null, { status: 404 });
+    if (priceRequests === 6) inFlight.resolve();
+    return new Promise((_, reject) => {
+      init.signal.addEventListener('abort', () => {
+        abortedRequests += 1;
+        reject(init.signal.reason);
+      }, { once: true });
+    });
+  });
+
+  const start = await breakoutStart(new Request(`${functionsUrl}breakout-start?mode=scan&region=us`, { method: 'POST' }));
+  const { jobId, progress: initialProgress } = await start.json();
+  const worker = breakoutWorker(new Request(`${functionsUrl}breakout-scan-background`, { method: 'POST', body: workerBody }));
+  await inFlight.promise;
+  t.mock.timers.tick(2000);
+  await setImmediate();
+
+  const progress = { total: initialProgress.total, processed: 2, checked: 1, failed: 1 };
+  assert.deepEqual(await (await readJob(jobId)).json(), { status: 'running', progress });
+  assert.deepEqual(await (await stopJob(jobId)).json(), { status: 'stopping', progress });
+  t.mock.timers.tick(2000);
+  await worker;
+  assert.deepEqual(await (await readJob(jobId)).json(), { status: 'cancelled', progress });
+  assert.equal(abortedRequests, 4);
+  assert.equal(priceRequests, 6);
+});
 
 test('riset menunggu konfirmasi worker dan menampilkan hasil terbaru untuk semua bursa', async (t) => {
   const dispatched = Promise.withResolvers();
@@ -198,9 +307,10 @@ test('job konsolidasi bulanan menilai bulan terakhir yang selesai di bursa', asy
   assert.equal(status, 'done');
   assert.equal(result.timeframe, 'monthly');
   assert.equal(result.language, 'en');
-  assert.equal(result.checked, 2);
+  assert.equal(result.checked, 1);
   assert.equal(result.scanned, priceRequests.length);
-  assert.deepEqual(result.referenceSessions, ['2026-05', '2026-06']);
+  assert.equal(result.failed, result.scanned - 1);
+  assert.deepEqual(result.referenceSessions, ['2026-06']);
   assert.equal(result.ai, undefined);
   assert.ok(priceRequests.every(url => url.hostname === 'query1.finance.yahoo.com'
     && url.searchParams.get('interval') === '1mo' && url.searchParams.get('range') === '5y'));
@@ -235,9 +345,9 @@ test('job falling wedge preserves the third method and reports missing market da
   const { status, result } = await (await readJob(jobId)).json();
   assert.equal(status, 'done');
   assert.deepEqual(result, {
-    mode: 'falling-wedge', language: 'en', region: 'sz', universe: 'Shenzhen Top 10',
+    mode: 'falling-wedge', language: 'en', region: 'sz', universe: 'China (Shenzhen)',
     timeframe: 'daily', confirmationTimeframe: 'weekly', volumeLookback: 50,
-    scanned: quoteRequests, checked: 0, referenceSessions: [], results: [],
+    scanned: quoteRequests, checked: 0, failed: quoteRequests, referenceSessions: [], results: [],
   });
   assert.ok(quoteRequests > 0);
 });

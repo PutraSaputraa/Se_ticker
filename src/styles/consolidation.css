@@ -15,14 +15,12 @@
 .consolidation-section-heading > div { min-width: 0; }
 .consolidation-summary-heading h2 { font-size: var(--section-title-size); }
 .consolidation-section-heading p { margin-block-start: 0.2rem; }
-.consolidation-muted,
-.consolidation-scan-phase {
+.consolidation-muted {
   color: var(--muted);
   font-size: 0.875rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
-.consolidation-scan-phase { margin-top: 0.75rem; }
 .consolidation-stale {
   padding: 0.55rem 0.75rem;
   border: 1px solid var(--support-border);
