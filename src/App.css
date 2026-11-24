@@ -529,7 +529,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 }
 
 .theme-toggle, .support-trigger { width: var(--touch-size); padding: 0; }
-.support-trigger { flex: none; }
+.support-trigger { --focus: var(--nav-focus); flex: none; }
 .theme-toggle { transition-duration: var(--motion-theme); }
 .theme-toggle svg { width: 1.18rem; height: 1.18rem; }
 .theme-toggle-icon :is(.theme-toggle-sun, .theme-toggle-moon) {
@@ -541,13 +541,13 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .theme-toggle-moon { opacity: 1; transform: none; }
 :root[data-theme="dark"] .theme-toggle-sun { opacity: 1; transform: none; }
 :root[data-theme="dark"] .theme-toggle-moon { opacity: 0; transform: rotate(26deg) scale(0.74); }
-:is(.theme-toggle, .support-trigger):hover, .account-menu summary:hover {
+.theme-toggle:hover, .account-menu summary:hover {
   border-color: var(--field-border);
   background: var(--surface-hover);
 }
 
 /* Tombol pada pita hitam memakai permukaan navigasi dan cincin fokus emas. */
-:is(.workspace-bar, .auth-brand-row) :is(.theme-toggle, .support-trigger, .account-menu summary) {
+:is(.workspace-bar, .auth-brand-row) :is(.theme-toggle, .account-menu summary) {
   --focus: var(--nav-focus);
   background: color-mix(in srgb, var(--nav-current) 62%, transparent);
   border-color: var(--nav-edge);
@@ -555,13 +555,13 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
 }
 
-.workspace-bar :is(.theme-toggle, .support-trigger, .account-menu summary) { color: var(--nav-muted); }
+.workspace-bar .theme-toggle { color: var(--nav-muted); }
 .workspace-bar .account-menu summary {
   color: var(--nav-text);
   font-weight: 600;
 }
 
-:is(.workspace-bar, .auth-brand-row) :is(.theme-toggle:hover, .support-trigger:hover, .account-menu summary:hover) {
+:is(.workspace-bar, .auth-brand-row) :is(.theme-toggle:hover, .account-menu summary:hover) {
   background: var(--nav-hover);
   border-color: color-mix(in srgb, var(--nav-accent) 30%, var(--nav-edge));
   color: var(--nav-text);
@@ -705,7 +705,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 :is(.account-signout, .watch-toggle):active:not(:disabled) { background: var(--workspace-action-soft); }
 .watch-toggle--active { background: var(--workspace-action-soft); border-color: var(--action-text); }
 
-:is(.scan-button, .check-button, .navbar-search-trigger, .stock-identity .watch-toggle:not(.watch-toggle--active)) {
+:is(.scan-button, .check-button, .navbar-search-trigger, .support-trigger, .stock-identity .watch-toggle:not(.watch-toggle--active)) {
   --action-drop-shadow: 0 1px var(--action-shadow-blur) var(--action-shadow-color);
   border-color: color-mix(in srgb, var(--workspace-action-active) 58%, var(--workspace-on-action));
   /* Shift between thirds of the gradient to animate the button colors. */
@@ -721,14 +721,18 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 }
 
 @media (hover: hover) {
-  :is(.scan-button, .check-button, .navbar-search-trigger, .stock-identity .watch-toggle:not(.watch-toggle--active)):hover:not(:disabled, [aria-disabled="true"]) {
+  :is(.scan-button, .check-button, .navbar-search-trigger, .support-trigger, .stock-identity .watch-toggle:not(.watch-toggle--active)):hover:not(:disabled, [aria-disabled="true"]) {
     --action-drop-shadow: 0 2px 6px var(--action-shadow-color);
     background-position: top;
     transform: translateY(var(--motion-action-lift));
   }
 }
 
-:is(.scan-button, .check-button, .navbar-search-trigger, .stock-identity .watch-toggle:not(.watch-toggle--active)):is(:active, .navbar-search-trigger[aria-expanded="true"]):not(:disabled, [aria-disabled="true"]) {
+:is(.scan-button, .check-button, .navbar-search-trigger, .support-trigger, .stock-identity .watch-toggle:not(.watch-toggle--active)):is(
+  :active,
+  .navbar-search-trigger[aria-expanded="true"],
+  :where(.support-control[data-open] > .support-trigger)
+):not(:disabled, [aria-disabled="true"]) {
   --action-drop-shadow: 0 1px 1px var(--action-shadow-color);
   background-position: bottom;
   transform: translateY(0);

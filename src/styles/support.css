@@ -4,21 +4,6 @@
   flex: none;
 }
 
-.workspace-bar .support-control .support-trigger {
-  color: var(--nav-accent);
-  border-color: color-mix(in srgb, var(--nav-accent) 55%, var(--nav-current));
-  background: color-mix(in srgb, var(--nav-accent) 8%, var(--nav-surface));
-  transition-duration: var(--motion-page);
-}
-
-.workspace-bar .support-control:is(:hover, :focus-within, [data-open]) .support-trigger {
-  color: var(--nav-accent);
-  border-color: color-mix(in srgb, var(--nav-accent) 82%, var(--nav-current));
-  background: color-mix(in srgb, var(--nav-accent) 15%, var(--nav-surface));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--nav-accent) 20%, transparent),
-    0 2px 8px color-mix(in srgb, var(--nav-accent) 14%, transparent);
-}
-
 .support-coffee { pointer-events: none; }
 .support-cup { transition: transform var(--motion-page) var(--motion-ease); }
 .support-steam { opacity: 0.72; transition: opacity var(--motion-page) var(--motion-ease); }
