@@ -10,6 +10,7 @@ import ThemeToggle from './components/ThemeToggle.jsx';
 import LanguageSwitcher from './components/LanguageSwitcher.jsx';
 import NavbarSearch from './components/NavbarSearch.jsx';
 import SupportButton from './components/SupportButton.jsx';
+import UsernameDialog from './components/UsernameDialog.jsx';
 import WorkspaceIcon from './components/WorkspaceIcon.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import StockDetailPage from './pages/StockDetailPage.jsx';
@@ -104,10 +105,12 @@ function TopBar({ user, account }) {
   const { t } = useTranslation();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
+  const [editingUsername, setEditingUsername] = useState(false);
   const accountMenu = useRef(null);
   const header = useRef(null);
   const { pathname, search, key } = useLocation();
   const initialTicker = pathname === '/' ? new URLSearchParams(search).get('ticker') : null;
+  const username = user.displayName?.trim() || 'User1';
 
   useLayoutEffect(() => {
     if (accountMenu.current.open) accountMenu.current.open = false;
@@ -148,6 +151,13 @@ function TopBar({ user, account }) {
     }
   }
 
+  function editUsername() {
+    const menu = accountMenu.current;
+    menu.open = false;
+    menu.querySelector('summary').focus({ preventScroll: true });
+    setEditingUsername(true);
+  }
+
   return (
     <>
       <header className="workspace-bar" ref={header}>
@@ -172,13 +182,20 @@ function TopBar({ user, account }) {
                   event.currentTarget.querySelector('summary').focus();
                 }
               }}>
-              <summary aria-label={t("Akun")}>
+              <summary aria-label={username} title={username}>
                 <WorkspaceIcon name="account" size={17} />
-                <span>{t("Akun")}</span>
+                <span className="account-name" dir="auto">{username}</span>
                 <span className="account-chevron"><WorkspaceIcon name="chevron" size={14} /></span>
               </summary>
               <div className="account-popover" inert>
-                <span className="account-email">{user.email}</span>
+                <div className="account-profile">
+                  <strong dir="auto">{username}</strong>
+                  <span className="account-email">{user.email}</span>
+                </div>
+                <button type="button" className="text-button account-edit-username" aria-haspopup="dialog"
+                  disabled={signingOut} onClick={editUsername}>
+                  <WorkspaceIcon name="edit" size={16} /> {t('Ubah username')}
+                </button>
                 <button type="button" className="account-signout" disabled={signingOut} onClick={handleSignOut}>
                   {signingOut ? t("Keluar…") : t("Keluar")}
                 </button>
@@ -187,6 +204,7 @@ function TopBar({ user, account }) {
           </div>
         </div>
       </header>
+      {editingUsername && <UsernameDialog user={user} username={username} onClose={() => setEditingUsername(false)} />}
       {signOutError && (
         <div className="account-message account-message--error" role="alert">
           <p>{t(signOutError)}</p>
