@@ -3,6 +3,13 @@ export const journalStopLossPercentages = [5, 6, 7, 8];
 
 const levelPattern = new RegExp(`^\\d*(?:[.,]\\d{1,${levelPrecision}})?$`);
 
+export function parseJournalPrice(input) {
+  const text = input.trim();
+  if (!levelPattern.test(text)) return null;
+  const price = Number(text.replace(',', '.'));
+  return Number.isFinite(price) && price > 0 ? price : null;
+}
+
 function parseLevelUnits(input) {
   const text = input.trim();
   if (!levelPattern.test(text)) return null;

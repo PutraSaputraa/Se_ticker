@@ -315,7 +315,7 @@
   min-width: 0;
 }
 
-.journal-form :is(input, select, textarea),
+.journal-form :is(input:where(:not([type="radio"])), select, textarea),
 .journal-chart-controls select {
   width: 100%;
   min-width: 0;
@@ -429,6 +429,52 @@
 .journal-position-value-dialog .journal-form { display: grid; gap: 0.75rem; }
 .journal-position-value-dialog .scan-button { min-height: 2.75rem; }
 .journal-position-value-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+
+.journal-close-options,
+.journal-manual-exit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.5rem;
+}
+
+.journal-close-options {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.journal-close-options legend {
+  margin-bottom: 0.35rem;
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.journal-close-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--touch-size);
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--field-radius);
+  background: var(--field);
+}
+
+.journal-close-options label:has(input:enabled) { cursor: pointer; }
+.journal-close-options label:has(input:checked) {
+  border-color: var(--action-text);
+  background: var(--workspace-action-soft);
+}
+
+.journal-close-options input {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--support);
+}
 
 .journal-screenshot-dialog[open] {
   display: flex;
@@ -902,6 +948,13 @@
   color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.4;
+}
+
+.journal-note-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .journal-position-notes { white-space: pre-wrap; }

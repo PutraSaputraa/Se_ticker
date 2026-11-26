@@ -113,6 +113,7 @@ export function normalizeTrade(entry) {
       quoteCurrency,
       exitPrice: num(entry.exitPrice),
       exitDate: typeof entry.exitDate === 'string' ? entry.exitDate : null,
+      ...(entry.exitSource === 'manual' && { exitSource: 'manual' }),
       ...(positionUsd > 0 && { positionUsd }),
       ...(leverage > 1 && { leverage }),
       ...(Number.isSafeInteger(entry.walletPnlCents) && { walletPnlCents: entry.walletPnlCents }),
@@ -152,19 +153,38 @@ export function quoteDateForTrade(trade, quote) {
   return quote.date;
 }
 
-export function holdingPeriodDays(trade, now = new Date()) {
-  const endDate = trade.status === 'open'
-    ? quoteDateForTrade(trade, {
-      date: now.toLocaleDateString('sv-SE'),
-      timestamp: Math.floor(now.getTime() / 1000),
-    })
-    : trade.exitDate;
-  // Compare calendar dates at UTC midnight so DST and hours do not change the day count.
-  const [start, end] = [trade.date, endDate].map((date) => {
-    const timestamp = typeof date === 'string' ? Date.parse(`${date}T00:00:00Z`) : NaN;
-    return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === date
-      ? timestamp : null;
+function currentTradeDate(trade, now) {
+  return quoteDateForTrade(trade, {
+    date: now.toLocaleDateString('sv-SE'),
+    timestamp: Math.floor(now.getTime() / 1000),
   });
+}
+
+function tradeDateTimestamp(date) {
+  const timestamp = typeof date === 'string' ? Date.parse(`${date}T00:00:00Z`) : NaN;
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === date ? timestamp : null;
+}
+
+export function lastManualExitDate(trade, now = new Date()) {
+  const today = currentTradeDate(trade, now);
+  // A spot entry can already be on the next calendar day in the exchange's time zone.
+  return trade.date > today ? trade.date : today;
+}
+
+export function manualTradeExitError(trade, exit, at) {
+  if (!Number.isFinite(exit.price) || exit.price <= 0) return 'Harga keluar harus lebih dari nol.';
+  if (tradeDateTimestamp(exit.date) == null || exit.date < trade.date) {
+    return 'Isi tanggal keluar yang valid pada atau setelah tanggal masuk.';
+  }
+  if (exit.date > lastManualExitDate(trade, new Date(at))) return 'Tanggal keluar belum tiba.';
+  return '';
+}
+
+export function holdingPeriodDays(trade, now = new Date()) {
+  const endDate = trade.status === 'open' ? currentTradeDate(trade, now) : trade.exitDate;
+  // Compare calendar dates at UTC midnight so DST and hours do not change the day count.
+  const start = tradeDateTimestamp(trade.date);
+  const end = tradeDateTimestamp(endDate);
   if (start == null || end == null || end < start) return null;
   return (end - start) / 86_400_000;
 }
@@ -185,14 +205,16 @@ export function calculateTradePnl(trade, price) {
   return { pnl, pnlPct: (pnl / trade.entryPrice) * 100 * positionLeverage(trade) };
 }
 
-export function closeTrade(journal, id, quote) {
+export function closeTrade(journal, id, exit) {
   return journal.map((trade) => {
     if (trade.id !== id || trade.status !== 'open') return trade;
-    const result = calculateTradePnl(trade, quote.price);
+    const result = calculateTradePnl(trade, exit.price);
+    const manual = exit.source === 'manual';
     return {
       ...trade,
-      exitPrice: quote.price,
-      exitDate: quoteDateForTrade(trade, quote),
+      exitPrice: exit.price,
+      exitDate: manual ? exit.date : quoteDateForTrade(trade, exit),
+      ...(manual && { exitSource: 'manual' }),
       ...result,
       status: result.pnl > 0 ? 'win' : result.pnl < 0 ? 'loss' : 'be',
     };
@@ -213,9 +235,7 @@ export function realizedTradePnl(trade, manualCurrency) {
 
 export function realizedTradeDate(trade) {
   const date = trade.exitDate ?? (trade.quoteCurrency ? null : trade.date);
-  if (!date) return null;
-  const timestamp = Date.parse(`${date}T00:00:00Z`);
-  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === date ? date : null;
+  return tradeDateTimestamp(date) == null ? null : date;
 }
 
 function addPnl(totals, amount) {

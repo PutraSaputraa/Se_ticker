@@ -22,6 +22,7 @@ import {
   journalSides,
   journalStatuses,
   journalTypes,
+  lastManualExitDate,
   normalizeTrade,
   parseJournalLeverage,
   positionPnlUsd,
@@ -31,7 +32,7 @@ import {
   tradeQuoteError,
 } from '../journal.js';
 import { formatDate, formatPct, formatPnl, formatPrice, priceDecimals } from '../format.js';
-import { calculateLevels, levelPrecision, validateLevels } from '../journalLevels.js';
+import { calculateLevels, levelPrecision, parseJournalPrice, validateLevels } from '../journalLevels.js';
 import { journalSetupMarkets } from '../journalSetups.js';
 import { deleteJournalScreenshot, uploadJournalScreenshot } from '../journalScreenshot.js';
 import { estimateTradeRisk, summarizeOpenPositions } from '../journalValuation.js';
@@ -280,40 +281,94 @@ function PositionValueDialog({ trade, disabled, saving, feedback, onSave, onClos
   );
 }
 
-function TradeActionDialog({ action, busy, disabled, feedback, onConfirm, onClose }) {
+function TradeActionDialog({ action, busy, disabled, feedback, onClearFeedback, onConfirm, onClose }) {
   const { t } = useTranslation();
   const dialog = useRef(null);
   const titleId = useId();
   const hintId = useId();
+  const [closeMethod, setCloseMethod] = useState('market');
+  const [priceInput, setPriceInput] = useState('');
+  const [priceInvalid, setPriceInvalid] = useState(false);
+  const [exitDate, setExitDate] = useState(null);
   const closePosition = action.kind === 'close';
+  const manualClose = closePosition && closeMethod === 'manual';
+  const maxExitDate = manualClose ? lastManualExitDate(action.trade) : undefined;
+  const actionLabel = closePosition ? "Tutup posisi" : "Hapus posisi";
+  const busyLabel = closePosition ? (manualClose ? "Menyimpan…" : "Mengambil harga…") : "Menghapus…";
 
   useEffect(() => {
     if (!dialog.current.open) dialog.current.showModal();
   }, []);
 
+  function changeCloseMethod(event) {
+    setCloseMethod(event.target.value);
+    onClearFeedback();
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
-    if (disabled || !await onConfirm()) return;
+    if (disabled) return;
+
+    let exit;
+    if (manualClose) {
+      const price = parseJournalPrice(priceInput);
+      if (price === null) {
+        setPriceInvalid(true);
+        return;
+      }
+      exit = { source: 'manual', price, date: exitDate ?? maxExitDate };
+    }
+    if (!await onConfirm(exit)) return;
     dialog.current?.close();
     document.getElementById('journal-' + action.section + '-title')?.focus({ preventScroll: true });
   }
 
   return (
     <dialog ref={dialog} className="journal-position-value-dialog" aria-labelledby={titleId}
-      aria-describedby={hintId} onClose={onClose} onCancel={(event) => { if (busy) event.preventDefault(); }}>
+      aria-describedby={manualClose ? undefined : hintId} onClose={onClose} onCancel={(event) => { if (busy) event.preventDefault(); }}>
       <form className="journal-form" onSubmit={handleSubmit} aria-busy={busy}>
         <h2 id={titleId}>{t(closePosition ? "Tutup posisi {0}?" : "Hapus posisi {0}?", action.trade.pair)}</h2>
-        <p className="journal-help" id={hintId}>{closePosition
-          ? t("Jurnal akan mengambil kuotasi terakhir Yahoo Finance untuk mencatat harga keluar dan PnL.")
-          : action.returnsFunds
-            ? t("Catatan posisi akan dihapus dan dana yang dialokasikan akan kembali ke wallet.")
-            : t("Catatan posisi akan dihapus secara permanen dari jurnal.")}</p>
+        {closePosition ? (
+          <>
+            <fieldset className="journal-close-options" disabled={disabled}>
+              <legend>{t("Cara tutup posisi")}</legend>
+              <label>
+                <input type="radio" name="closeMethod" value="market" checked={!manualClose} onChange={changeCloseMethod} />
+                {t("Harga pasar")}
+              </label>
+              <label>
+                <input type="radio" name="closeMethod" value="manual" checked={manualClose} onChange={changeCloseMethod} />
+                {t("Input manual")}
+              </label>
+            </fieldset>
+            {manualClose ? (
+              <>
+                <div className="journal-manual-exit">
+                  <PriceField label={t("Harga keluar ({0})", action.trade.quoteCurrency)} value={priceInput}
+                    onChange={(value) => { setPriceInput(value); setPriceInvalid(false); }}
+                    describedBy={hintId} disabled={disabled}
+                    error={priceInvalid && t("Gunakan angka positif hingga {0} desimal untuk harga yang diisi manual.", levelPrecision)} />
+                  <label>
+                    {t("Tanggal keluar")}
+                    <input type="date" value={exitDate ?? maxExitDate} min={action.trade.date} max={maxExitDate}
+                      onChange={(event) => setExitDate(event.target.value)} disabled={disabled} required />
+                  </label>
+                </div>
+                <p className="journal-help" id={hintId}>{t("Tulis desimal dengan titik atau koma tanpa pemisah ribuan.")}</p>
+              </>
+            ) : <p className="journal-help" id={hintId}>{t("Harga dan tanggal keluar mengikuti kuotasi terbaru Yahoo Finance.")}</p>}
+          </>
+        ) : (
+          <p className="journal-help" id={hintId}>{t(action.returnsFunds
+            ? "Catatan posisi akan dihapus dan dana yang dialokasikan akan kembali ke wallet."
+            : "Catatan posisi akan dihapus secara permanen dari jurnal.")}</p>
+        )}
         <JournalFeedback feedback={feedback} section={action.section} />
         <div className="journal-position-value-actions">
-          <button type="button" className="journal-secondary-button" autoFocus disabled={busy}
+          <button type="button" className="journal-secondary-button" autoFocus={!closePosition} disabled={busy}
             onClick={() => dialog.current.close()}>{t("Batal")}</button>
           <button type="submit" className={closePosition ? 'scan-button' : 'journal-secondary-button journal-danger-button'} disabled={disabled}>
-            {t(busy ? (closePosition ? "Mengambil harga…" : "Menghapus…") : (closePosition ? "Tutup posisi" : "Hapus posisi"))}
+            {t(busy ? busyLabel : actionLabel)}
           </button>
         </div>
       </form>
@@ -321,11 +376,11 @@ function TradeActionDialog({ action, busy, disabled, feedback, onConfirm, onClos
   );
 }
 
-function PositionDetailRow({ trade, value, currency, id, expanded, onViewScreenshot }) {
+function PositionDetailRow({ trade, value, currency, id, columnCount, expanded, onViewScreenshot }) {
   const { t } = useTranslation();
   return (
     <tr id={id} className="journal-detail-row" aria-hidden={!expanded}>
-      <td colSpan={13}>
+      <td colSpan={columnCount}>
         <div className="journal-detail-reveal" data-expanded={expanded} inert={!expanded}>
           <div className="journal-detail-clip">
             <div className="journal-position-details">
@@ -359,6 +414,7 @@ function TradeTable({
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(null);
   const [visited, setVisited] = useState(() => new Set());
+  const columnCount = closed ? 17 : 13;
   if (trades.length === 0) {
     return (
       <p className="journal-empty" role="status">
@@ -413,6 +469,7 @@ function TradeTable({
             const entryPrecision = trade.stopLoss != null ? levelPrecision : undefined;
             const holdingDays = holdingPeriodDays(trade);
             const detailsId = 'journal-position-' + trade.id;
+            const hasDetails = !closed || Boolean(trade.notes);
             const showDetails = expanded === trade.id;
             const quoteValue = runningValues?.get(trade.id);
             const actions = (
@@ -449,7 +506,7 @@ function TradeTable({
               <tr className="journal-trade-row">
                 <th scope="row" className="journal-ticker">
                   {trade.pair}
-                  {!closed && <button type="button" className="journal-position-disclosure" aria-expanded={showDetails}
+                  {hasDetails && <button type="button" className="journal-position-disclosure" aria-expanded={showDetails}
                     aria-controls={detailsId} aria-label={t("Rincian posisi {0}", trade.pair)}
                     onClick={() => {
                       setExpanded(showDetails ? null : trade.id);
@@ -492,7 +549,7 @@ function TradeTable({
                     </small>
                   )}
                   {trade.riskPct != null && <small className="journal-trade-note">{t("Risiko")} {trade.riskPct}%</small>}
-                  {trade.notes && <small className="journal-trade-note journal-position-notes">{trade.notes}</small>}
+                  {trade.notes && <small className="journal-trade-note journal-note-preview">{trade.notes}</small>}
                   {trade.chartScreenshot && (
                     <button type="button" className="text-button journal-screenshot-button"
                       aria-label={t("Lihat screenshot chart {0}", trade.pair)} onClick={() => onViewScreenshot(trade)}>{t("Lihat screenshot")}</button>
@@ -512,7 +569,7 @@ function TradeTable({
                 {closed && (
                   <>
                     <td>{trade.exitDate ? <time dateTime={trade.exitDate}>{compactTradeDate(trade.exitDate)}</time> : '–'}</td>
-                    <td className="num">{formatJournalPrice(trade.exitPrice, currency)}</td>
+                    <td className="num">{formatJournalPrice(trade.exitPrice, currency, trade.exitSource === 'manual' ? levelPrecision : undefined)}</td>
                     <td className={`num ${pnlTone(trade.pnl)}`}>
                       {formatPnl(trade.pnl, currency)}
                       {trade.pnl != null && <small className="journal-trade-note">{trade.quoteCurrency ? t("Per saham") : t("Manual")}</small>}
@@ -526,10 +583,10 @@ function TradeTable({
             return (
               <Fragment key={trade.id}>
                 {row}
-                {!closed && (visited.has(trade.id)
+                {hasDetails && (visited.has(trade.id)
                   ? <PositionDetailRow trade={trade} value={quoteValue} currency={currency} id={detailsId}
-                      expanded={showDetails} onViewScreenshot={onViewScreenshot} />
-                  : <tr id={detailsId} hidden><td colSpan={13} /></tr>)}
+                      columnCount={columnCount} expanded={showDetails} onViewScreenshot={onViewScreenshot} />
+                  : <tr id={detailsId} hidden><td colSpan={columnCount} /></tr>)}
               </Fragment>
             );
           })}
@@ -716,11 +773,11 @@ export default function JournalPage({ account, uid }) {
     });
   }
 
-  function handleClose(trade) {
+  function handleClose(trade, manualExit) {
     return runAction(trade.id, 'open', async () => {
-      const quote = await fetchJournalQuote(trade.pair);
+      const exit = manualExit ?? await fetchJournalQuote(trade.pair);
       const at = Date.now();
-      const saved = await account.update((current) => closeWalletPosition(current, trade.id, quote, at));
+      const saved = await account.update((current) => closeWalletPosition(current, trade.id, exit, at));
       if (!saved) throw new Error('Posisi gagal ditutup. Coba lagi.');
       return `Posisi ${trade.pair} ditutup.`;
     });
@@ -1018,7 +1075,8 @@ export default function JournalPage({ account, uid }) {
       </section>
       {tradeAction && (
         <TradeActionDialog action={tradeAction} busy={activeAction != null} disabled={disabled} feedback={feedback}
-          onConfirm={() => tradeAction.kind === 'close' ? handleClose(tradeAction.trade) : handleRemove(tradeAction.trade, tradeAction.section)}
+          onClearFeedback={() => setFeedback(null)}
+          onConfirm={(exit) => tradeAction.kind === 'close' ? handleClose(tradeAction.trade, exit) : handleRemove(tradeAction.trade, tradeAction.section)}
           onClose={() => setTradeAction(null)} />
       )}
       {viewingScreenshot && (

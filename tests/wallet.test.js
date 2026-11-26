@@ -116,6 +116,39 @@ test('posisi futures memakai tanggal kuotasi di zona saat dicatat dan menyimpan 
   assert.equal(closed.journal[0].notes, 'Cek volume\nPantau sesi berikutnya');
 });
 
+test('penutupan manual menyimpan tanggal dan harga yang diisi serta mengembalikan margin dan PnL', () => {
+  const funded = deposit(normalizeAccountData(), 50_000);
+  const opened = openWalletPosition(funded, {
+    ...trade,
+    side: 'short',
+    type: 'futures',
+    leverage: 2,
+    quoteCurrency: 'IDR',
+    entryTimeZone: 'Asia/Jakarta',
+    entryTimestamp: Date.parse('2026-02-02T10:00:00Z') / 1000,
+  }, at);
+  const exit = { source: 'manual', date: trade.date, price: 90.125 };
+
+  for (const [changes, message] of [
+    [{ price: 0 }, /Harga keluar harus lebih dari nol/],
+    [{ date: '2026-02-01' }, /pada atau setelah tanggal masuk/],
+    [{ date: '2026-02-30' }, /tanggal keluar yang valid/],
+    [{ date: '2026-02-05' }, /Tanggal keluar belum tiba/],
+  ]) {
+    assert.throws(() => closeWalletPosition(opened, trade.id, { ...exit, ...changes }, at), message);
+  }
+
+  const closed = normalizeAccountData(closeWalletPosition(opened, trade.id, exit, at));
+  const [position] = closed.journal;
+  assert.equal(position.exitPrice, exit.price);
+  assert.equal(position.exitDate, exit.date);
+  assert.equal(position.exitSource, 'manual');
+  assert.equal(position.status, 'win');
+  assert.deepEqual(realizedTradePnl(position, 'IDR'), { currency: 'USD', amount: 39.5 });
+  assert.deepEqual(balances(closed), [53_950, 0, 53_950]);
+  assert.equal(closeWalletPosition(closed, trade.id, exit, at), closed);
+});
+
 test('input leverage mendukung desimal dan membatasi nilai posisi pada rentang yang dapat dicatat', () => {
   assert.equal(parseJournalLeverage('10×', 10_000), 10);
   assert.equal(parseJournalLeverage('2,5', 10_000), 2.5);

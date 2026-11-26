@@ -1,5 +1,5 @@
 import { AccountChangeError } from './accountData.js';
-import { addTrade, closeTrade, positionPnlUsd, removeTrade, tradeQuoteError } from './journal.js';
+import { addTrade, closeTrade, manualTradeExitError, positionPnlUsd, removeTrade, tradeQuoteError } from './journal.js';
 
 export const walletMovementLabels = {
   deposit: 'Tambah saldo',
@@ -101,13 +101,13 @@ export function recordInitialPositionValue(account, id, amount) {
   return { ...account, journal };
 }
 
-export function closeWalletPosition(account, id, quote, at) {
+export function closeWalletPosition(account, id, exit, at) {
   const trade = account.journal.find((item) => item.id === id && item.status === 'open');
   if (!trade) return account;
-  const error = tradeQuoteError(trade, quote);
+  const error = exit.source === 'manual' ? manualTradeExitError(trade, exit, at) : tradeQuoteError(trade, exit);
   if (error) throw new AccountChangeError(error);
 
-  let journal = closeTrade(account.journal, id, quote);
+  let journal = closeTrade(account.journal, id, exit);
   const state = summarizeWallet(account.wallet);
   const principal = state.positions.get(id);
   if (principal == null) return { ...account, journal };
